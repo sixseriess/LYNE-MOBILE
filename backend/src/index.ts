@@ -80,6 +80,7 @@ function publicTrack(row: TrackRow) {
     id: row.id, title: row.title, artist: row.artist, artistId: row.artistId,
     album: row.album || undefined, albumId: row.albumId || undefined,
     durationMs: row.durationMs, explicit: !!row.explicit, genre: row.genre || undefined,
+    audioMime: row.audioMime, audioSize: row.audioSize,
     artwork: mediaUrl(row.artworkKey), audioUrl: mediaUrl(row.audioKey),
   };
 }
@@ -286,7 +287,11 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if(path==="/v1/me/playlists" && request.method==="GET"){
     const userId=await requireUser(request,env);
     const playlists=await env.DB.prepare("SELECT id,name,description,cover_key AS coverKey,updated_at AS updatedAt FROM playlists WHERE user_id=? ORDER BY updated_at DESC").bind(userId).all();
-    return json({playlists:playlists.results.map((p:any)=>({...p,cover:mediaUrl(p.coverKey)}))});
+    const hydrated=await Promise.all(playlists.results.map(async (p:any)=>{
+      const items=await env.DB.prepare("SELECT track_id AS id FROM playlist_tracks WHERE playlist_id=? ORDER BY position ASC,added_at ASC").bind(p.id).all<{id:string}>();
+      return {...p,cover:mediaUrl(p.coverKey),trackIds:items.results.map(item=>item.id),updatedAt:Date.parse(p.updatedAt)||Date.now()};
+    }));
+    return json({playlists:hydrated});
   }
 
   if(path==="/v1/me/playlists" && request.method==="POST"){
@@ -294,6 +299,38 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const name=body.name?.trim()||""; if(!name||name.length>80)return fail("Playlist name must be 1–80 characters.");
     const playlistId=id(); await env.DB.prepare("INSERT INTO playlists (id,user_id,name,description) VALUES (?,?,?,?)").bind(playlistId,userId,name,body.description?.slice(0,500)||null).run();
     return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:[],updatedAt:Date.now()},201);
+  }
+
+  const playlistMatch=path.match(/^\\/v1\\/me\\/playlists\\/([a-f0-9-]+)$/i);
+  if(playlistMatch && request.method==="PUT"){
+    const userId=await requireUser(request,env); const playlistId=playlistMatch[1];
+    const body=await request.json() as {name?:string;description?:string;trackIds?:string[]};
+    const name=body.name?.trim()||"";
+    if(!name||name.length>80)return fail("Playlist name must be 1–80 characters.");
+    if(body.trackIds!==undefined && (!Array.isArray(body.trackIds)||body.trackIds.length>500))return fail("Playlist can contain up to 500 tracks.");
+    const owned=await env.DB.prepare("SELECT id FROM playlists WHERE id=? AND user_id=?").bind(playlistId,userId).first();
+    if(!owned)return fail("Playlist not found.",404);
+    const trackIds=[...new Set((body.trackIds||[]).filter((value):value is string=>typeof value==="string" && value.length<=80))];
+    const validIds:string[]=[];
+    if(trackIds.length){
+      const placeholders=trackIds.map(()=>"?").join(",");
+      const valid=await env.DB.prepare("SELECT id FROM tracks WHERE published=1 AND id IN ("+placeholders+")").bind(...trackIds).all<{id:string}>();
+      const validSet=new Set(valid.results.map(item=>item.id));
+      trackIds.forEach(value=>{if(validSet.has(value))validIds.push(value);});
+    }
+    const batch=[
+      env.DB.prepare("UPDATE playlists SET name=?,description=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(name,(body.description||"").slice(0,500)||null,playlistId,userId),
+      env.DB.prepare("DELETE FROM playlist_tracks WHERE playlist_id=?").bind(playlistId),
+      ...validIds.map((trackId,index)=>env.DB.prepare("INSERT INTO playlist_tracks (playlist_id,track_id,position) VALUES (?,?,?)").bind(playlistId,trackId,index))
+    ];
+    await env.DB.batch(batch);
+    return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:validIds,updatedAt:Date.now()});
+  }
+  if(playlistMatch && request.method==="DELETE"){
+    const userId=await requireUser(request,env);
+    const result=await env.DB.prepare("DELETE FROM playlists WHERE id=? AND user_id=?").bind(playlistMatch[1],userId).run();
+    if(!result.meta.changes)return fail("Playlist not found.",404);
+    return new Response(null,{status:204});
   }
 
   if(path==="/v1/me/listening" && request.method==="POST"){
