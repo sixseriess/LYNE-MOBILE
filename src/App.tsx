@@ -53,9 +53,21 @@ async function removeAudioFile(id:string):Promise<void>{
     tx.onerror=()=>reject(tx.error||new Error("Could not remove this audio file."));
   }).finally(()=>db.close());
 }
-const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500 } };
+const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500, audioQuality: "auto" as "auto"|"lossless" } };
 const providerName = (provider: string) => ({spotify:"Spotify",soundcloud:"SoundCloud",youtube:"YouTube",apple_music:"Apple Music"} as Record<string,string>)[provider] || provider;
 const artwork = (track: Track) => track.artwork || "";
+function getAudioSourceQuality(track:Track):{label:string;lossless:boolean;format:string}{
+  const mime=(track.audioMime||"").toLowerCase().split(";")[0].trim();
+  const url=(track.audioUrl||"").toLowerCase();
+  if(mime==="audio/flac"||mime==="audio/x-flac"||/\.flac(?:$|[?#])/.test(url))return {label:"FLAC · Lossless",lossless:true,format:"FLAC"};
+  if(mime==="audio/wav"||mime==="audio/x-wav"||mime==="audio/wave"||/\.wav(?:$|[?#])/.test(url))return {label:"WAV · Lossless PCM",lossless:true,format:"WAV"};
+  if(mime==="audio/alac"||/\.alac(?:$|[?#])/.test(url))return {label:"ALAC · Lossless",lossless:true,format:"ALAC"};
+  if(mime==="audio/mpeg"||/\.mp3(?:$|[?#])/.test(url))return {label:"MP3 · Lossy",lossless:false,format:"MP3"};
+  if(mime==="audio/aac"||/\.aac(?:$|[?#])/.test(url))return {label:"AAC · Lossy",lossless:false,format:"AAC"};
+  if(mime==="audio/opus"||/\.opus(?:$|[?#])/.test(url))return {label:"Opus · Lossy",lossless:false,format:"Opus"};
+  if(mime==="audio/mp4"||/\.(m4a|mp4)(?:$|[?#])/.test(url))return {label:"M4A · Codec not verified",lossless:false,format:"M4A"};
+  return {label:"Source quality not reported",lossless:false,format:"Unknown"};
+}
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 async function resizePlaylistImage(file: File): Promise<string> { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext("2d"); if (!context) { bitmap.close(); throw new Error("Could not process that image."); } context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg", 0.82); }
