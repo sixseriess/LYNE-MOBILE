@@ -258,8 +258,27 @@ export default function App() {
   const movePlaylistTrack=(playlist:Playlist,index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=playlist.trackIds.length)return;const trackIds=[...playlist.trackIds];[trackIds[index],trackIds[target]]=[trackIds[target],trackIds[index]];setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds,updatedAt:Date.now()}:p)}));};
   const removePlaylistTrack=(playlist:Playlist,trackId:string)=>setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds:p.trackIds.filter(id=>id!==trackId),updatedAt:Date.now()}:p)}));
   const deletePlaylist=(playlist:Playlist)=>{if(!window.confirm("Delete the playlist \""+playlist.name+"\"?"))return;setState(s=>({...s,playlists:s.playlists.filter(p=>p.id!==playlist.id)}));setModal(null);setSelectedPlaylistId(null);setNotice("Playlist deleted.");};
-  const submitAccount=async()=>{setAccountMessage("Connecting to LYNE...");try{const result=accountMode==="login"?await lyneApi.login(accountName,accountPassword):await lyneApi.register(accountName,accountEmail,accountPassword);localStorage.setItem("lyne.accessToken",result.accessToken);setUser(result.user);void lyneApi.getImports().then(data=>setState(s=>({...s,importedLikes:data.likes||[],importedCollections:data.collections||[]}))).catch(()=>{});setAccountMessage("You're signed in.");setModal(null);}catch(e){setAccountMessage(e instanceof Error?e.message:"Couldn't sign in.");}};
-  const logout=()=>{localStorage.removeItem("lyne.accessToken");setUser(null);setNotice("Signed out.");};
+  const submitAccount=async()=>{
+    if(!accountName.trim()||!accountPassword){setAccountMessage("Enter your username/email and password.");return;}
+    if(accountMode==="register"&&(!accountEmail.trim()||accountPassword.length<10)){setAccountMessage("Enter a valid email and a password with at least 10 characters.");return;}
+    setAccountBusy(true);setAccountMessage("Connecting to LYNE...");
+    try{
+      const result=accountMode==="login"
+        ?await lyneApi.login(accountName.trim(),accountPassword)
+        :await lyneApi.register(accountName.trim(),accountEmail.trim(),accountPassword);
+      localStorage.setItem("lyne.accessToken",result.accessToken);
+      setUser(result.user);setGuestMode(false);
+      try{
+        const [profile,remote,imports]=await Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports()]);
+        setUser({id:profile.id,username:profile.username});
+        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:[...remote.playlists,...old.playlists.filter(item=>!remote.playlists.some(remoteItem=>remoteItem.id===item.id))],importedLikes:imports.likes||[],importedCollections:imports.collections||[]}));
+      }catch{setNotice("Signed in. Some account library data could not be loaded yet.");}
+      setAccountMessage("You're signed in.");setModal(null);setNotice("Signed in to LYNE.");
+    }catch(e){localStorage.removeItem("lyne.accessToken");setAccountMessage(e instanceof Error?e.message:"Couldn't connect to LYNE.");}
+    finally{setAccountBusy(false);}
+  };
+  const logout=()=>{localStorage.removeItem("lyne.accessToken");setUser(null);setGuestMode(false);setNotice("Signed out.");};
+
   const refreshStorage=async()=>{try{const estimate=await navigator.storage?.estimate();setStorageUsed(estimate?.usage??0);}catch{setStorageUsed(null);}};
   const clearCache=async()=>{try{const names=await caches.keys();await Promise.all(names.map(name=>caches.delete(name)));await refreshStorage();setNotice("Cached app files cleared. Your library and account data were kept.");}catch{setNotice("This browser does not allow cache management here.");}};
   const periodStart=()=>{const d=new Date();if(period==="day")return dayKey(d);if(period==="week"){d.setDate(d.getDate()-6);}if(period==="month"){d.setDate(1);}if(period==="year"){d.setMonth(0,1);}return dayKey(d);};
@@ -273,6 +292,28 @@ export default function App() {
   const dateLabel=new Intl.DateTimeFormat("en",{weekday:"long",month:"long",day:"numeric"}).format(new Date());
   const [homeFilter,setHomeFilter]=useState<"all"|"mixes"|"charts"|"recent">("all");
   const renderRows=(items:Track[])=>items.length?<div className="track-list">{items.map(t=><Row key={t.id} track={t} active={current?.id===t.id} liked={state.likes.includes(t.id)} onPlay={()=>play(t,items)} onLike={()=>toggleLike(t)} onMore={()=>{setActiveTrack(t);setModal("track");}}/>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
+  if(!user&&!guestMode)return <main className="auth-shell">
+    <div className="auth-glow"/>
+    <header className="auth-brand"><span>LYNE</span><i/></header>
+    <section className="auth-panel">
+      <p className="eyebrow">YOUR MUSIC. YOUR SPACE.</p>
+      <h1>{accountMode==="login"?"Welcome back":"Create your LYNE account"}</h1>
+      <p className="auth-subtitle">{accountMode==="login"?"Sign in to sync your library, playlists and listening history.":"Create an account and keep your LYNE collection in sync."}</p>
+      <div className="auth-mode"><button className={accountMode==="login"?"active":""} onClick={()=>{setAccountMode("login");setAccountMessage("");}}>Sign in</button><button className={accountMode==="register"?"active":""} onClick={()=>{setAccountMode("register");setAccountMessage("");}}>Create account</button></div>
+      <form onSubmit={event=>{event.preventDefault();void submitAccount();}}>
+        <label className="auth-field"><span>Username or email</span><input value={accountName} onChange={event=>setAccountName(event.target.value)} autoComplete="username" placeholder="Your username or email" required/></label>
+        {accountMode==="register"&&<label className="auth-field"><span>Email address</span><input value={accountEmail} onChange={event=>setAccountEmail(event.target.value)} type="email" autoComplete="email" placeholder="you@example.com" required/></label>}
+        <label className="auth-field"><span>Password</span><input value={accountPassword} onChange={event=>setAccountPassword(event.target.value)} type="password" autoComplete={accountMode==="login"?"current-password":"new-password"} placeholder={accountMode==="login"?"Your password":"At least 10 characters"} required minLength={accountMode==="register"?10:1}/></label>
+        <button className="auth-submit" type="submit" disabled={accountBusy}>{accountBusy?<LoaderCircle className="spin" size={16}/>:null}{accountBusy?"Connecting...":accountMode==="login"?"Sign in to LYNE":"Create account"}</button>
+      </form>
+      {accountMessage&&<p className="auth-message" role="status">{accountMessage}</p>}
+      <div className="auth-divider"><span>OR</span></div>
+      <button className="auth-guest" onClick={()=>setGuestMode(true)}>Continue as guest</button>
+      <p className="auth-footnote">Guest mode keeps local music and preferences on this device. Sign in any time to sync account features.</p>
+    </section>
+    <p className="auth-version">LYNE MOBILE · BUILT AROUND YOUR MUSIC</p>
+  </main>;
+
   return <main className="app-shell">
     <audio ref={audioRef} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>setDuration(e.currentTarget.duration*1000)} />
     <header className="topbar"><div className="brand"><span>LYNE</span></div><div className="top-actions"><span className={`api-dot ${apiStatus}`} title={apiStatus==="online"?"LYNE API connected":"LYNE API not connected"}/><button className="avatar" onClick={()=>setTab("Profile")} aria-label="Open profile">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</button></div></header>
