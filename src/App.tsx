@@ -107,7 +107,7 @@ export default function App() {
   const [query,setQuery]=useState("");
   const [filter,setFilter]=useState<SearchKind>("all");
   const [results,setResults]=useState<Track[]>([]);
-  const [artistResults,setArtistResults]=useState<{id:string;name:string;bio?:string}[]>([]);
+  const [artistResults,setArtistResults]=useState<{id:string;name:string;bio?:string;artwork?:string}[]>([]);
   const [albumResults,setAlbumResults]=useState<{id:string;title:string;artist:string;artistId:string;artwork?:string}[]>([]);
   const [artistDetail,setArtistDetail]=useState<{artist:{id:string;name:string;bio?:string;artwork?:string};tracks:Track[];albums:{id:string;title:string;releaseDate?:string;artwork?:string}[]}|null>(null);
   const [albumDetail,setAlbumDetail]=useState<{album:{id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string};tracks:Track[]}|null>(null);
