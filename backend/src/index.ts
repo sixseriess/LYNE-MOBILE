@@ -116,7 +116,7 @@ async function requireAdmin(request: Request, env: Env) {
 async function media(request: Request, env: Env, key: string) {
   if (!/^(audio|artwork|avatars|playlists)\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes("..")) return fail("Media not found.",404);
   const object = await env.MEDIA.get(key, { range: request.headers });
-  if (!object) return fail("Media not found.",404);
+  if (!object || !("body" in object) || !object.body) return fail("Media not found.",404);
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
