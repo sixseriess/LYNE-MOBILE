@@ -27,10 +27,18 @@ Copy the D1 database ID from the first command into `wrangler.toml` where it say
 npx wrangler d1 migrations apply lyne-catalog --remote
 npx wrangler secret put ADMIN_API_TOKEN
 npx wrangler secret put AUTH_SECRET
+npx wrangler secret put SPOTIFY_CLIENT_ID
+npx wrangler secret put SPOTIFY_CLIENT_SECRET
+npx wrangler secret put SOUNDCLOUD_CLIENT_ID
+npx wrangler secret put SOUNDCLOUD_CLIENT_SECRET
+npx wrangler secret put YOUTUBE_API_KEY
+npx wrangler secret put APPLE_MUSIC_DEVELOPER_TOKEN
 npx wrangler deploy
 ```
 
 Generate long random secrets, for example with `openssl rand -base64 48`. Do not commit secret values. Set `CORS_ORIGIN` in `wrangler.toml` to your exact mobile app origin after Pages is enabled (for example `https://sixseriess.github.io`). Wildcard is only the starter default.
+
+The four provider integrations use official metadata APIs. Add each provider's credentials as Worker secrets (leave a provider unconfigured until its developer app is approved). Spotify and SoundCloud public resources use app tokens; YouTube uses a Data API key; Apple Music uses a signed developer token. Private or user-library resources need the relevant user authorization flow, which is not included in this initial public-link resolver.
 
 Then set `VITE_API_URL` in the LYNE-MOBILE GitHub repository's Actions variables to the deployed Worker URL and rebuild the mobile site.
 
@@ -57,6 +65,10 @@ Public:
 - `GET /v1/search?q=...&type=all|tracks|artists|albums|playlists`
 - `GET|HEAD /v1/media/:key` (supports HTTP byte ranges)
 
+Imports:
+- `GET /v1/import/resolve?url=...` — resolve supported Spotify, SoundCloud, YouTube and Apple Music song, album or playlist links via the official provider API.
+- `GET|POST /v1/me/imports` — list/save imported songs in Liked Songs and imported playlists/albums in the Library.
+
 Account:
 - `POST /v1/auth/register`
 - `POST /v1/auth/login`
@@ -67,4 +79,6 @@ Account:
 Admin:
 - `POST /v1/admin/tracks`
 
-This is the initial backend foundation. It does not contain a commercial music catalogue, third-party API credentials, or copied media. The catalogue will remain empty until LYNE adds recordings it owns, recordings it has licensed, or public-domain recordings.
+Imported provider content stays linked to its source. Metadata and permitted artwork URLs are stored with the source URL; audio is not downloaded, copied to R2, or re-streamed by LYNE. Spotify content must retain links and attribution, and Spotify content may not be downloaded or stream-ripped. YouTube imports use Data API metadata and official YouTube embeds; Apple Music items use catalogue links/MusicKit-compatible playback; SoundCloud items retain their official permalink/widget stream reference. See each provider's developer terms before enabling playback or caching.
+
+The first-party LYNE catalogue and provider-link imports are separate. LYNE's own hosted catalogue remains empty until LYNE adds recordings it owns, recordings it has licensed, or public-domain recordings.
