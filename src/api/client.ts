@@ -10,6 +10,8 @@ export type ExternalTrack = { providerId:string; title:string; artist:string; ex
 export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; tracks:ExternalTrack[] };
 export type SavedImport = ResolvedImport & { createdAt?:string };
 
+export class ApiError extends Error { constructor(message: string, public status = 0) { super(message); this.name = "ApiError"; } }
+
 function normalizeApiUrl(raw:string):string{
   const value=raw.trim();
   if(!value)return "";
@@ -46,7 +48,6 @@ function hydrateMedia<T>(value: T): T {
   }
   return value;
 }
-export class ApiError extends Error { constructor(message: string, public status = 0) { super(message); this.name = "ApiError"; } }
 
 /** First-party LYNE API client. No third-party music API or legacy API fallback is used. */
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
