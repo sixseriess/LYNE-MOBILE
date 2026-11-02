@@ -6,7 +6,7 @@ import {
   Download, SlidersHorizontal, Share2, Check, Radio, Music, Sparkles, ArrowLeft, LoaderCircle,
   Link2, ExternalLink, ChevronUp, ChevronDown, Trash2, Pencil, ListPlus
 } from "lucide-react";
-import { lyneApi, type Track, type Playlist, type SearchKind, type ResolvedImport, type SavedImport } from "./api/client";
+import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type Playlist, type SearchKind, type ResolvedImport, type SavedImport } from "./api/client";
 
 type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
 type Period = "day" | "week" | "month" | "year";
@@ -114,6 +114,8 @@ export default function App() {
   const [detailBusy,setDetailBusy]=useState(false);
   const [apiStatus,setApiStatus]=useState<"checking"|"online"|"offline">("checking");
   const [apiMessage,setApiMessage]=useState("");
+  const [apiUrlInput,setApiUrlInput]=useState(getApiUrl());
+  const [apiTesting,setApiTesting]=useState(false);
   const [homeTracks,setHomeTracks]=useState<Track[]>([]);
   const [loadingSearch,setLoadingSearch]=useState(false);
   const [modal,setModal]=useState<"playlist"|"playlistDetail"|"track"|"artistDetail"|"albumDetail"|"account"|"settings"|"queue"|"lyrics"|"import"|"collection"|null>(null);
@@ -182,7 +184,7 @@ export default function App() {
     }).catch(()=>{if(!cancelled)setNotice("Saved device audio could not be restored in this browser.");});
     return ()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};
   },[]);
-  useEffect(()=>{ let live=true; lyneApi.health().then(()=>{if(live){setApiStatus("online");setApiMessage("");}}).catch(e=>{if(live){setApiStatus("offline");setApiMessage(e.message);}}); return ()=>{live=false;}; },[]);
+  useEffect(()=>{ let live=true; if(!isApiConfigured()){setApiStatus("offline");setApiMessage("API URL not configured. Deploy the LYNE Worker, then paste its URL in Settings → About.");return ()=>{live=false;};} lyneApi.health().then(()=>{if(live){setApiStatus("online");setApiMessage("");}}).catch(e=>{if(live){setApiStatus("offline");setApiMessage(e.message);}}); return ()=>{live=false;}; },[]);
   useEffect(()=>{ if(apiStatus!=="online")return; lyneApi.home().then(data=>setHomeTracks([...(data.recentlyPlayed||[]),...(data.popular||[])] )).catch(e=>setApiMessage(e.message)); },[apiStatus]);
   useEffect(()=>{ if(!current?.audioUrl){ if(audioRef.current)audioRef.current.pause(); return; } const audio=audioRef.current; if(!audio)return; audio.src=current.audioUrl; audio.volume=volume; if(playing)void audio.play().catch(()=>{setPlaying(false);setNotice("This track couldn't be played.");}); },[current?.id,current?.audioUrl]);
   useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
@@ -360,6 +362,23 @@ export default function App() {
   };
   const logout=()=>{localStorage.removeItem("lyne.accessToken");setUser(null);setGuestMode(false);setNotice("Signed out.");};
 
+  const connectApi=async()=>{
+    setApiTesting(true);setApiMessage("Testing LYNE Worker...");
+    try{
+      configureApiUrl(apiUrlInput);
+      if(!isApiConfigured())throw new Error("Enter the deployed LYNE Worker URL first.");
+      setApiStatus("checking");
+      const health=await lyneApi.health();
+      if(!health.ok)throw new Error("The LYNE Worker responded but did not pass its health check.");
+      setApiStatus("online");setApiMessage("");
+      const home=await lyneApi.home();
+      setHomeTracks([...(home.recentlyPlayed||[]),...(home.popular||[])]);
+      setNotice("LYNE API connected successfully.");
+    }catch(error){
+      setApiStatus("offline");
+      setApiMessage(error instanceof Error?error.message:"Could not connect to the LYNE API.");
+    }finally{setApiTesting(false);}
+  };
   const refreshStorage=async()=>{try{const estimate=await navigator.storage?.estimate();setStorageUsed(estimate?.usage??0);}catch{setStorageUsed(null);}};
   const clearCache=async()=>{try{const names=await caches.keys();await Promise.all(names.map(name=>caches.delete(name)));await refreshStorage();setNotice("Cached app files cleared. Your library and account data were kept.");}catch{setNotice("This browser does not allow cache management here.");}};
   const periodStart=()=>{const d=new Date();if(period==="day")return dayKey(d);if(period==="week"){d.setDate(d.getDate()-6);}if(period==="month"){d.setDate(1);}if(period==="year"){d.setMonth(0,1);}return dayKey(d);};
@@ -399,7 +418,7 @@ export default function App() {
 
   return <main className="app-shell">
     <audio ref={audioRef} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>setDuration(e.currentTarget.duration*1000)} />
-    <header className="topbar"><div className="brand"><span>LYNE</span></div><div className="top-actions"><span className={`api-dot ${apiStatus}`} title={apiStatus==="online"?"LYNE API connected":"LYNE API not connected"}/><button className="avatar" onClick={()=>setTab("Profile")} aria-label="Open profile">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</button></div></header>
+    <header className="topbar"><div className="brand"><span>LYNE</span></div><div className="top-actions"><button className="api-status-trigger" title="Configure LYNE API" onClick={()=>{setSettingsSection("About");setApiUrlInput(getApiUrl());setModal("settings");}}><span className={`api-dot ${apiStatus}`}/><span>{apiStatus==="online"?"API CONNECTED":isApiConfigured()?"API OFFLINE":"API SETUP"}</span></button><button className="avatar" onClick={()=>setTab("Profile")} aria-label="Open profile">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</button></div></header>
     <section className="page" key={tab}>
       {tab==="Home"&&<><div className="home-art-backdrop" style={homeTracks[0]?.artwork?{backgroundImage:`url("${homeTracks[0].artwork}")`}:undefined}/>
         <div className="home-heading"><div className="home-avatar">{state.profile.avatar?<img src={state.profile.avatar} alt=""/>:state.profile.name.slice(0,1).toUpperCase()}</div><div className="home-heading-copy"><h1>{greeting}{state.profile.name&&state.profile.name!=="Listener"?<span>, {state.profile.name}</span>:""}</h1><p><i/> {dateLabel}</p></div><button className="home-quick-play" onClick={()=>{const track=state.history[0]||homeTracks[0];if(track)play(track,[...state.history,...homeTracks]);else setTab("Search");}}><Play size={14} fill="currentColor"/> Play</button></div>
@@ -446,7 +465,7 @@ export default function App() {
           {settingsSection==="Overlay"&&<><div className="settings-section-title">Player overlay</div><SettingToggle title="Show mini-player" description="Keep playback controls visible above the bottom navigation" checked={state.preferences.miniPlayer} onChange={v=>setState(s=>({...s,preferences:{...s.preferences,miniPlayer:v}}))}/><div className="capability-note"><b>Picture-in-picture and lock-screen controls</b><p>These depend on browser and operating-system media-session support. LYNE will use the native controls available to the installed PWA; it cannot draw a desktop-style floating overlay above other apps.</p></div></>}
           {settingsSection==="Discord"&&<><div className="settings-section-title">Discord</div><div className="capability-note"><b>Discord Rich Presence isn't available in mobile browsers</b><p>The Windows desktop integration uses native desktop capabilities that an installed PWA cannot access. These settings will become active only if Discord provides a supported mobile integration.</p></div><SettingToggle title="Enable playback status preference" description="Remember your preference for a future supported integration" checked={state.preferences.discordPresence} onChange={v=>setState(s=>({...s,preferences:{...s.preferences,discordPresence:v}}))}/></>}
           {settingsSection==="YouTube"&&<><div className="settings-section-title">YouTube</div><div className="capability-note"><b>Official account connection</b><p>LYNE Mobile uses the first-party LYNE backend. Provider sign-in and playback must use supported official authorization and embed flows; no desktop cookies or private endpoints are used.</p></div><SettingToggle title="Play through your account" description="Use an officially connected YouTube account when supported by LYNE" checked={state.preferences.youtubeAccountPlayback} onChange={v=>setState(s=>({...s,preferences:{...s.preferences,youtubeAccountPlayback:v}}))}/><SettingToggle title="Ask me to sign in" description="Show a sign-in prompt when YouTube requires account access" checked={state.preferences.youtubePromptSignIn} onChange={v=>setState(s=>({...s,preferences:{...s.preferences,youtubePromptSignIn:v}}))}/><SettingToggle title="Sync YouTube library" description="Show supported YouTube playlists in your LYNE library" checked={state.preferences.youtubeSyncLibrary} onChange={v=>setState(s=>({...s,preferences:{...s.preferences,youtubeSyncLibrary:v}}))}/></>}
-          {settingsSection==="About"&&<><div className="settings-section-title">About LYNE</div><div className="about-card"><div className="brand">LYNE<span>.</span></div><b>LYNE Mobile</b><small>Version 0.1.0 · Progressive Web App</small><p>Your music, your space.</p></div><div className="setting-line"><span><b>First-party API</b><small>{apiStatus==="online"?"Connected to LYNE":"Not connected"}{apiMessage?" · "+apiMessage:""}</small></span><span className={"status-pill "+apiStatus}>{apiStatus}</span></div><button className="provider-open" onClick={()=>window.open("https://github.com/sixseriess/LYNE-MOBILE","_blank","noopener,noreferrer")}>LYNE Mobile on GitHub <ExternalLink size={14}/></button><button className="provider-open" onClick={()=>window.open("https://discord.com","_blank","noopener,noreferrer")}>Support <ExternalLink size={14}/></button></>}
+          {settingsSection==="About"&&<><div className="settings-section-title">About LYNE</div><div className="about-card"><div className="brand">LYNE<span>.</span></div><b>LYNE Mobile</b><small>Version 0.1.0 · Progressive Web App</small><p>Your music, your space.</p></div><div className="api-setup-panel"><b>First-party LYNE API</b><p>{apiStatus==="online"?"Connected. Catalogue, account and library endpoints are responding.":isApiConfigured()?"A Worker URL is saved, but the health check is failing. Check that the Cloudflare Worker is deployed and its CORS origin includes https://sixseriess.github.io.":"The API has not been connected yet. Deploy the LYNE Worker in Cloudflare first, then paste the workers.dev URL here. This URL is saved on this device."}</p><label className="field-label">Cloudflare Worker URL<input value={apiUrlInput} onChange={e=>setApiUrlInput(e.target.value)} placeholder="https://lyne-api.your-subdomain.workers.dev" inputMode="url" autoComplete="url"/></label><button className="primary-button" onClick={()=>void connectApi()} disabled={apiTesting}>{apiTesting?<LoaderCircle size={15} className="spin"/>:null}{apiTesting?"Testing connection":"Save URL & test connection"}</button><div className="api-setup-status">{apiMessage||"For all devices, also set the GitHub Actions variable VITE_API_URL to this same URL and rebuild the PWA."}</div><button className="provider-open" onClick={()=>window.open("https://github.com/sixseriess/LYNE-MOBILE/blob/main/backend/README.md","_blank","noopener,noreferrer")}>Open API deployment instructions <ExternalLink size={14}/></button></div><div className="setting-line"><span><b>Connection status</b><small>{apiStatus==="online"?"Connected to LYNE":apiMessage||"Not connected"}</small></span><span className={"status-pill "+apiStatus}>{apiStatus==="online"?"online":isApiConfigured()?"offline":"not set"}</span></div><button className="provider-open" onClick={()=>window.open("https://github.com/sixseriess/LYNE-MOBILE","_blank","noopener,noreferrer")}>LYNE Mobile on GitHub <ExternalLink size={14}/></button><button className="provider-open" onClick={()=>window.open("https://discord.com","_blank","noopener,noreferrer")}>Support <ExternalLink size={14}/></button></>}
         </div>
       </div>}
       {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current?.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
