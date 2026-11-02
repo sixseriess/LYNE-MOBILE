@@ -141,6 +141,7 @@ export default function App() {
   const audioRef=useRef<HTMLAudioElement|null>(null);
   const fileRef=useRef<HTMLInputElement|null>(null);
   const currentRef=useRef<Track|null>(null);
+  const listeningReportedRef=useRef<string|null>(null);
 
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); document.documentElement.dataset.theme=state.theme; },[state]);
   useEffect(()=>{ currentRef.current=current; },[current]);
@@ -184,7 +185,14 @@ export default function App() {
   useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{ const audio=audioRef.current; if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);} },500); return ()=>window.clearInterval(timer); },[playing,current?.id]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{setState(s=>{const key=dayKey();const old=s.stats.find(x=>x.id===current.id&&x.day===key);const item={id:current.id,title:current.title,artist:current.artist,ms:(old?.ms||0)+1000,day:key};return {...s,stats:old?s.stats.map(x=>x===old?item:x):[...s.stats,item]};});},1000);return()=>window.clearInterval(timer); },[playing,current?.id]);
+  const reportListening=useCallback((track:Track|null,listenedMs:number)=>{
+    if(!user||!track||track.source==="local"||listenedMs<1000||listeningReportedRef.current===track.id)return;
+    listeningReportedRef.current=track.id;
+    void lyneApi.listening({trackId:track.id,listenedMs:Math.min(3600000,Math.floor(listenedMs)),playedAt:new Date().toISOString()}).catch(()=>{listeningReportedRef.current=null;});
+  },[user]);
   const play = useCallback((track:Track,list:Track[] = [])=>{
+    if(current&&current.id!==track.id)reportListening(current,position);
+    listeningReportedRef.current=null;
     const quality=getAudioSourceQuality(track);
     if(state.preferences.audioQuality==="lossless"&&!quality.lossless){
       setNotice("Lossless only is enabled. "+quality.label+". Choose Auto or use a FLAC, WAV or ALAC source.");
@@ -194,7 +202,7 @@ export default function App() {
     setQueue(list.length?list.filter(t=>t.id!==track.id):[track]);
     setPlaying(true);setExpanded(false);
     setState(old=>({...old,history:[track,...old.history.filter(t=>t.id!==track.id)].slice(0,50)}));
-  },[state.preferences.audioQuality]);
+  },[state.preferences.audioQuality,current,position,reportListening]);
   const toggleLike=(track:Track)=>setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));
   const next=()=>{if(!queue.length)return;const idx=queue.findIndex(t=>t.id===current?.id);const target=shuffle?queue[Math.floor(Math.random()*queue.length)]:queue[(idx+1)%queue.length];if(target)play(target,queue);};
   const previous=()=>{if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}const idx=queue.findIndex(t=>t.id===current?.id);const target=queue[(idx-1+queue.length)%queue.length];if(target)play(target,queue);};
