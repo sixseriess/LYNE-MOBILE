@@ -1,4 +1,9 @@
+import { resolveMusicLink, type ResolvedImport } from "./providers";
+
 interface Env {
+  SPOTIFY_CLIENT_ID?: string; SPOTIFY_CLIENT_SECRET?: string;
+  SOUNDCLOUD_CLIENT_ID?: string; SOUNDCLOUD_CLIENT_SECRET?: string;
+  YOUTUBE_API_KEY?: string; APPLE_MUSIC_DEVELOPER_TOKEN?: string;
   DB: D1Database;
   MEDIA: R2Bucket;
   ADMIN_API_TOKEN: string;
@@ -171,6 +176,46 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare("SELECT id,username,avatar_key AS avatarKey FROM users WHERE id=?").bind(userId).first<{id:string;username:string;avatarKey:string|null}>();
     if (!row) return fail("Account not found.",404);
     return json({ id:row.id, username:row.username, avatar:mediaUrl(row.avatarKey) });
+  }
+
+  if(path==="/v1/import/resolve" && request.method==="GET"){
+    const raw=url.searchParams.get("url")||"";
+    if(raw.length>2048)return fail("Music link is too long.");
+    try{
+      const resolved=await resolveMusicLink(raw,env);
+      return json(resolved);
+    }catch(error){
+      return fail(error instanceof Error?error.message:"Unable to resolve that music link.",422);
+    }
+  }
+
+  if(path==="/v1/me/imports" && request.method==="GET"){
+    const userId=await requireUser(request,env);
+    const [likes,collections]=await Promise.all([
+      env.DB.prepare("SELECT id,provider,provider_item_id AS providerId,title,subtitle,external_url AS externalUrl,artwork_url AS artwork,embed_url AS embedUrl,metadata_json AS metadataJson,created_at AS createdAt FROM imported_likes WHERE user_id=? ORDER BY created_at DESC").bind(userId).all(),
+      env.DB.prepare("SELECT id,provider,provider_item_id AS providerId,kind,title,subtitle,external_url AS externalUrl,artwork_url AS artwork,embed_url AS embedUrl,metadata_json AS metadataJson,created_at AS createdAt FROM imported_collections WHERE user_id=? ORDER BY created_at DESC").bind(userId).all()
+    ]);
+    const hydrate=(row:any)=>{let metadata={};try{metadata=JSON.parse(row.metadataJson||"{}");}catch{}return {...row,...metadata,createdAt:row.createdAt};};
+    return json({likes:likes.results.map(hydrate),collections:collections.results.map(hydrate)});
+  }
+
+  if(path==="/v1/me/imports" && request.method==="POST"){
+    const userId=await requireUser(request,env);
+    const item=await request.json() as Partial<ResolvedImport>;
+    const providers=["spotify","soundcloud","youtube","apple_music"];
+    if(!item.provider||!providers.includes(item.provider)||!item.providerId||!item.title||!item.externalUrl||!["track","playlist","album"].includes(item.kind||""))return fail("Invalid imported music item.");
+    let external:URL;try{external=new URL(item.externalUrl);}catch{return fail("Invalid source link.");}
+    const hosts=["open.spotify.com","spotify.link","soundcloud.com","m.soundcloud.com","youtube.com","www.youtube.com","music.youtube.com","youtu.be","music.apple.com"];
+    if(external.protocol!=="https:"||!hosts.includes(external.hostname.toLowerCase()))return fail("Unsupported music source URL.");
+    const safePayload={provider:item.provider,kind:item.kind,providerId:item.providerId,title:item.title.slice(0,180),subtitle:(item.subtitle||"").slice(0,180),externalUrl:external.toString(),artwork:item.artwork||"",embedUrl:item.embedUrl||"",tracks:(item.tracks||[]).slice(0,100)};
+    const itemId=id();const meta=JSON.stringify(safePayload);
+    if(item.kind==="track"){
+      const result=await env.DB.prepare("INSERT INTO imported_likes (id,user_id,provider,provider_item_id,title,subtitle,external_url,artwork_url,embed_url,metadata_json) VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,provider,provider_item_id) DO UPDATE SET title=excluded.title,subtitle=excluded.subtitle,external_url=excluded.external_url,artwork_url=excluded.artwork_url,embed_url=excluded.embed_url,metadata_json=excluded.metadata_json RETURNING id").bind(itemId,userId,item.provider,item.providerId,safePayload.title,safePayload.subtitle,safePayload.externalUrl,safePayload.artwork,safePayload.embedUrl,meta).first<{id:string}>();
+      return json({saved:true,kind:"track",id:result?.id||itemId},201);
+    }
+    const kind=item.kind as "playlist"|"album";
+    const result=await env.DB.prepare("INSERT INTO imported_collections (id,user_id,provider,provider_item_id,kind,title,subtitle,external_url,artwork_url,embed_url,metadata_json) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,provider,provider_item_id,kind) DO UPDATE SET title=excluded.title,subtitle=excluded.subtitle,external_url=excluded.external_url,artwork_url=excluded.artwork_url,embed_url=excluded.embed_url,metadata_json=excluded.metadata_json RETURNING id").bind(itemId,userId,item.provider,item.providerId,kind,safePayload.title,safePayload.subtitle,safePayload.externalUrl,safePayload.artwork,safePayload.embedUrl,meta).first<{id:string}>();
+    return json({saved:true,kind,id:result?.id||itemId},201);
   }
 
   if (path === "/v1/home" && request.method === "GET") {
