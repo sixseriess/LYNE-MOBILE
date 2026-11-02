@@ -10,7 +10,27 @@ export type ExternalTrack = { providerId:string; title:string; artist:string; ex
 export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; tracks:ExternalTrack[] };
 export type SavedImport = ResolvedImport & { createdAt?:string };
 
-const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
+function normalizeApiUrl(raw:string):string{
+  const value=raw.trim();
+  if(!value)return "";
+  let parsed:URL;
+  try{parsed=new URL(value);}catch{throw new ApiError("Enter the full LYNE Worker URL, including https://.");}
+  const local=parsed.hostname==="localhost"||parsed.hostname==="127.0.0.1";
+  if(parsed.protocol!=="https:"&&!(local&&parsed.protocol==="http:"))throw new ApiError("The LYNE API must use HTTPS.");
+  if(parsed.username||parsed.password||parsed.search||parsed.hash||parsed.pathname!=="/")throw new ApiError("Enter only the base Worker URL, without a path, query or credentials.");
+  return parsed.origin;
+}
+const savedApiUrl=typeof localStorage!=="undefined"?localStorage.getItem("lyne.apiUrl"):"";
+let API_URL=normalizeApiUrl(savedApiUrl||import.meta.env.VITE_API_URL||"");
+export function getApiUrl():string{return API_URL;}
+export function isApiConfigured():boolean{return Boolean(API_URL);}
+export function configureApiUrl(raw:string):string{
+  const next=normalizeApiUrl(raw);
+  if(!next){if(typeof localStorage!=="undefined")localStorage.removeItem("lyne.apiUrl");API_URL="";return API_URL;}
+  if(typeof localStorage!=="undefined")localStorage.setItem("lyne.apiUrl",next);
+  API_URL=next;
+  return API_URL;
+}
 function hydrateMedia<T>(value: T): T {
   if (Array.isArray(value)) return value.map(item => hydrateMedia(item)) as T;
   if (value && typeof value === "object") {
