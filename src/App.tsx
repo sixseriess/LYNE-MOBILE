@@ -119,6 +119,8 @@ export default function App() {
   const [accountMode,setAccountMode]=useState<"login"|"register">("login");
   const [accountMessage,setAccountMessage]=useState("");
   const [user,setUser]=useState<{id:string;username:string}|null>(null);
+  const [guestMode,setGuestMode]=useState(false);
+  const [accountBusy,setAccountBusy]=useState(false);
   const [period,setPeriod]=useState<Period>("week");
   const [localTracks,setLocalTracks]=useState<Track[]>([]);
   const [shuffle,setShuffle]=useState(false);
@@ -131,6 +133,23 @@ export default function App() {
 
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); document.documentElement.dataset.theme=state.theme; },[state]);
   useEffect(()=>{ currentRef.current=current; },[current]);
+  useEffect(()=>{
+    const token=localStorage.getItem("lyne.accessToken");
+    if(!token)return;
+    let active=true;
+    void Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports()]).then(([profile,remote,imports])=>{
+      if(!active)return;
+      setUser({id:profile.id,username:profile.username});
+      setGuestMode(false);
+      setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:[...remote.playlists,...old.playlists.filter(item=>!remote.playlists.some(remoteItem=>remoteItem.id===item.id))],importedLikes:imports.likes||[],importedCollections:imports.collections||[]}));
+    }).catch(()=>{
+      if(!active)return;
+      localStorage.removeItem("lyne.accessToken");
+      setUser(null);
+      setNotice("Your LYNE session expired. Sign in again to sync your account.");
+    });
+    return ()=>{active=false;};
+  },[]);
   useEffect(()=>{
     let cancelled=false;
     const urls:string[]=[];
