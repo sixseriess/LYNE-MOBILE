@@ -264,15 +264,55 @@ export default function App() {
   const saveImportedLink=async()=>{if(!importPreview)return;let synced=false;if(user){try{await lyneApi.saveImport(importPreview);synced=true;}catch(e){setNotice(e instanceof Error?e.message:"Saved locally; LYNE account sync failed.");}}const saved:SavedImport={...importPreview};setState(s=>importPreview.kind==="track"?({...s,importedLikes:[saved,...s.importedLikes.filter(x=>!(x.provider===saved.provider&&x.providerId===saved.providerId))]}):({...s,importedCollections:[saved,...s.importedCollections.filter(x=>!(x.provider===saved.provider&&x.providerId===saved.providerId&&x.kind===saved.kind))]}));setModal(null);setNotice(synced?"Added and synced with your LYNE account.":user?"Added on this device; account sync isn't available right now.":importPreview.kind==="track"?"Added to Liked Songs on this device. Sign in to sync it.":"Added to your library on this device. Sign in to sync it.");};
   const likeImportedTrack=(collection:SavedImport,track:NonNullable<SavedImport["tracks"]>[number])=>{const saved:SavedImport={provider:collection.provider,kind:"track",providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]};setState(s=>({...s,importedLikes:[saved,...s.importedLikes.filter(x=>!(x.provider===saved.provider&&x.providerId===saved.providerId))]}));if(user)void lyneApi.saveImport(saved).catch(()=>setNotice("Added locally. Account sync couldn't be completed."));setNotice(`Added ${track.title} to Liked Songs.`);};
   const likeAllImportedTracks=(collection:SavedImport)=>{const tracks=collection.tracks||[];const additions=tracks.map(track=>({provider:collection.provider,kind:"track" as const,providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]}));setState(s=>{const existing=new Set(s.importedLikes.map(x=>x.provider+":"+x.providerId));return {...s,importedLikes:[...additions.filter(x=>!existing.has(x.provider+":"+x.providerId)),...s.importedLikes]};});if(user)void Promise.allSettled(additions.map(item=>lyneApi.saveImport(item)));setModal(null);setNotice(`Added ${tracks.length} tracks from ${collection.title} to Liked Songs.`);};
-  const createPlaylist=()=>{const name=playlistName.trim();if(!name)return;const p:Playlist={id:crypto.randomUUID(),name,trackIds:[],updatedAt:Date.now()};setState(s=>({...s,playlists:[p,...s.playlists]}));setPlaylistName("");setModal(null);};
-  const addToPlaylist=(playlist:Playlist,track:Track)=>{setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds:p.trackIds.includes(track.id)?p.trackIds:[...p.trackIds,track.id],updatedAt:Date.now()}:p)}));setNotice(playlist.trackIds.includes(track.id)?track.title+" is already in "+playlist.name+".":"Added "+track.title+" to "+playlist.name+".");setModal(null);};
+  const persistPlaylist=async(playlist:Playlist)=>{
+    if(!user||!playlist.synced)return;
+    try{await lyneApi.updatePlaylist(playlist);}
+    catch{setNotice("Saved on this device, but LYNE account playlist sync failed.");}
+  };
+  const createPlaylist=async()=>{
+    const name=playlistName.trim();if(!name)return;
+    let playlist:Playlist={id:crypto.randomUUID(),name,trackIds:[],updatedAt:Date.now(),synced:false};
+    if(user){
+      try{playlist={...(await lyneApi.createPlaylist(name)),synced:true};}
+      catch{setNotice("Playlist created on this device. Account sync isn't available.");}
+    }
+    setState(s=>({...s,playlists:[playlist,...s.playlists]}));
+    setPlaylistName("");setModal(null);
+  };
+  const addToPlaylist=(playlist:Playlist,track:Track)=>{
+    if(playlist.trackIds.includes(track.id)){setNotice(track.title+" is already in "+playlist.name+".");setModal(null);return;}
+    const updated={...playlist,trackIds:[...playlist.trackIds,track.id],updatedAt:Date.now()};
+    setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?updated:p)}));
+    void persistPlaylist(updated);
+    setNotice("Added "+track.title+" to "+playlist.name+".");setModal(null);
+  };
   const addNext=(track:Track)=>{setQueue(old=>{const list=old.filter(t=>t.id!==track.id);const index=list.findIndex(t=>t.id===current?.id);list.splice(index>=0?index+1:list.length,0,track);return list;});setNotice("Added "+track.title+" to play next.");setModal(null);};
   const openPlaylist=(playlist:Playlist)=>{setSelectedPlaylistId(playlist.id);setEditPlaylistName(playlist.name);setModal("playlistDetail");};
-  const savePlaylistName=()=>{if(!selectedPlaylistId||!editPlaylistName.trim())return;setState(s=>({...s,playlists:s.playlists.map(p=>p.id===selectedPlaylistId?{...p,name:editPlaylistName.trim(),updatedAt:Date.now()}:p)}));setNotice("Playlist name updated.");};
+  const savePlaylistName=()=>{
+    if(!selectedPlaylistId||!editPlaylistName.trim())return;
+    const playlist=state.playlists.find(p=>p.id===selectedPlaylistId);if(!playlist)return;
+    const updated={...playlist,name:editPlaylistName.trim(),updatedAt:Date.now()};
+    setState(s=>({...s,playlists:s.playlists.map(p=>p.id===selectedPlaylistId?updated:p)}));
+    void persistPlaylist(updated);setNotice("Playlist name updated.");
+  };
   const setPlaylistCover=async(file:File)=>{if(!selectedPlaylistId)return;try{const cover=await resizePlaylistImage(file);setState(s=>({...s,playlists:s.playlists.map(p=>p.id===selectedPlaylistId?{...p,cover,updatedAt:Date.now()}:p)}));setNotice("Playlist artwork updated.");}catch(e){setNotice(e instanceof Error?e.message:"Could not use that image.");}};
-  const movePlaylistTrack=(playlist:Playlist,index:number,direction:-1|1)=>{const target=index+direction;if(target<0||target>=playlist.trackIds.length)return;const trackIds=[...playlist.trackIds];[trackIds[index],trackIds[target]]=[trackIds[target],trackIds[index]];setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds,updatedAt:Date.now()}:p)}));};
-  const removePlaylistTrack=(playlist:Playlist,trackId:string)=>setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds:p.trackIds.filter(id=>id!==trackId),updatedAt:Date.now()}:p)}));
-  const deletePlaylist=(playlist:Playlist)=>{if(!window.confirm("Delete the playlist \""+playlist.name+"\"?"))return;setState(s=>({...s,playlists:s.playlists.filter(p=>p.id!==playlist.id)}));setModal(null);setSelectedPlaylistId(null);setNotice("Playlist deleted.");};
+  const movePlaylistTrack=(playlist:Playlist,index:number,direction:-1|1)=>{
+    const target=index+direction;if(target<0||target>=playlist.trackIds.length)return;
+    const trackIds=[...playlist.trackIds];[trackIds[index],trackIds[target]]=[trackIds[target],trackIds[index]];
+    const updated={...playlist,trackIds,updatedAt:Date.now()};
+    setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?updated:p)}));void persistPlaylist(updated);
+  };
+  const removePlaylistTrack=(playlist:Playlist,trackId:string)=>{
+    const updated={...playlist,trackIds:playlist.trackIds.filter(id=>id!==trackId),updatedAt:Date.now()};
+    setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?updated:p)}));void persistPlaylist(updated);
+  };
+  const deletePlaylist=async(playlist:Playlist)=>{
+    if(!window.confirm("Delete the playlist \""+playlist.name+"\"?"))return;
+    if(user&&playlist.synced){try{await lyneApi.deletePlaylist(playlist.id);}catch{setNotice("Couldn't delete the synced playlist. Try again.");return;}}
+    setState(s=>({...s,playlists:s.playlists.filter(p=>p.id!==playlist.id)}));
+    setModal(null);setSelectedPlaylistId(null);setNotice("Playlist deleted.");
+  };
+
   const submitAccount=async()=>{
     if(!accountName.trim()||!accountPassword){setAccountMessage("Enter your username/email and password.");return;}
     if(accountMode==="register"&&(!accountEmail.trim()||accountPassword.length<10)){setAccountMessage("Enter a valid email and a password with at least 10 characters.");return;}
