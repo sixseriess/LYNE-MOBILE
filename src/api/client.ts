@@ -46,7 +46,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),
   home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string }[] }>("/v1/home"),
-  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: unknown[]; albums: unknown[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string}[]; albums: {id:string;title:string;artist:string;artistId:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
   me: () => api<{ id: string; username: string; avatar?: string }>("/v1/me"),
   login: (username: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   register: (username: string, email: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/register", { method: "POST", body: JSON.stringify({ username, email, password }) }),
