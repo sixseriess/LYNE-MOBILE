@@ -3,7 +3,7 @@ export type Track = {
   audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
   lyrics?: string;
 };
-export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number };
+export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
 export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
 export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
 export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
