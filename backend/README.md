@@ -82,3 +82,26 @@ Admin:
 Imported provider content stays linked to its source. Metadata and permitted artwork URLs are stored with the source URL; audio is not downloaded, copied to R2, or re-streamed by LYNE. Spotify content must retain links and attribution, and Spotify content may not be downloaded or stream-ripped. YouTube imports use Data API metadata and official YouTube embeds; Apple Music items use catalogue links/MusicKit-compatible playback; SoundCloud items retain their official permalink/widget stream reference. See each provider's developer terms before enabling playback or caching.
 
 The first-party LYNE catalogue and provider-link imports are separate. LYNE's own hosted catalogue remains empty until LYNE adds recordings it owns, recordings it has licensed, or public-domain recordings.
+
+## One-click Worker deployment
+
+The repository includes a manual GitHub Actions workflow named **Deploy LYNE API**. Before running it, complete this one-time Cloudflare setup:
+
+1. In Cloudflare, create a D1 database named `lyne-catalog` and an R2 bucket named `lyne-media`.
+2. Copy the D1 database ID into the GitHub repository variable `LYNE_D1_DATABASE_ID`.
+3. Add these GitHub repository secrets:
+   - `CLOUDFLARE_API_TOKEN` — token with Workers Scripts:Edit, D1:Edit and R2 Storage:Edit permissions for the account.
+   - `CLOUDFLARE_ACCOUNT_ID` — the Cloudflare account ID.
+   - `LYNE_AUTH_SECRET` — a long random secret (at least 32 random bytes).
+   - `LYNE_ADMIN_API_TOKEN` — a separate long random admin token.
+4. Optional provider secrets, needed only for imports from those services:
+   - `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
+   - `SOUNDCLOUD_CLIENT_ID`, `SOUNDCLOUD_CLIENT_SECRET`
+   - `YOUTUBE_API_KEY`
+   - `APPLE_MUSIC_DEVELOPER_TOKEN`
+5. Run **Actions → Deploy LYNE API → Run workflow**. The workflow applies the D1 migrations, deploys the Worker, then stores the private Worker secrets. It prints the deployed Worker URL in the deployment log.
+6. Copy that Worker URL into the GitHub repository variable `VITE_API_URL`, then run **Build and deploy LYNE Mobile**. You can also paste the Worker URL into **LYNE Mobile → Settings → About** on a device to test the connection immediately.
+
+To create the two random secrets locally, use `openssl rand -base64 48` twice. Never put `LYNE_AUTH_SECRET`, `LYNE_ADMIN_API_TOKEN`, or provider keys in source code or a `VITE_*` variable. GitHub Actions variables/secrets are configured under **Repository → Settings → Secrets and variables → Actions**.
+
+The Worker CORS origin is restricted to `https://sixseriess.github.io`, which is the origin serving LYNE Mobile. The Cloudflare account credentials and D1 database ID are not included in this repository, so the deploy workflow deliberately waits for those account-specific values instead of deploying a nonfunctional Worker.
