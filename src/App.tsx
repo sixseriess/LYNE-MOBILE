@@ -1,0 +1,123 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Home, Search, Library, UserRound, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat2,
+  Heart, MoreHorizontal, Headphones, Plus, ChevronRight, Music2, Settings, ListMusic,
+  Upload, X, Volume2, Maximize2, Minimize2, Clock3, Disc3, Mic2, LogOut, ImagePlus,
+  Download, SlidersHorizontal, Share2, Check, Radio, Music, Sparkles, ArrowLeft, LoaderCircle
+} from "lucide-react";
+import { api, lyneApi, type Track, type Playlist, type SearchKind } from "./api/client";
+
+type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
+type Period = "day" | "week" | "month" | "year";
+type PlayRecord = { id: string; title: string; artist: string; ms: number; day: string };
+const STORE = "lyne.mobile.v1";
+const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one" };
+const artwork = (track: Track) => track.artwork || "";
+const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function loadState() { try { return { ...blankState, ...JSON.parse(localStorage.getItem(STORE) || "{}") }; } catch { return blankState; } }
+function Cover({ track, className = "" }: { track?: Track; className?: string }) {
+  return <div className={`cover ${className}`} style={artwork(track || {} as Track) ? { backgroundImage: `url("${artwork(track!)}")` } : undefined}>{!artwork(track || {} as Track) && <Music2 size={22}/>}</div>;
+}
+function Row({ track, active, liked, onPlay, onLike }: { track: Track; active: boolean; liked: boolean; onPlay:()=>void; onLike:()=>void }) {
+  return <div className={`track-row ${active?"is-active":""}`}><button className="track-main" onClick={onPlay}><Cover track={track}/><span className="track-copy"><b>{track.title}</b><small>{track.artist}{track.explicit?" · E":""}</small></span></button><button className={`plain-icon ${liked?"liked":""}`} aria-label="Like song" onClick={onLike}><Heart size={18} fill={liked?"currentColor":"none"}/></button><button className="plain-icon" aria-label="More options"><MoreHorizontal size={19}/></button></div>;
+}
+export default function App() {
+  const [tab,setTab]=useState<Tab>("Home");
+  const [state,setState]=useState(loadState);
+  const [current,setCurrent]=useState<Track|null>(null);
+  const [queue,setQueue]=useState<Track[]>([]);
+  const [playing,setPlaying]=useState(false);
+  const [expanded,setExpanded]=useState(false);
+  const [position,setPosition]=useState(0);
+  const [duration,setDuration]=useState(0);
+  const [volume,setVolume]=useState(0.8);
+  const [query,setQuery]=useState("");
+  const [filter,setFilter]=useState<SearchKind>("all");
+  const [results,setResults]=useState<Track[]>([]);
+  const [apiStatus,setApiStatus]=useState<"checking"|"online"|"offline">("checking");
+  const [apiMessage,setApiMessage]=useState("");
+  const [homeTracks,setHomeTracks]=useState<Track[]>([]);
+  const [loadingSearch,setLoadingSearch]=useState(false);
+  const [modal,setModal]=useState<"playlist"|"account"|"settings"|"queue"|"lyrics"|null>(null);
+  const [playlistName,setPlaylistName]=useState("");
+  const [accountName,setAccountName]=useState("");
+  const [accountEmail,setAccountEmail]=useState("");
+  const [accountPassword,setAccountPassword]=useState("");
+  const [accountMode,setAccountMode]=useState<"login"|"register">("login");
+  const [accountMessage,setAccountMessage]=useState("");
+  const [user,setUser]=useState<{id:string;username:string}|null>(null);
+  const [period,setPeriod]=useState<Period>("week");
+  const [localTracks,setLocalTracks]=useState<Track[]>([]);
+  const [shuffle,setShuffle]=useState(false);
+  const [notice,setNotice]=useState("");
+  const audioRef=useRef<HTMLAudioElement|null>(null);
+  const fileRef=useRef<HTMLInputElement|null>(null);
+  const currentRef=useRef<Track|null>(null);
+
+  useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); document.documentElement.dataset.theme=state.theme; },[state]);
+  useEffect(()=>{ currentRef.current=current; },[current]);
+  useEffect(()=>{ let live=true; lyneApi.health().then(()=>{if(live){setApiStatus("online");setApiMessage("");}}).catch(e=>{if(live){setApiStatus("offline");setApiMessage(e.message);}}); return ()=>{live=false;}; },[]);
+  useEffect(()=>{ if(apiStatus!=="online")return; lyneApi.home().then(data=>setHomeTracks([...(data.recentlyPlayed||[]),...(data.popular||[])] )).catch(e=>setApiMessage(e.message)); },[apiStatus]);
+  useEffect(()=>{ if(!current?.audioUrl){ if(audioRef.current)audioRef.current.pause(); return; } const audio=audioRef.current; if(!audio)return; audio.src=current.audioUrl; audio.volume=volume; if(playing)void audio.play().catch(()=>{setPlaying(false);setNotice("This track couldn't be played.");}); },[current?.id,current?.audioUrl]);
+  useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
+  useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{ const audio=audioRef.current; if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);} },500); return ()=>window.clearInterval(timer); },[playing,current?.id]);
+  useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{setState(s=>{const key=dayKey();const old=s.stats.find(x=>x.id===current.id&&x.day===key);const item={id:current.id,title:current.title,artist:current.artist,ms:(old?.ms||0)+1000,day:key};return {...s,stats:old?s.stats.map(x=>x===old?item:x):[...s.stats,item]};});},1000);return()=>window.clearInterval(timer); },[playing,current?.id]);
+  const play = useCallback((track:Track,list:Track[]=[])=>{setCurrent(track);setQueue(list.length?list.filter(t=>t.id!==track.id):[track]);setPlaying(true);setExpanded(false);setState(s=>({...s,history:[track,...s.history.filter(t=>t.id!==track.id)].slice(0,50)}));},[]);
+  const toggleLike=(track:Track)=>setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));
+  const next=()=>{if(!queue.length)return;const idx=queue.findIndex(t=>t.id===current?.id);const target=shuffle?queue[Math.floor(Math.random()*queue.length)]:queue[(idx+1)%queue.length];if(target)play(target,queue);};
+  const previous=()=>{if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}const idx=queue.findIndex(t=>t.id===current?.id);const target=queue[(idx-1+queue.length)%queue.length];if(target)play(target,queue);};
+  const allTracks=useMemo(()=>[...localTracks,...homeTracks], [localTracks,homeTracks]);
+  const likedTracks=useMemo(()=>state.likes.map(id=>allTracks.find(t=>t.id===id)).filter(Boolean) as Track[],[state.likes,allTracks]);
+  const search=async(value:string,kind:SearchKind)=>{setQuery(value);setFilter(kind);if(value.trim().length<2){setResults([]);return;}setLoadingSearch(true);try{const data=await lyneApi.search(value,kind);setResults(data.tracks||[]);}catch{setResults([]);}finally{setLoadingSearch(false);}};
+  const importFiles=(files:FileList|null)=>{if(!files)return;const added=Array.from(files).filter(f=>f.type.startsWith("audio/")).map((f,i)=>({id:`local-${Date.now()}-${i}`,title:f.name.replace(/\.[^.]+$/,""),artist:"Local file",audioUrl:URL.createObjectURL(f),durationMs:0,source:"local" as const}));setLocalTracks(old=>[...old,...added]);setNotice(added.length?`Added ${added.length} local track`:"No supported audio files selected.");};
+  const createPlaylist=()=>{const name=playlistName.trim();if(!name)return;const p:Playlist={id:crypto.randomUUID(),name,trackIds:[],updatedAt:Date.now()};setState(s=>({...s,playlists:[p,...s.playlists]}));setPlaylistName("");setModal(null);};
+  const addToPlaylist=(playlist:Playlist,track:Track)=>setState(s=>({...s,playlists:s.playlists.map(p=>p.id===playlist.id?{...p,trackIds:p.trackIds.includes(track.id)?p.trackIds:[...p.trackIds,track.id],updatedAt:Date.now()}:p)}));
+  const submitAccount=async()=>{setAccountMessage("Connecting to LYNE...");try{const result=accountMode==="login"?await lyneApi.login(accountName,accountPassword):await lyneApi.register(accountName,accountEmail,accountPassword);localStorage.setItem("lyne.accessToken",result.accessToken);setUser(result.user);setAccountMessage("You're signed in.");setModal(null);}catch(e){setAccountMessage(e instanceof Error?e.message:"Couldn't sign in.");}};
+  const logout=()=>{localStorage.removeItem("lyne.accessToken");setUser(null);setNotice("Signed out.");};
+  const periodStart=()=>{const d=new Date();if(period==="day")return dayKey(d);if(period==="week"){d.setDate(d.getDate()-6);}if(period==="month"){d.setDate(1);}if(period==="year"){d.setMonth(0,1);}return dayKey(d);};
+  const periodStats=state.stats.filter(x=>x.day>=periodStart());
+  const totalMinutes=Math.floor(periodStats.reduce((sum,x)=>sum+x.ms,0)/60000);
+  const ranking=(key:"title"|"artist")=>{const counts=new Map<string,number>();periodStats.forEach(x=>counts.set(x[key],(counts.get(x[key])||0)+x.ms));return [...counts.entries()].sort((a,b)=>b[1]-a[1]).slice(0,10);};
+  const shareStats=async()=>{const content=`LYNE listening stats\n${totalMinutes.toLocaleString()} minutes listened\nTop songs: ${ranking("title").slice(0,3).map(x=>x[0]).join(", ")||"Not enough data yet"}\nTop artists: ${ranking("artist").slice(0,3).map(x=>x[0]).join(", ")||"Not enough data yet"}`;try{if(navigator.share)await navigator.share({title:"My LYNE stats",text:content});else if(navigator.clipboard)await navigator.clipboard.writeText(content);else throw new Error();setNotice("Your stats are ready to share.");}catch{setNotice("Sharing was cancelled or isn't available.");}};
+  const tracksForTab=tab==="Library"?likedTracks:homeTracks;
+  const renderRows=(items:Track[])=>items.length?<div className="track-list">{items.map(t=><Row key={t.id} track={t} active={current?.id===t.id} liked={state.likes.includes(t.id)} onPlay={()=>play(t,items)} onLike={()=>toggleLike(t)}/>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
+  return <main className="app-shell">
+    <audio ref={audioRef} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>setDuration(e.currentTarget.duration*1000)} />
+    <header className="topbar"><div className="brand">LYNE<span>.</span></div><div className="top-actions"><span className={`api-dot ${apiStatus}`} title={apiStatus==="online"?"LYNE API connected":"LYNE API not connected"}/><button className="avatar" onClick={()=>setTab("Profile")} aria-label="Open profile">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</button></div></header>
+    <section className="page" key={tab}>
+      {tab==="Home"&&<><div className="hero"><p className="eyebrow">YOUR MUSIC, YOUR SPACE</p><h1>Good evening</h1><p className="muted">Pick up where you left off.</p></div>
+        <div className="section-heading"><h2>Made for you</h2><span className="section-note">LYNE mixes</span></div>
+        <div className="mix-grid">{["Daily Mix","On repeat","Discover"].map((name,i)=><button className="mix-tile" key={name} onClick={()=>setTab("Library")}><div className={`mix-art mix-${i}`}>{i===0?<Sparkles/>:i===1?<Repeat2/>:<Radio/>}</div><b>{name}</b><small>{i===0?"A mix built around you":i===1?"Your most played":"Find something new"}</small></button>)}</div>
+        <div className="section-heading"><h2>Recently played</h2><button className="subtle-action" onClick={()=>setTab("Library")}>See all</button></div>
+        {renderRows(state.history.slice(0,5))}
+        <div className="section-heading"><h2>Popular right now</h2><span className="section-note">From LYNE</span></div>{renderRows(homeTracks.slice(0,8))}
+        {apiStatus==="offline"&&<div className="api-note"><span>LYNE API isn't connected</span><small>{apiMessage||"Configure the first-party API to load catalogue content and sync your account."}</small></div>}
+      </>}
+      {tab==="Search"&&<><div className="hero"><p className="eyebrow">EXPLORE THE CATALOGUE</p><h1>Search</h1><p className="muted">Find tracks, artists, albums and playlists.</p></div><label className="searchbox"><Search/><input value={query} onChange={e=>void search(e.target.value,filter)} placeholder="What do you want to listen to?"/></label><div className="filter-pills">{(["all","tracks","artists","albums","playlists"] as SearchKind[]).map(x=><button key={x} className={filter===x?"selected":""} onClick={()=>void search(query,x)}>{x[0].toUpperCase()+x.slice(1)}</button>)}</div>{loadingSearch?<div className="loading"><LoaderCircle className="spin"/> Searching LYNE...</div>:renderRows(results)}</>}
+      {tab==="Library"&&<><div className="hero"><p className="eyebrow">YOUR COLLECTION</p><h1>Your library</h1><p className="muted">Everything you've saved, all in one place.</p></div><div className="library-actions"><button onClick={()=>setModal("playlist")}><Plus/> Create playlist</button><button onClick={()=>fileRef.current?.click()}><Upload/> Import music</button><input ref={fileRef} hidden type="file" accept="audio/*" multiple onChange={e=>importFiles(e.target.files)}/></div>
+        <div className="library-row" onClick={()=>setTab("Stats")}><div className="library-art liked-art"><Heart fill="currentColor"/></div><span><b>Liked Songs</b><small>{likedTracks.length} saved tracks</small></span><ChevronRight/></div>
+        <div className="library-row" onClick={()=>{}}><div className="library-art local-art"><Headphones/></div><span><b>Local music</b><small>{localTracks.length} tracks on this device</small></span><ChevronRight/></div>
+        <div className="section-heading"><h2>Your playlists</h2><button className="subtle-action" onClick={()=>setModal("playlist")}>New playlist</button></div>
+        {state.playlists.length?state.playlists.map(p=><button className="playlist-row" key={p.id} onClick={()=>{setQueue(p.trackIds.map(id=>allTracks.find(t=>t.id===id)).filter(Boolean) as Track[]);setNotice(`${p.name} · ${p.trackIds.length} tracks`);}}><div className="library-art playlist-art"><ListMusic/></div><span><b>{p.name}</b><small>Playlist · {p.trackIds.length} tracks</small></span><ChevronRight/></button>):<Empty title="Make it yours" text="Create a playlist and add tracks as your collection grows."/>}
+        <div className="section-heading"><h2>Liked tracks</h2><span className="section-note">{likedTracks.length} songs</span></div>{renderRows(likedTracks)}
+        <div className="section-heading"><h2>Local files</h2><button className="subtle-action" onClick={()=>fileRef.current?.click()}>Add files</button></div>{renderRows(localTracks)}
+      </>}
+      {tab==="Stats"&&<><div className="hero"><p className="eyebrow">YOUR LISTENING ACTIVITY</p><h1>Your stats</h1><p className="muted">A closer look at what you've been listening to.</p></div><div className="period-pills">{(["day","week","month","year"] as Period[]).map(p=><button className={period===p?"selected":""} onClick={()=>setPeriod(p)} key={p}>{({day:"Day",week:"Week",month:"Month",year:"Year"} as Record<Period,string>)[p]}</button>)}</div><div className="stat-card"><span>TOTAL MINUTES LISTENED</span><strong>{totalMinutes.toLocaleString()}</strong><small>{period==="day"?"Today":period==="week"?"Last 7 days":period==="month"?"This month":"This year"}</small></div><div className="section-heading"><h2>Top 10 songs</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("title")}/><div className="section-heading"><h2>Top 10 artists</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("artist")}/><button className="share-button" onClick={()=>void shareStats()}><Share2/> Share your stats</button><p className="footnote">Listening time is recorded on this device. Account sync becomes available through the LYNE API.</p></>}
+      {tab==="Profile"&&<><div className="profile-hero"><div className="profile-avatar">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</div><p className="eyebrow">YOUR LYNE ACCOUNT</p><h1>{state.profile.name}</h1><p className="muted">{user?(`Signed in as @${user.username}`):"Personalize your listening space."}</p></div><button className="profile-option" onClick={()=>setModal("account")}><UserRound/><span><b>{user?"Account details":"Sign in or create account"}</b><small>Sync your LYNE music and settings</small></span><ChevronRight/></button><label className="profile-option upload-avatar"><ImagePlus/><span><b>Change profile picture</b><small>Choose an image from your device</small></span><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)setState(s=>({...s,profile:{...s.profile,avatar:URL.createObjectURL(f)}}));}}/></label><button className="profile-option" onClick={()=>setModal("settings")}><Settings/><span><b>App settings</b><small>Appearance and playback preferences</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>setTab("Stats")}><Clock3/><span><b>Listening stats</b><small>Your minutes, songs and artists</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>{setNotice("Offline downloads require LYNE's media storage API.");}}><Download/><span><b>Downloads & offline</b><small>Manage music available on this device</small></span><ChevronRight/></button>{user&&<button className="signout" onClick={logout}><LogOut/> Sign out</button>}</>}
+    </section>
+    {current&&<button className="mini-player" onClick={()=>setExpanded(true)}><Cover track={current}/><span className="mini-copy"><b>{current.title}</b><small>{current.artist}</small></span><button className="plain-icon" onClick={e=>{e.stopPropagation();toggleLike(current);}}><Heart size={18} fill={state.likes.includes(current.id)?"currentColor":"none"}/></button><button className="plain-icon play-mini" onClick={e=>{e.stopPropagation();setPlaying(v=>!v);}}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button></button>}
+    <nav className="bottom-nav">{([{id:"Home",icon:Home},{id:"Search",icon:Search},{id:"Library",icon:Library},{id:"Stats",icon:Disc3},{id:"Profile",icon:UserRound}] as const).map(({id,icon:Icon})=><button key={id} className={tab===id?"active":""} onClick={()=>setTab(id)}><Icon size={21}/><span>{id}</span></button>)}</nav>
+    {expanded&&current&&<div className="player-overlay"><div className="player-top"><button className="plain-icon" onClick={()=>setExpanded(false)}><Minimize2/></button><span>NOW PLAYING</span><button className="plain-icon" onClick={()=>setModal("queue")}><ListMusic/></button></div><Cover track={current} className="player-cover"/><div className="player-track"><div><h2>{current.title}</h2><p>{current.artist}</p></div><button className={state.likes.includes(current.id)?"liked plain-icon":"plain-icon"} onClick={()=>toggleLike(current)}><Heart fill={state.likes.includes(current.id)?"currentColor":"none"}/></button></div><input className="seek" type="range" min="0" max={duration||100} value={Math.min(position,duration||100)} onChange={e=>{const v=Number(e.target.value);setPosition(v);if(audioRef.current)audioRef.current.currentTime=v/1000;}}/><div className="time-row"><span>{fmtTime(position)}</span><span>{fmtTime(duration)}</span></div><div className="transport"><button className={shuffle?"control-on":"plain-icon"} onClick={()=>setShuffle(v=>!v)}><Shuffle/></button><button className="plain-icon large-control" onClick={previous}><SkipBack fill="currentColor"/></button><button className="main-play" onClick={()=>setPlaying(v=>!v)}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button><button className="plain-icon large-control" onClick={next}><SkipForward fill="currentColor"/></button><button className={state.repeat!=="off"?"control-on":"plain-icon"} onClick={()=>setState(s=>({...s,repeat:s.repeat==="off"?"all":s.repeat==="all"?"one":"off"}))}><Repeat2/></button></div><div className="volume-row"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="plain-icon" onClick={()=>setModal("lyrics")}><Mic2/></button></div></div>}
+    {modal&&<div className="modal-backdrop" onClick={()=>setModal(null)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><h2>{modal==="playlist"?"Create playlist":modal==="account"?"LYNE account":modal==="settings"?"Settings":modal==="queue"?"Play queue":"Lyrics"}</h2><button className="plain-icon" onClick={()=>setModal(null)}><X/></button></div>
+      {modal==="playlist"&&<><label className="field-label">Playlist name<input autoFocus value={playlistName} onChange={e=>setPlaylistName(e.target.value)} placeholder="My playlist"/></label><button className="primary-button" onClick={createPlaylist} disabled={!playlistName.trim()}>Create playlist</button></>}
+      {modal==="account"&&<><div className="filter-pills"><button className={accountMode==="login"?"selected":""} onClick={()=>setAccountMode("login")}>Sign in</button><button className={accountMode==="register"?"selected":""} onClick={()=>setAccountMode("register")}>Create account</button></div><label className="field-label">Username<input value={accountName} onChange={e=>setAccountName(e.target.value)} autoComplete="username"/></label>{accountMode==="register"&&<label className="field-label">Email<input value={accountEmail} onChange={e=>setAccountEmail(e.target.value)} type="email" autoComplete="email"/></label>}<label className="field-label">Password<input value={accountPassword} onChange={e=>setAccountPassword(e.target.value)} type="password" autoComplete={accountMode==="login"?"current-password":"new-password"}/></label><button className="primary-button" onClick={()=>void submitAccount()}>{accountMode==="login"?"Sign in":"Create account"}</button>{accountMessage&&<p className="modal-note">{accountMessage}</p>}</>}
+      {modal==="settings"&&<><div className="setting-line"><span><b>Appearance</b><small>LYNE dark or light theme</small></span><select value={state.theme} onChange={e=>setState(s=>({...s,theme:e.target.value}))}><option value="dark">Dark</option><option value="light">Light</option></select></div><div className="setting-line"><span><b>Repeat</b><small>Playback repeat mode</small></span><select value={state.repeat} onChange={e=>setState(s=>({...s,repeat:e.target.value as typeof s.repeat}))}><option value="off">Off</option><option value="all">Repeat all</option><option value="one">Repeat one</option></select></div><div className="setting-line"><span><b>Shuffle</b><small>Randomize the play queue</small></span><button className={shuffle?"toggle on":"toggle"} onClick={()=>setShuffle(v=>!v)} /></div></>}
+      {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
+      {modal==="lyrics"&&<div className="lyrics-body">{current.lyrics||"Lyrics aren't available for this track yet."}</div>}
+    </div></div>}
+    {notice&&<button className="notice" onClick={()=>setNotice("")}>{notice}<X size={15}/></button>}
+  </main>;
+}
+function Empty({title,text}:{title:string;text:string}){return <div className="empty"><div className="empty-icon"><Music2/></div><b>{title}</b><p>{text}</p></div>;}
+function Rankings({items}:{items:[string,number][]}){return items.length?<div className="rank-list">{items.map(([name,ms],i)=><div className="rank-row" key={name}><span className="rank-number">{i+1}</span><span className="rank-name">{name}</span><small>{Math.floor(ms/60000)}m</small></div>)}</div>:<Empty title="Your rankings will appear here" text="Listen to music to start building your top 10."/>;}
