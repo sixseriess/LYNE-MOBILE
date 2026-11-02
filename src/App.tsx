@@ -411,6 +411,12 @@ export default function App() {
       {accountMessage&&<p className="auth-message" role="status">{accountMessage}</p>}
       <div className="auth-divider"><span>OR</span></div>
       <button className="auth-guest" onClick={()=>setGuestMode(true)}>Continue as guest</button>
+      <details className="auth-api-details">
+        <summary>Server connection {apiStatus==="online"?"· Connected":isApiConfigured()?"· Check URL":"· Setup needed"}</summary>
+        <label className="auth-field"><span>LYNE Worker URL</span><input value={apiUrlInput} onChange={event=>setApiUrlInput(event.target.value)} placeholder="https://lyne-api.your-subdomain.workers.dev" inputMode="url"/></label>
+        <button className="auth-api-test" type="button" onClick={()=>void connectApi()} disabled={apiTesting}>{apiTesting?"Testing...":"Save URL & test"}</button>
+        {apiMessage&&<p className="auth-api-message">{apiMessage}</p>}
+      </details>
       <p className="auth-footnote">Guest mode keeps local music and preferences on this device. Sign in any time to sync account features.</p>
     </section>
     <p className="auth-version">LYNE MOBILE · BUILT AROUND YOUR MUSIC</p>
