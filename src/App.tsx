@@ -142,6 +142,32 @@ export default function App() {
   const toggleLike=(track:Track)=>setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));
   const next=()=>{if(!queue.length)return;const idx=queue.findIndex(t=>t.id===current?.id);const target=shuffle?queue[Math.floor(Math.random()*queue.length)]:queue[(idx+1)%queue.length];if(target)play(target,queue);};
   const previous=()=>{if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}const idx=queue.findIndex(t=>t.id===current?.id);const target=queue[(idx-1+queue.length)%queue.length];if(target)play(target,queue);};
+  useEffect(()=>{
+    const session=navigator.mediaSession;
+    if(!session)return;
+    if(!current){session.metadata=null;session.playbackState="none";return;}
+    try{
+      if(typeof MediaMetadata!=="undefined"){
+        const cover=current.artwork? [{src:current.artwork,sizes:"512x512"}] : [];
+        session.metadata=new MediaMetadata({title:current.title,artist:current.artist,album:current.album||"LYNE",artwork:cover});
+      }
+      session.playbackState=playing?"playing":"paused";
+    }catch{}
+    const bind=(action:MediaSessionAction,handler:MediaSessionActionHandler|null)=>{try{session.setActionHandler(action,handler);}catch{}};
+    bind("play",()=>setPlaying(true));
+    bind("pause",()=>setPlaying(false));
+    bind("previoustrack",()=>previous());
+    bind("nexttrack",()=>next());
+    bind("seekto",details=>{if(typeof details.seekTime==="number"&&audioRef.current){audioRef.current.currentTime=Math.max(0,details.seekTime);setPosition(audioRef.current.currentTime*1000);}});
+    bind("seekbackward",details=>{if(audioRef.current){const offset=details.seekOffset??10;audioRef.current.currentTime=Math.max(0,audioRef.current.currentTime-offset);setPosition(audioRef.current.currentTime*1000);}});
+    bind("seekforward",details=>{if(audioRef.current){const offset=details.seekOffset??10;const limit=Number.isFinite(audioRef.current.duration)?audioRef.current.duration:Infinity;audioRef.current.currentTime=Math.min(limit,audioRef.current.currentTime+offset);setPosition(audioRef.current.currentTime*1000);}});
+    return ()=>{["play","pause","previoustrack","nexttrack","seekto","seekbackward","seekforward"].forEach(action=>bind(action as MediaSessionAction,null));};
+  },[current?.id,current?.title,current?.artist,current?.album,current?.artwork,playing,queue,shuffle,position,duration]);
+  useEffect(()=>{
+    const session=navigator.mediaSession;
+    if(!session||typeof session.setPositionState!=="function"||duration<=0)return;
+    try{session.setPositionState({duration:duration/1000,position:Math.min(position,duration)/1000,playbackRate:audioRef.current?.playbackRate||1});}catch{}
+  },[position,duration,playing]);
   const allTracks=useMemo(()=>{const unique=new Map<string,Track>();[...localTracks,...homeTracks,...results,...state.history].forEach(track=>unique.set(track.id,track));return [...unique.values()];}, [localTracks,homeTracks,results,state.history]);
   const selectedPlaylist=state.playlists.find(p=>p.id===selectedPlaylistId)||null;
   const selectedPlaylistTracks=selectedPlaylist?selectedPlaylist.trackIds.map(id=>allTracks.find(track=>track.id===id)).filter(Boolean) as Track[]:[];
