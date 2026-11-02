@@ -1,0 +1,1 @@
+LYNE Mobile PWA icon assets.

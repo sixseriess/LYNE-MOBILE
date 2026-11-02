@@ -1,16 +1,15 @@
 # LYNE Mobile
 
-A standalone, mobile-first LYNE music app. The UI uses the Windows app's design language (Inter, near-black surfaces, electric lime accent) while adapting navigation and playback for phones.
+A standalone, installable Progressive Web App (PWA) for phones and tablets. Open it in a browser and add it to the home screen; it launches in its own app-style window without an App Store or Play Store install.
 
-## Scope and separation
+## Add LYNE to your home screen
 
-- This repository is independent from the Windows app repository.
-- The Windows application is used as a read-only visual and feature reference.
-- No Liner API, Liner proxy, or legacy music-service API is called by this project.
-- Mobile requests use only the first-party LYNE API contract under `/v1`.
-- Local audio files can be imported and played directly in the browser. Catalogue streaming, account sync, synced playlists, server-side listening history, and hosted downloads require the LYNE API deployment below.
+- **iPhone / iPad:** open the LYNE Mobile URL in Safari, tap **Share**, then **Add to Home Screen**.
+- **Android:** open the LYNE Mobile URL in Chrome, open the menu, then tap **Install app** or **Add to Home screen**.
 
-## Run the mobile client
+The PWA manifest, iOS home-screen icon, standalone display mode and service worker are included. The service worker caches the app shell for repeat visits and basic offline launch. Music catalogue/API requests are never cached as app-shell files.
+
+## Run locally
 
 ```sh
 npm install
@@ -18,16 +17,20 @@ cp .env.example .env
 npm run dev
 ```
 
-Set `VITE_API_URL` to the deployed LYNE API origin. Leave it blank only while developing local-only UI and audio import.
+Set `VITE_API_URL` to the deployed first-party LYNE API origin. Until that backend is deployed and configured, local audio import and the on-device app features remain available, while remote catalogue/search/account sync report the missing API rather than redirecting elsewhere.
 
-## Deploy the LYNE API
+## Publish
 
-The `api/worker` folder contains LYNE's own Cloudflare Worker API and D1 schema. Follow `api/worker/README.md` to create a D1 database, apply the schema, set the API signing secret, and deploy. This is a new backend; it is not a proxy.
+GitHub Actions builds and deploys `dist` to GitHub Pages on pushes to `main`. In the repository's **Settings → Pages**, set the source to **GitHub Actions**. Once the LYNE API is deployed, add a repository Actions variable named `VITE_API_URL`.
 
-## Deploy the mobile site
+## Project boundaries
 
-The GitHub Actions workflow builds the Vite site and publishes the `dist` folder to GitHub Pages. Configure Pages to use GitHub Actions in repository settings. Add `VITE_API_URL` as a repository Actions variable after the LYNE API is deployed.
+- This repository is independent from the LYNE Windows application repository.
+- The Windows app is used as a read-only reference for design and feature direction.
+- No third-party legacy music API or API proxy is configured or called.
+- The mobile client only talks to the first-party LYNE API configured via `VITE_API_URL`.
+- The API host is intentionally blank by default. The API must be a separately deployed LYNE-owned service.
 
-## Feature status
+## Current mobile foundation
 
-The initial mobile foundation includes mobile navigation, expandable playback controls, queue, local file import/playback, likes, playlist creation, profile photo selection, appearance settings, listening-time tracking, top-10 song/artist rankings and shareable stats text. Remote search, catalogue playback, authenticated sync, lyrics, hosted downloads and remote media depend on the LYNE API and catalogue being deployed and populated. Features are not silently redirected to Liner or another API.
+Mobile navigation, home/search/library/stats/profile views, expandable playback controls, queue controls, local audio import and playback, likes, playlist creation, profile picture selection, appearance and playback settings, listening-time stats, top-10 song/artist rankings, and share-your-stats text sharing are included. Remote music catalogue, account sync, playlist image cloud sync, lyrics, downloads/offline media and synced history need the LYNE API and media catalogue to be implemented and deployed.
