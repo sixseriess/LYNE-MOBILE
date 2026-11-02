@@ -301,13 +301,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:[],updatedAt:Date.now()},201);
   }
 
-  const playlistMatch=path.match(/^\\/v1\\/me\\/playlists\\/([a-f0-9-]+)$/i);
+  const playlistMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)$/i);
   if(playlistMatch && request.method==="PUT"){
     const userId=await requireUser(request,env); const playlistId=playlistMatch[1];
     const body=await request.json() as {name?:string;description?:string;trackIds?:string[]};
     const name=body.name?.trim()||"";
     if(!name||name.length>80)return fail("Playlist name must be 1–80 characters.");
-    if(body.trackIds!==undefined && (!Array.isArray(body.trackIds)||body.trackIds.length>500))return fail("Playlist can contain up to 500 tracks.");
+    if(body.trackIds!==undefined && (!Array.isArray(body.trackIds)||body.trackIds.length>90))return fail("Playlist can contain up to 90 synced catalogue tracks.");
     const owned=await env.DB.prepare("SELECT id FROM playlists WHERE id=? AND user_id=?").bind(playlistId,userId).first();
     if(!owned)return fail("Playlist not found.",404);
     const trackIds=[...new Set((body.trackIds||[]).filter((value):value is string=>typeof value==="string" && value.length<=80))];
