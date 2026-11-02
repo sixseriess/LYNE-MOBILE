@@ -71,6 +71,17 @@ function getAudioSourceQuality(track:Track):{label:string;lossless:boolean;forma
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 async function resizePlaylistImage(file: File): Promise<string> { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext("2d"); if (!context) { bitmap.close(); throw new Error("Could not process that image."); } context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg", 0.82); }
+async function syncPendingPlaylists(items: Playlist[]): Promise<Playlist[]> {
+  return Promise.all(items.map(async playlist=>{
+    if(playlist.synced)return playlist;
+    try{
+      const remote=await lyneApi.createPlaylist(playlist.name,playlist.description||"");
+      const synced={...playlist,id:remote.id,synced:true};
+      await lyneApi.updatePlaylist(synced);
+      return synced;
+    }catch{return playlist;}
+  }));
+}
 function loadState(): typeof blankState {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE) || "{}") as Partial<typeof blankState>;
