@@ -1,6 +1,6 @@
 export type Track = {
   id: string; title: string; artist: string; album?: string; artwork?: string;
-  audioUrl?: string; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
+  audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
   lyrics?: string;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number };
@@ -50,12 +50,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),
   home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string }[] }>("/v1/home"),
-  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string}[]; albums: {id:string;title:string;artist:string;artistId:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  tracks: (limit = 30, offset = 0) => api<{ tracks: Track[]; total: number }>(`/v1/tracks?limit=${limit}&offset=${offset}`),
+  artist: (id: string) => api<{ artist: {id:string;name:string;bio?:string;artwork?:string}; tracks: Track[]; albums: {id:string;title:string;releaseDate?:string;artwork?:string}[] }>(`/v1/artists/${encodeURIComponent(id)}`),
+  album: (id: string) => api<{ album: {id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string}; tracks: Track[] }>(`/v1/albums/${encodeURIComponent(id)}`),
   me: () => api<{ id: string; username: string; avatar?: string }>("/v1/me"),
   login: (username: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   register: (username: string, email: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/register", { method: "POST", body: JSON.stringify({ username, email, password }) }),
   playlists: () => api<{ playlists: Playlist[] }>("/v1/me/playlists"),
-  savePlaylist: (playlist: Playlist) => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify(playlist) }),
+  createPlaylist: (name: string, description = "") => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify({ name, description }) }),
+  updatePlaylist: (playlist: Playlist) => api<Playlist>(`/v1/me/playlists/${encodeURIComponent(playlist.id)}`, { method: "PUT", body: JSON.stringify({ name: playlist.name, description: playlist.description || "", trackIds: playlist.trackIds }) }),
+  deletePlaylist: (id: string) => api<void>(`/v1/me/playlists/${encodeURIComponent(id)}`, { method: "DELETE" }),
   listening: (event: { trackId: string; listenedMs: number; playedAt: string }) => api<void>("/v1/me/listening", { method: "POST", body: JSON.stringify(event) }),
   resolveImport: (url: string) => api<ResolvedImport>(`/v1/import/resolve?url=${encodeURIComponent(url)}`),
   saveImport: (item: ResolvedImport) => api<{ saved:boolean; kind:string; id:string }>("/v1/me/imports", { method:"POST", body:JSON.stringify(item) }),
