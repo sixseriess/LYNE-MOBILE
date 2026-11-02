@@ -48,7 +48,7 @@ async function issueToken(userId: string, secret: string) {
 }
 async function tokenUser(request: Request, env: Env): Promise<string | null> {
   try {
-    const token = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "");
+    const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
     if (!token || !env.AUTH_SECRET) return null;
     const parts = token.split(".");
     if (parts.length !== 3 || parts.some((part) => !part)) return null;
