@@ -24,3 +24,6 @@ jobs:
       - name: Type-check API Worker
         working-directory: backend
         run: npx tsc --noEmit
+      - name: Syntax-check Cloudflare provisioning script
+        working-directory: backend
+        run: node --check scripts/ensure-cloudflare-resources.mjs
