@@ -261,8 +261,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (q.length<2) return json({ tracks:[],artists:[],albums:[],playlists:[] });
     const like="%"+q.replace(/[%_]/g,"")+"%";
     const tracks = type==="all"||type==="tracks" ? await env.DB.prepare(TRACK_SELECT+" WHERE t.published=1 AND (t.title LIKE ? OR a.name LIKE ? OR al.title LIKE ?) ORDER BY t.plays_count DESC LIMIT 30").bind(like,like,like).all<TrackRow>() : {results:[] as TrackRow[]};
-    const artists = type==="all"||type==="artists" ? await env.DB.prepare("SELECT id,name,bio FROM artists WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT 20").bind(like).all() : {results:[]};
-    const albums = type==="all"||type==="albums" ? await env.DB.prepare("SELECT al.id,al.title,a.name AS artist,a.id AS artistId FROM albums al JOIN artists a ON a.id=al.artist_id WHERE al.title LIKE ? OR a.name LIKE ? ORDER BY al.title LIMIT 20").bind(like,like).all() : {results:[]};
+    const artists = type==="all"||type==="artists" ? await env.DB.prepare("SELECT id,name,bio,CASE WHEN image_key IS NULL THEN '' ELSE '/v1/media/' || image_key END AS artwork FROM artists WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT 20").bind(like).all() : {results:[]};
+    const albums = type==="all"||type==="albums" ? await env.DB.prepare("SELECT al.id,al.title,a.name AS artist,a.id AS artistId,CASE WHEN al.artwork_key IS NULL THEN '' ELSE '/v1/media/' || al.artwork_key END AS artwork FROM albums al JOIN artists a ON a.id=al.artist_id WHERE al.title LIKE ? OR a.name LIKE ? ORDER BY al.title LIMIT 20").bind(like,like).all() : {results:[]};
     const playlists = type==="all"||type==="playlists" ? await env.DB.prepare("SELECT p.id,p.name,p.description,u.username AS owner FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.name LIKE ? LIMIT 20").bind(like).all() : {results:[]};
     return json({ tracks:tracks.results.map(publicTrack), artists:artists.results, albums:albums.results, playlists:playlists.results });
   }
