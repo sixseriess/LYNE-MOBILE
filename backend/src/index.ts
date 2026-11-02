@@ -137,7 +137,7 @@ async function media(request: Request, env: Env, key: string) {
       start = object.size - length;
     } else {
       start = object.range.offset ?? 0;
-      length = object.range.length;
+      length = object.range.length ?? Math.max(0, object.size - start);
     }
     headers.set("content-range", `bytes ${start}-${start + length - 1}/${object.size}`);
     headers.set("content-length", String(length));
