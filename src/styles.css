@@ -484,3 +484,8 @@ body{font-feature-settings:"ss01" on,"cv11" on}
 @media(prefers-reduced-motion:reduce){
   *,*:before,*:after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
 }
+
+/* Keep the artwork haze above the player surface without covering controls */
+.player-overlay{isolation:isolate}
+.player-art-backdrop{z-index:0}
+.player-overlay>*:not(.player-art-backdrop){position:relative;z-index:1}
