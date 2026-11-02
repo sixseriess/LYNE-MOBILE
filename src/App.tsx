@@ -15,7 +15,12 @@ const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: 
 const artwork = (track: Track) => track.artwork || "";
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
-function loadState() { try { return { ...blankState, ...JSON.parse(localStorage.getItem(STORE) || "{}") }; } catch { return blankState; } }
+function loadState(): typeof blankState {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE) || "{}") as Partial<typeof blankState>;
+    return { ...blankState, ...saved, profile: { ...blankState.profile, ...saved.profile } };
+  } catch { return blankState; }
+}
 function Cover({ track, className = "" }: { track?: Track; className?: string }) {
   return <div className={`cover ${className}`} style={artwork(track || {} as Track) ? { backgroundImage: `url("${artwork(track!)}")` } : undefined}>{!artwork(track || {} as Track) && <Music2 size={22}/>}</div>;
 }
@@ -113,8 +118,8 @@ export default function App() {
       {modal==="playlist"&&<><label className="field-label">Playlist name<input autoFocus value={playlistName} onChange={e=>setPlaylistName(e.target.value)} placeholder="My playlist"/></label><button className="primary-button" onClick={createPlaylist} disabled={!playlistName.trim()}>Create playlist</button></>}
       {modal==="account"&&<><div className="filter-pills"><button className={accountMode==="login"?"selected":""} onClick={()=>setAccountMode("login")}>Sign in</button><button className={accountMode==="register"?"selected":""} onClick={()=>setAccountMode("register")}>Create account</button></div><label className="field-label">Username<input value={accountName} onChange={e=>setAccountName(e.target.value)} autoComplete="username"/></label>{accountMode==="register"&&<label className="field-label">Email<input value={accountEmail} onChange={e=>setAccountEmail(e.target.value)} type="email" autoComplete="email"/></label>}<label className="field-label">Password<input value={accountPassword} onChange={e=>setAccountPassword(e.target.value)} type="password" autoComplete={accountMode==="login"?"current-password":"new-password"}/></label><button className="primary-button" onClick={()=>void submitAccount()}>{accountMode==="login"?"Sign in":"Create account"}</button>{accountMessage&&<p className="modal-note">{accountMessage}</p>}</>}
       {modal==="settings"&&<><div className="setting-line"><span><b>Appearance</b><small>LYNE dark or light theme</small></span><select value={state.theme} onChange={e=>setState(s=>({...s,theme:e.target.value}))}><option value="dark">Dark</option><option value="light">Light</option></select></div><div className="setting-line"><span><b>Repeat</b><small>Playback repeat mode</small></span><select value={state.repeat} onChange={e=>setState(s=>({...s,repeat:e.target.value as typeof s.repeat}))}><option value="off">Off</option><option value="all">Repeat all</option><option value="one">Repeat one</option></select></div><div className="setting-line"><span><b>Shuffle</b><small>Randomize the play queue</small></span><button className={shuffle?"toggle on":"toggle"} onClick={()=>setShuffle(v=>!v)} /></div></>}
-      {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
-      {modal==="lyrics"&&<div className="lyrics-body">{current.lyrics||"Lyrics aren't available for this track yet."}</div>}
+      {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current?.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
+      {modal==="lyrics"&&<div className="lyrics-body">{current?.lyrics||"Lyrics aren't available for this track yet."}</div>}
     </div></div>}
     {notice&&<button className="notice" onClick={()=>setNotice("")}>{notice}<X size={15}/></button>}
   </main>;
