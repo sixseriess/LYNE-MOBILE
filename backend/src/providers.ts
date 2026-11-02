@@ -113,10 +113,10 @@ async function youtubeImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
 }
 async function appleImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   if(!env.APPLE_MUSIC_DEVELOPER_TOKEN)throw new Error("Apple Music import isn't configured on LYNE yet. Add an Apple Music developer token to the LYNE backend.");
-  const match=url.pathname.match(/^\/([a-z]{2})\/(album|playlist)\/.*\/(\d+)\/?$/i);
+  const match=url.pathname.match(/^\/([a-z]{2})\/(album|playlist|song)\/.*\/(\d+)\/?$/i);
   const songId=url.searchParams.get("i");
   const storefront=match?.[1]||"us";
-  const kind:ImportKind=songId?"track":match?.[2]==="playlist"?"playlist":"album";
+  const kind:ImportKind=songId||match?.[2]==="song"?"track":match?.[2]==="playlist"?"playlist":"album";
   const id=songId||match?.[3];
   if(!id)throw new Error("Paste an Apple Music song, album or playlist link.");
   const resource=kind==="track"?"songs":kind==="playlist"?"playlists":"albums";

@@ -129,8 +129,12 @@ async function media(request: Request, env: Env, key: string) {
   headers.set("cache-control", "public, max-age=31536000, immutable");
   headers.set("x-content-type-options", "nosniff");
   if (object.range) {
-    const start = object.range.offset ?? 0;
-    const length = object.range.length ?? object.size;
+    const start = "offset" in object.range
+      ? object.range.offset
+      : Math.max(0, object.size - object.range.suffix);
+    const length = "length" in object.range
+      ? object.range.length
+      : object.size - start;
     headers.set("content-range", `bytes ${start}-${start + length - 1}/${object.size}`);
     headers.set("content-length", String(length));
     return new Response(request.method === "HEAD" ? null : object.body, { status: 206, headers });

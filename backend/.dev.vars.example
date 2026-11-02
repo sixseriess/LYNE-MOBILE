@@ -1,4 +1,13 @@
-# Set locally in backend/.dev.vars and in Cloudflare Worker secrets.
+# Configure with: npx wrangler secret put <NAME>
 ADMIN_API_TOKEN=replace-with-a-long-random-admin-token
 AUTH_SECRET=replace-with-at-least-32-random-bytes
-CORS_ORIGIN=http://localhost:5173
+
+# Provider API credentials: these are server-only secrets, never mobile app variables.
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+SOUNDCLOUD_CLIENT_ID=
+SOUNDCLOUD_CLIENT_SECRET=
+YOUTUBE_API_KEY=
+APPLE_MUSIC_DEVELOPER_TOKEN=
+
+# CORS_ORIGIN belongs in wrangler.toml; set it to the exact deployed app origin.
