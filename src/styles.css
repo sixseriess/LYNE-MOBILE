@@ -144,3 +144,22 @@ html,body,#root{background:var(--bg)}
 :root[data-theme=light] .plain-icon{color:rgba(0,0,0,.55)}
 :root[data-theme=light] .home-heading-copy p{color:rgba(0,0,0,.5)}
 :root[data-theme=light] .mix-tile b{color:#18181b}
+
+/* Desktop-style Your Mixes rail and artwork-led expanded player */
+.mix-section-heading{display:flex;align-items:center;justify-content:flex-start;gap:10px;margin-top:23px;margin-bottom:13px}
+.mix-section-icon{width:32px;height:32px;flex:none;border-radius:10px;display:grid;place-items:center;color:#fff;background:linear-gradient(145deg,#ff6868,#b91c1c);box-shadow:0 6px 18px rgba(255,77,77,.16)}
+.mix-section-copy{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mix-section-copy h2{font-size:21px;line-height:1.05;letter-spacing:-.8px;font-weight:700;margin:0}
+.mix-section-copy small{font-size:8px;font-weight:700;letter-spacing:1.05px;color:var(--dim)}
+.mix-section-heading .section-note{margin-left:auto}
+.mix-grid{display:flex;align-items:flex-start;gap:15px;overflow-x:auto;overflow-y:hidden;padding:0 1px 6px;scroll-snap-type:x mandatory;scrollbar-width:none}
+.mix-grid::-webkit-scrollbar{display:none}
+.mix-tile{flex:0 0 154px;min-width:0;scroll-snap-align:start}
+.mix-art{width:100%;height:auto;aspect-ratio:1}
+.mix-tile b{font-size:12px}
+.mix-tile small{font-size:10px}
+.player-overlay{isolation:isolate}
+.player-art-backdrop{position:absolute;z-index:0;inset:-28px;pointer-events:none;background-size:cover;background-position:center;filter:blur(48px) saturate(.78);opacity:.38;transform:scale(1.12);mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.72) 66%,transparent 100%)}
+.player-overlay>*:not(.player-art-backdrop){position:relative;z-index:1}
+@media(min-width:600px){.mix-tile{flex-basis:175px}.mix-grid{gap:24px}.mix-section-copy h2{font-size:25px}}
+@media(max-width:380px){.mix-tile{flex-basis:142px}.mix-grid{gap:11px}.mix-section-copy h2{font-size:19px}}
