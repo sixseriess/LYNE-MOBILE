@@ -4,7 +4,7 @@ compatibility_date = "2026-11-01"
 workers_dev = true
 
 [vars]
-CORS_ORIGIN = "*"
+CORS_ORIGIN = "https://sixseriess.github.io"
 
 [[d1_databases]]
 binding = "DB"
