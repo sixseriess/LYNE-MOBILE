@@ -5,6 +5,10 @@ export type Track = {
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number };
 export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
+export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
+export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
+export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; tracks:ExternalTrack[] };
+export type SavedImport = ResolvedImport & { createdAt?:string };
 
 const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 function hydrateMedia<T>(value: T): T {
@@ -53,4 +57,7 @@ export const lyneApi = {
   playlists: () => api<{ playlists: Playlist[] }>("/v1/me/playlists"),
   savePlaylist: (playlist: Playlist) => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify(playlist) }),
   listening: (event: { trackId: string; listenedMs: number; playedAt: string }) => api<void>("/v1/me/listening", { method: "POST", body: JSON.stringify(event) }),
+  resolveImport: (url: string) => api<ResolvedImport>(`/v1/import/resolve?url=${encodeURIComponent(url)}`),
+  saveImport: (item: ResolvedImport) => api<{ saved:boolean; kind:string; id:string }>("/v1/me/imports", { method:"POST", body:JSON.stringify(item) }),
+  getImports: () => api<{ likes:SavedImport[]; collections:SavedImport[] }>("/v1/me/imports"),
 };
