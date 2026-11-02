@@ -41,8 +41,16 @@ jobs:
               exit 1
             fi
           done
-          if [[ "${#LYNE_AUTH_SECRET}" -lt 32 || "${#LYNE_ADMIN_API_TOKEN}" -lt 24 ]]; then
-            echo "::error title=Weak LYNE secrets::Use long random values for LYNE_AUTH_SECRET and LYNE_ADMIN_API_TOKEN."
+          if [[ "${#LYNE_AUTH_SECRET}" -lt 32 ]]; then
+            echo "::error title=LYNE_AUTH_SECRET is too short::Set LYNE_AUTH_SECRET to a random value with at least 32 characters."
+            exit 1
+          fi
+          if [[ "${#LYNE_ADMIN_API_TOKEN}" -lt 24 ]]; then
+            echo "::error title=LYNE_ADMIN_API_TOKEN is too short::Set LYNE_ADMIN_API_TOKEN to a random value with at least 24 characters."
+            exit 1
+          fi
+          if [[ "$LYNE_AUTH_SECRET" =~ [[:space:]] || "$LYNE_ADMIN_API_TOKEN" =~ [[:space:]] ]]; then
+            echo "::error title=Invalid LYNE secret format::Use random values without spaces or line breaks."
             exit 1
           fi
 
