@@ -47,18 +47,36 @@ async function issueToken(userId: string, secret: string) {
   return unsigned + "." + b64url(await hmac(secret, unsigned));
 }
 async function tokenUser(request: Request, env: Env): Promise<string | null> {
-  const token = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token || !env.AUTH_SECRET) return null;
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  const expected = await hmac(env.AUTH_SECRET, parts[0] + "." + parts[1]);
-  const actual = decodeB64url(parts[2]);
-  if (expected.length !== actual.length || expected.some((v, i) => v !== actual[i])) return null;
   try {
-    const data = JSON.parse(new TextDecoder().decode(decodeB64url(parts[1]))) as { sub?: string; exp?: number };
-    if (!data.sub || !data.exp || data.exp < Date.now()/1000) return null;
+    const token = request.headers.get("authorization")?.replace(/^Bearer\\s+/i, "");
+    if (!token || !env.AUTH_SECRET) return null;
+    const parts = token.split(".");
+    if (parts.length !== 3 || parts.some((part) => !part)) return null;
+
+    const header = JSON.parse(new TextDecoder().decode(decodeB64url(parts[0]))) as { alg?: string; typ?: string };
+    if (header.alg !== "HS256" || header.typ !== "JWT") return null;
+
+    const expected = await hmac(env.AUTH_SECRET, parts[0] + "." + parts[1]);
+    const actual = decodeB64url(parts[2]);
+    if (expected.length !== actual.length) return null;
+    let mismatch = 0;
+    for (let index = 0; index < expected.length; index++) mismatch |= expected[index] ^ actual[index];
+    if (mismatch !== 0) return null;
+
+    const data = JSON.parse(new TextDecoder().decode(decodeB64url(parts[1]))) as { sub?: string; iat?: number; exp?: number };
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      typeof data.sub !== "string" || !data.sub ||
+      !Number.isInteger(data.iat) || !Number.isInteger(data.exp) ||
+      (data.iat as number) > now + 60 ||
+      (data.exp as number) <= now ||
+      (data.exp as number) - (data.iat as number) > 60 * 60 * 24 * 30 + 60
+    ) return null;
     return data.sub;
-  } catch { return null; }
+  } catch {
+    // Malformed or tampered bearer tokens are authentication failures, not server errors.
+    return null;
+  }
 }
 async function passwordHash(password: string, salt?: Uint8Array) {
   const actualSalt = salt || crypto.getRandomValues(new Uint8Array(16));
@@ -151,7 +169,23 @@ async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(request, env) });
-  if (path === "/v1/health" && request.method === "GET") return json({ ok: true, service: "LYNE API", storage: "Cloudflare R2", database: "Cloudflare D1" });
+  if (path === "/v1/health" && request.method === "GET") {
+    let database = "unavailable";
+    let schema = "unknown";
+    try {
+      await env.DB.prepare("SELECT 1 AS ok").first();
+      database = "connected";
+      const usersTable = await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").first<{ name: string }>();
+      schema = usersTable ? "ready" : "pending";
+    } catch {
+      // Keep the health response useful without exposing internal database errors.
+    }
+    const storage = env.MEDIA ? "configured" : "missing";
+    const auth = env.AUTH_SECRET ? "configured" : "missing";
+    const admin = env.ADMIN_API_TOKEN ? "configured" : "missing";
+    const ok = database === "connected" && schema === "ready" && storage === "configured" && auth === "configured" && admin === "configured";
+    return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
+  }
 
   if (path.startsWith("/v1/media/") && ["GET","HEAD"].includes(request.method)) {
     const key = path.slice("/v1/media/".length).split("/").map(decodeURIComponent).join("/");
