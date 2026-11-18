@@ -104,8 +104,8 @@ export default function App() {
   const [expanded,setExpanded]=useState(false);
   const [position,setPosition]=useState(0);
   const [duration,setDuration]=useState(0);
-  const [volume,setVolume]=useState(0.8);
-  const [playbackRate,setPlaybackRate]=useState(1);
+  const [volume,setVolume]=useState(()=>{const saved=localStorage.getItem("lyne.mobile.volume");const value=saved===null?0.8:Number(saved);return Number.isFinite(value)?Math.max(0,Math.min(1,value)):0.8;});
+  const [playbackRate,setPlaybackRate]=useState(()=>{const saved=localStorage.getItem("lyne.mobile.playbackRate");const value=saved===null?1:Number(saved);return Number.isFinite(value)&&value>=0.5&&value<=2?value:1;});
   const [query,setQuery]=useState("");
   const [filter,setFilter]=useState<SearchKind>("all");
   const [results,setResults]=useState<Track[]>([]);
@@ -141,7 +141,7 @@ export default function App() {
   const [accountBusy,setAccountBusy]=useState(false);
   const [period,setPeriod]=useState<Period>("week");
   const [localTracks,setLocalTracks]=useState<Track[]>([]);
-  const [shuffle,setShuffle]=useState(false);
+  const [shuffle,setShuffle]=useState(()=>localStorage.getItem("lyne.mobile.shuffle")==="true");
   const [notice,setNotice]=useState("");
   const [settingsSection,setSettingsSection]=useState<"Appearance"|"Playback"|"Storage"|"Shortcuts"|"Overlay"|"Discord"|"YouTube"|"About">("Appearance");
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
@@ -193,6 +193,9 @@ export default function App() {
   useEffect(()=>{ if(apiStatus!=="online")return; lyneApi.home().then(data=>setHomeTracks([...(data.recentlyPlayed||[]),...(data.popular||[])] )).catch(e=>setApiMessage(e.message)); },[apiStatus]);
   useEffect(()=>{ if(!current?.audioUrl){ if(audioRef.current)audioRef.current.pause(); return; } const audio=audioRef.current; if(!audio)return; audio.src=current.audioUrl; audio.volume=volume; if(playing)void audio.play().catch(()=>{setPlaying(false);setNotice("This track couldn't be played.");}); },[current?.id,current?.audioUrl]);
   useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
+  useEffect(()=>{localStorage.setItem("lyne.mobile.volume",String(volume));},[volume]);
+  useEffect(()=>{localStorage.setItem("lyne.mobile.playbackRate",String(playbackRate));},[playbackRate]);
+  useEffect(()=>{localStorage.setItem("lyne.mobile.shuffle",String(shuffle));},[shuffle]);
   useEffect(()=>{if(audioRef.current)audioRef.current.playbackRate=playbackRate;},[playbackRate,current?.id]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{ const audio=audioRef.current; if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);} },500); return ()=>window.clearInterval(timer); },[playing,current?.id]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{setState(s=>{const key=dayKey();const old=s.stats.find(x=>x.id===current.id&&x.day===key);const item={id:current.id,title:current.title,artist:current.artist,ms:(old?.ms||0)+1000,day:key};return {...s,stats:old?s.stats.map(x=>x===old?item:x):[...s.stats,item]};});},1000);return()=>window.clearInterval(timer); },[playing,current?.id]);
