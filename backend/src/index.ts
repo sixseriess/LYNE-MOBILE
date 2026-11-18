@@ -367,6 +367,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return new Response(null,{status:204});
   }
 
+  if(path==="/v1/me/listening" && request.method==="GET"){
+    const userId=await requireUser(request,env);
+    const history=await env.DB.prepare(`SELECT le.track_id AS id,t.title,a.name AS artist,SUM(le.listened_ms) AS ms,substr(le.played_at,1,10) AS day
+      FROM listening_events le JOIN tracks t ON t.id=le.track_id JOIN artists a ON a.id=t.artist_id
+      WHERE le.user_id=? GROUP BY le.track_id,substr(le.played_at,1,10) ORDER BY day DESC,ms DESC LIMIT 5000`).bind(userId).all<{id:string;title:string;artist:string;ms:number;day:string}>();
+    return json({stats:history.results.map(item=>({...item,ms:Number(item.ms)||0}))});
+  }
+
   if(path==="/v1/me/listening" && request.method==="POST"){
     const userId=await requireUser(request,env); const body=await request.json() as {trackId?:string;listenedMs?:number;playedAt?:string};
     const ms=Math.max(0,Math.min(60*60*1000,Math.floor(body.listenedMs||0)));
