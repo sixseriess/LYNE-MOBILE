@@ -1999,3 +1999,36 @@ html,body,#root{width:100%;height:100%;min-height:100%;margin:0;background:#000;
 
 /* DailyMixCover SVG wordmark matches the Windows 40x14 LYNE mark. */
 .mix-artwork-logo{width:40px;height:14px;display:block;overflow:visible;font-size:initial;letter-spacing:normal;line-height:normal;text-shadow:none}
+
+
+/* Library cards follow the Windows LibraryGrid: artwork first, no tile chrome. */
+.library-content-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:24px;padding:0 12px 24px}
+.library-content-grid .library-item-card{
+  display:flex;min-width:0;flex-direction:column;align-items:stretch;gap:0;
+  padding:0;border:0;border-radius:0;background:transparent;box-shadow:none;
+  color:inherit;text-align:left;
+}
+.library-content-grid .library-item-art{
+  position:relative;width:100%;height:auto;aspect-ratio:1;overflow:hidden;
+  display:block;border-radius:6px;background:#141414;background-size:cover;background-position:center;
+}
+.library-content-grid .library-item-art img{display:block;width:100%;height:100%;object-fit:cover}
+.library-content-grid .library-item-card b{display:block;margin-top:8px;font-size:14px;line-height:1.25;font-weight:500;color:var(--text-primary,#fff)}
+.library-content-grid .library-item-card small{display:block;margin-top:2px;font-size:13px;line-height:1.35;color:rgba(255,255,255,.45)}
+.library-content-grid.list{display:flex;flex-direction:column;gap:4px}
+.library-content-grid.list .library-row{
+  display:flex;align-items:center;gap:16px;width:100%;min-height:64px;
+  padding:8px;border:0;border-radius:6px;background:transparent;color:inherit;text-align:left;
+}
+.library-content-grid.list .library-art{width:48px;height:48px;flex:none;overflow:hidden;border-radius:6px;background:#141414}
+.library-content-grid.list .library-art img{display:block;width:100%;height:100%;object-fit:cover}
+.library-content-grid.list .library-row>span{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}
+.library-content-grid.list .library-row b{font-size:16px;line-height:1.2;font-weight:400;color:var(--text-primary,#fff)}
+.library-content-grid.list .library-row small{font-size:15px;line-height:1.2;font-weight:350;color:var(--text-secondary,rgba(255,255,255,.7))}
+.library-content-grid.list .library-row>svg{width:17px;color:var(--text-tertiary,rgba(255,255,255,.45))}
+#liked-tracks-section,#local-files-section{scroll-margin-top:14px}
+.page-home .home-track-play{display:none!important}
+:root[data-theme=light] .library-content-grid .library-item-card b{color:#18181b}
+:root[data-theme=light] .library-content-grid .library-item-card small{color:rgba(0,0,0,.48)}
+:root[data-theme=light] .library-content-grid.list .library-row b{color:#18181b}
+:root[data-theme=light] .library-content-grid.list .library-row small{color:rgba(0,0,0,.55)}
