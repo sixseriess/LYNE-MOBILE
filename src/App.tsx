@@ -441,7 +441,7 @@ export default function App() {
     const root=document.documentElement;
     if(current?.artwork)root.style.setProperty("--current-artwork",`url("${current.artwork}")`);
     else root.style.removeProperty("--current-artwork");
-    return ()=>root.style.removeProperty("--current-artwork");
+    return ()=>{root.style.removeProperty("--current-artwork");};
   },[current?.artwork]);
   useEffect(()=>{
     const [red,green,blue]=ambientColor.split(",").map(value=>Math.max(0,Math.min(255,Number(value)||0)));
