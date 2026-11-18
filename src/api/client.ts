@@ -1,7 +1,7 @@
 export type Track = {
   id: string; title: string; artist: string; album?: string; artwork?: string;
   audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
-  lyrics?: string;
+  lyrics?: string; offline?: boolean;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
 export type SearchPlaylist = { id: string; name: string; description?: string; owner: string; cover?: string };

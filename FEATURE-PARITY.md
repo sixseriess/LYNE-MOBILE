@@ -26,7 +26,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Create playlists and save external song / playlist / album links.
 - [x] Full playlist editing: rename, description, account-synced custom artwork, reorder, remove tracks, and delete.
 - [ ] Full local library management, metadata, artwork, and persistent file access where browser permissions allow.
-- [ ] Cached / saved tracks and offline mixes with storage limits and clear-cache controls.
+- [x] Save individual first-party LYNE catalogue tracks to device storage for offline playback, with a configurable download limit and remove controls. Offline mixes remain a future enhancement.
 - [ ] Import review, duplicate handling, progress, retries, and source attribution.
 - [ ] Spotify, SoundCloud, YouTube, and Apple Music imports must follow each provider's official terms and approved playback/embed path. Imports do not imply permission to copy or rehost audio.
 
