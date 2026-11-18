@@ -46,7 +46,8 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Basic LYNE account sign-in / registration UI and local profile image selection.
 - [ ] Reliable account restore, secure token lifecycle, sign-out cleanup, and sync for library, playlists, preferences, and stats.
 - [ ] Profile editing and persistent avatar upload / sync.
-- [ ] Listening history and full statistics, including day / week / month / year filters, top songs, and top artists.
+- [ ] Full statistics experience, including day / week / month / year filters and top songs / artists.
+- [x] Authenticated listening history can be retrieved from the LYNE API and restored across signed-in sessions.
 - [x] Export and share branded LYNE listening-stat images (native file share where supported, image-save fallback elsewhere).
 - [ ] Yearly Wrapped and historical listening summaries, if present in the Windows app.
 
@@ -70,6 +71,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and editing, local profile image selection, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
+The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and editing, local profile image selection, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation, including authenticated listening-history retrieval and sync. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
