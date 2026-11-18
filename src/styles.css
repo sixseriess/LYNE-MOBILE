@@ -1213,3 +1213,144 @@ html,body,#root{background:#08090b}
  .mini-player{left:72px}
  .mix-card,.home-track-card{flex-basis:175px;width:175px}
 }
+
+
+/* True phone layout: phone-width canvas on desktop, edge-to-edge on devices. */
+html,body,#root{width:100%;height:100%;min-height:100%;overflow:hidden;background:#050506}
+body{margin:0;overscroll-behavior:none}
+.app-shell{
+  width:100%;
+  max-width:430px;
+  height:100dvh;
+  min-height:100dvh;
+  margin:0 auto;
+  overflow:hidden;
+  position:relative;
+  background:#08090b;
+  box-shadow:0 0 0 1px rgba(255,255,255,.07),0 0 70px rgba(0,0,0,.5);
+}
+.app-shell:before{inset:42px -18% 80px;opacity:.19;filter:blur(62px) saturate(1.3)}
+.topbar{height:48px;min-height:48px;padding:0 12px 0 14px}
+.topbar .brand{height:48px;min-width:58px}
+.top-actions{gap:7px}
+.page{
+  height:calc(100% - 48px);
+  min-height:0;
+  margin:0;
+  padding:12px 15px calc(132px + env(safe-area-inset-bottom));
+  overflow-y:auto;
+  overflow-x:hidden;
+}
+.app-dock.windows-sidebar{
+  left:50%;
+  right:auto;
+  top:auto;
+  bottom:calc(7px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:min(370px,calc(100% - 24px));
+  height:49px;
+  min-height:49px;
+  flex-direction:row;
+  align-items:center;
+  justify-content:space-around;
+  gap:2px;
+  padding:4px 7px;
+  border:1px solid rgba(255,255,255,.09);
+  border-radius:13px;
+  background:rgba(25,26,30,.88);
+  backdrop-filter:blur(26px) saturate(155%);
+  -webkit-backdrop-filter:blur(26px) saturate(155%);
+  box-shadow:0 8px 28px rgba(0,0,0,.34);
+}
+.app-dock.windows-sidebar button{
+  position:relative;
+  flex:1 1 0;
+  width:auto;
+  min-width:0;
+  height:39px;
+  min-height:39px;
+  border-radius:8px;
+  color:rgba(240,242,246,.5);
+}
+.app-dock.windows-sidebar button.active{color:#fff;background:rgba(255,255,255,.075)}
+.app-dock.windows-sidebar button.active:after{
+  position:absolute;
+  right:auto;
+  left:50%;
+  bottom:2px;
+  top:auto;
+  transform:translateX(-50%);
+  width:3px;
+  height:3px;
+  border-radius:50%;
+  background:var(--lime);
+  box-shadow:0 0 9px rgba(var(--lime-rgb),.45);
+}
+.app-dock.windows-sidebar button svg{width:21px;height:21px}
+.app-dock.windows-sidebar .sidebar-spacer{display:none}
+.app-dock.windows-sidebar .sidebar-settings{margin:0}
+.mini-player{
+  left:8px;
+  right:8px;
+  bottom:calc(63px + env(safe-area-inset-bottom));
+  height:53px;
+  padding:6px 8px;
+  border-radius:9px;
+  gap:8px;
+}
+.mini-player .cover{width:39px;height:39px}
+.mini-player .plain-icon{padding:6px}
+.mini-copy{gap:3px}
+.mini-copy b{font-size:11px}
+.mini-copy small{font-size:9px}
+.home-heading.windows-home-heading{min-height:58px;padding:2px 0 10px}
+.windows-home-heading h1{font-size:23px}
+.home-filter-pills{gap:16px;padding:7px 0 11px}
+.home-filter-pills button{font-size:11px}
+.mix-section-heading .mix-section-copy h2{font-size:25px}
+.section-heading{margin:20px 1px 10px}
+.section-heading h2{font-size:15px}
+.mix-grid{gap:14px}
+.mix-card,.home-track-card{flex-basis:142px;width:142px}
+.mix-tile b,.home-track-card>b{font-size:11px}
+.track-row{padding:7px 1px}
+.track-row .cover,.cover{width:40px;height:40px}
+.track-main{gap:10px}
+.track-copy b{font-size:11px}
+.track-copy small{font-size:9px}
+.artist-page-backdrop .artist-page-modal{width:100%;max-width:430px;left:50%;transform:translateX(-50%)}
+.artist-page-modal .music-detail-hero{padding:21px 17px 12px;gap:12px}
+.artist-page-modal .music-detail-art{width:clamp(132px,40vw,166px);height:clamp(132px,40vw,166px)}
+.artist-page-modal .music-detail-hero h3{font-size:25px}
+.artist-page-modal .artist-detail-actions{padding:7px 15px 14px}
+.artist-page-modal .section-heading{padding:0 15px;margin-top:17px}
+.artist-page-modal .track-list{padding:0 11px}
+.player-overlay{padding:calc(10px + env(safe-area-inset-top)) 19px calc(14px + env(safe-area-inset-bottom))}
+.player-cover{width:min(74vw,285px);margin-top:auto;margin-bottom:18px}
+.player-track h2{font-size:18px}
+.transport{margin:16px 0}
+.main-play{width:51px;height:51px}
+.settings-layout{min-height:0}
+.settings-tabs{gap:5px;padding-bottom:8px}
+.settings-tabs button{padding:7px 9px;font-size:10px}
+.settings-content .settings-section-title{font-size:15px}
+.modal-backdrop{padding:8px;align-items:flex-end}
+.modal{max-height:min(88dvh,760px);padding:15px 14px 20px}
+@media(min-width:431px){
+  .app-shell{border-left:1px solid rgba(255,255,255,.08);border-right:1px solid rgba(255,255,255,.08)}
+}
+@media(max-width:360px){
+  .page{padding-left:12px;padding-right:12px}
+  .app-dock.windows-sidebar{width:calc(100% - 18px);height:47px;min-height:47px}
+  .app-dock.windows-sidebar button svg{width:20px;height:20px}
+  .mini-player{left:7px;right:7px}
+  .mix-card,.home-track-card{flex-basis:128px;width:128px}
+  .artist-page-modal .music-detail-art{width:132px;height:132px}
+}
+@media(max-height:680px){
+  .app-shell{height:100dvh;min-height:100dvh}
+  .player-cover{width:min(60vw,225px);margin-top:8px;margin-bottom:12px}
+  .player-top{margin-bottom:8px}
+  .transport{margin:10px 0}
+  .player-track{margin-bottom:12px}
+}
