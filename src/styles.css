@@ -704,3 +704,7 @@ body{font-feature-settings:"ss01" on,"cv11" on}
 .player-overlay.ambient-soft .player-art-backdrop{opacity:.42;filter:blur(48px) saturate(.9)}
 .player-overlay.ambient-glow .player-art-backdrop{opacity:.76;filter:blur(62px) saturate(1.5)}
 .player-overlay.ambient-off .player-art-backdrop{opacity:0}
+
+.detail-error{display:flex;flex-direction:column;gap:10px;padding:18px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--surface)}
+.detail-error p{font-size:12px;color:var(--muted);line-height:1.5;margin:0}
+.detail-error .secondary-action{align-self:flex-start}
