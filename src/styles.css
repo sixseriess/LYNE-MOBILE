@@ -1980,3 +1980,402 @@ html,body,#root{background:#0a0a0a;color:#f4f4f5}
   opacity:.22;filter:blur(58px) saturate(.92);
   background-image:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.72) 62%,#f0f0f3 100%),var(--current-artwork);
 }
+
+
+/* Final Windows-fidelity pass: remove decorative mobile-only treatments. */
+.app-shell{
+  width:100%;max-width:none;height:100dvh;min-height:100dvh;margin:0;
+  overflow:hidden;background:#0a0a0a;isolation:isolate;
+  background-image:none!important;
+}
+.app-shell:before{
+  content:"";position:absolute;z-index:0;left:0;right:0;top:0;bottom:50%;
+  pointer-events:none;display:block;background-image:var(--current-artwork);
+  background-size:cover;background-position:center 24%;
+  filter:blur(32px) saturate(130%);opacity:.6;
+  transform:scale(1.1) translateZ(0);
+  mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.9) 45%,transparent 100%);
+}
+.app-shell>*{position:relative}
+.topbar{
+  position:absolute;z-index:45;top:calc(6px + env(safe-area-inset-top));left:6px;right:6px;
+  height:50px;min-height:50px;padding:0 6px 0 0;border:0;background:transparent;
+  backdrop-filter:none;-webkit-backdrop-filter:none;
+}
+.topbar .brand{
+  width:76px;height:50px;min-width:76px;display:flex;align-items:center;justify-content:center;
+  padding:0;margin:0;border:0;background:transparent;
+}
+.topbar .brand img{
+  display:block;width:54px!important;height:27px!important;max-width:54px;
+  object-fit:contain;flex:none;filter:none;
+}
+.top-actions{
+  height:38px;display:flex;align-items:center;gap:2px;margin:0;padding:0 4px;
+  border:0;border-radius:10px;background:rgba(70,70,70,.2);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+}
+.top-actions .avatar{
+  width:30px;height:30px;flex:none;border:0;border-radius:8px;
+  background:rgba(255,255,255,.06);color:#f5f5f5;font-size:12px;
+}
+.page{
+  position:absolute;z-index:1;top:calc(56px + env(safe-area-inset-top));right:6px;bottom:6px;left:64px;
+  min-width:0;min-height:0;margin:0;flex:none;overflow-x:hidden;overflow-y:auto;
+  overscroll-behavior:contain;padding:0 12px calc(70px + env(safe-area-inset-bottom));
+  border-radius:12px;scrollbar-width:none;background:transparent;
+}
+.page::-webkit-scrollbar{display:none}
+.app-dock.windows-sidebar{
+  position:absolute;z-index:45;left:6px;right:auto;top:calc(56px + env(safe-area-inset-top));bottom:6px;
+  width:58px;height:auto;transform:none;display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;gap:20px;padding:16px 0;
+  border:0;border-radius:12px;background:rgba(70,70,70,.2);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:none;
+}
+.app-dock.windows-sidebar button{
+  position:relative;width:100%;height:29px;min-height:29px;flex:none;padding:0;
+  display:grid;place-items:center;border:0;border-radius:0;background:transparent;
+  color:rgba(245,245,245,.55);transition:opacity .15s;
+}
+.app-dock.windows-sidebar button svg{width:26px;height:26px;stroke-width:1.75}
+.app-dock.windows-sidebar button.active{color:#f5f5f5;background:transparent}
+.app-dock.windows-sidebar button.active:after{display:none!important;content:none!important}
+.app-dock.windows-sidebar .sidebar-spacer{display:block;flex:1;min-height:18px}
+.app-dock.windows-sidebar .sidebar-settings{margin:0 0 1px}
+.mini-player{
+  position:absolute;z-index:55;left:64px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom));
+  height:64px;min-height:64px;padding:5px 8px;display:flex;align-items:center;gap:4px;
+  border:1px solid rgba(255,255,255,.07);border-radius:12px;
+  background:rgba(10,10,10,.42);backdrop-filter:blur(48px) saturate(150%);
+  -webkit-backdrop-filter:blur(48px) saturate(150%);
+  box-shadow:none;text-align:left;
+}
+.mini-player:before{display:none!important}
+.mini-player-open{
+  min-width:0;min-height:48px;flex:1;display:flex;align-items:center;gap:9px;
+  padding:0;border:0;background:transparent;text-align:left;overflow:hidden;
+}
+.mini-player .cover{width:38px;height:38px;flex:none;border-radius:7px}
+.mini-player-open .mini-copy{min-width:0;flex:1;gap:3px}
+.mini-player-open .mini-copy b{font-size:12px;font-weight:450;color:#f2f2f2}
+.mini-player-open .mini-copy small{font-size:11px;color:rgba(245,245,245,.55)}
+.mini-player-controls,.mini-player-extras{display:flex;align-items:center;justify-content:center;gap:0;flex:none}
+.mini-player-controls .plain-icon,.mini-player-extras .plain-icon{
+  width:29px;height:32px;padding:4px;color:rgba(245,245,245,.68)
+}
+.mini-player-controls .mini-play{color:#f5f5f5}
+.mini-player-controls .mini-play svg{width:19px;height:19px}
+.mini-player-extras .liked{color:var(--lime)}
+.mini-progress{
+  position:absolute;left:8px;right:8px;bottom:0;height:2px;overflow:hidden;
+  border-radius:2px;background:rgba(255,255,255,.1);pointer-events:none
+}
+.mini-progress span{display:block;height:100%;border-radius:inherit;background:#f0f0f0;transition:width .2s linear}
+
+/* Home uses the same unboxed, artwork-first cards as the Windows Home feed. */
+.page-home{padding-top:0;isolation:isolate}
+.windows-daily-mixes-heading{
+  position:relative;z-index:1;display:flex;align-items:center;gap:12px;
+  min-height:44px;margin:0 0 12px;padding:0;
+}
+.mix-fluid-square{
+  position:relative;width:32px;height:32px;flex:none;overflow:hidden;border-radius:10px;
+  background:rgba(var(--lime-rgb),.88);user-select:none;
+}
+.mix-fluid-square:before,.mix-fluid-square:after,.mix-fluid-square i{
+  position:absolute;display:block;border-radius:50%;content:"";will-change:transform;
+}
+.mix-fluid-square:before{
+  width:25px;height:25px;left:-5px;top:-5px;background:rgba(255,255,255,.55);
+  filter:blur(4px);animation:lyne-fluid-drift 5.5s ease-in-out infinite alternate;
+}
+.mix-fluid-square:after{
+  width:29px;height:29px;right:-7px;bottom:-7px;background:rgba(0,0,0,.22);
+  filter:blur(5px);animation:lyne-fluid-swish 4.5s ease-in-out infinite alternate;
+}
+.mix-fluid-square i:nth-child(1){
+  width:22px;height:22px;left:50%;top:50%;background:rgba(255,255,255,.28);
+  filter:blur(4px);transform:translate(-50%,-50%);animation:lyne-fluid-spin 6.5s ease-in-out infinite;
+}
+.mix-fluid-square i:nth-child(2){display:none}
+.mix-fluid-square i:nth-child(3){display:none}
+@keyframes lyne-fluid-drift{0%{transform:translate(0,0) scale(1)}50%{transform:translate(4px,4px) scale(1.18)}100%{transform:translate(1px,6px) scale(.92)}}
+@keyframes lyne-fluid-swish{0%{transform:translate(0,0) scale(1)}50%{transform:translate(-6px,-6px) scale(1.22)}100%{transform:translate(-3px,-8px) scale(.95)}}
+@keyframes lyne-fluid-spin{0%{transform:translate(-50%,-50%) rotate(0deg) scale(.85,1.2)}50%{transform:translate(-50%,-50%) rotate(180deg) scale(1.25,.8)}100%{transform:translate(-50%,-50%) rotate(360deg) scale(.85,1.2)}}
+.windows-daily-mixes-heading h1{
+  margin:0;color:#f5f5f5;font-size:36px;line-height:1;letter-spacing:-1.25px;font-weight:560;
+}
+.page-home .section-heading{
+  position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;
+  margin:22px 0 12px;padding:0;
+}
+.page-home .section-heading h2{
+  margin:0;color:#f4f4f5;font-size:24px;line-height:1.08;
+  letter-spacing:-.65px;font-weight:560;
+}
+.page-home .section-note{font-size:10px;letter-spacing:.3px;font-weight:400;color:rgba(245,245,245,.48)}
+.page-home .mix-grid{
+  position:relative;z-index:1;display:flex;align-items:flex-start;gap:28px;
+  width:100%;overflow-x:auto;overflow-y:hidden;padding:0 0 3px;
+  scroll-snap-type:x proximity;scrollbar-width:none;
+}
+.page-home .mix-grid::-webkit-scrollbar,.page-home .home-card-rail::-webkit-scrollbar{display:none}
+.page-home .mix-card{position:relative;flex:0 0 175px;width:175px;min-width:0;scroll-snap-align:start}
+.page-home .mix-tile{
+  width:100%;min-width:0;display:flex;flex-direction:column;gap:0;
+  padding:0;border:0;border-radius:0;background:transparent;text-align:left;overflow:hidden;
+}
+.mix-artwork{
+  position:relative;width:100%;height:auto;aspect-ratio:1;overflow:hidden;
+  border-radius:6px;background-color:#151515;background-size:cover;background-position:center;
+  box-shadow:none;
+}
+.mix-artwork:after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.08),transparent 48%,rgba(0,0,0,.12));
+}
+.mix-artwork-logo{
+  position:absolute;z-index:1;left:12px;top:12px;color:#fff;
+  font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:800;
+  letter-spacing:-.8px;line-height:1;text-shadow:0 1px 7px rgba(0,0,0,.45);
+}
+.mix-artwork-word{
+  position:absolute;z-index:1;left:10px;bottom:9px;color:#fff;
+  font-family:Arial,Helvetica,sans-serif;font-size:44px;font-weight:800;
+  line-height:.8;letter-spacing:-1.8px;text-shadow:0 1px 10px rgba(0,0,0,.25);
+}
+.mix-artwork-number{
+  position:absolute;z-index:1;right:10px;bottom:8px;color:#fff;
+  font-family:Arial,Helvetica,sans-serif;font-size:46px;font-weight:500;
+  line-height:.8;letter-spacing:-.9px;text-shadow:0 1px 10px rgba(0,0,0,.25);
+}
+.page-home .mix-tile>b{
+  display:block;margin-top:8px;padding:0;font-size:14px;line-height:1.25;
+  font-weight:500;color:#f1f1f2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.page-home .mix-tile>small{
+  display:block;margin-top:4px;padding:0;font-size:13px;line-height:1.25;
+  font-weight:400;color:rgba(245,245,245,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.page-home .mix-download-action{
+  position:absolute;right:4px;bottom:2px;z-index:2;
+  width:25px;height:25px;display:grid;place-items:center;margin:0;padding:0;
+  border:0;border-radius:50%;background:rgba(10,10,10,.62);color:rgba(255,255,255,.8);
+  opacity:.72;
+}
+.page-home .mix-download-action:disabled{display:none}
+.page-home .home-card-rail{
+  position:relative;z-index:1;display:flex;gap:28px;overflow-x:auto;overflow-y:hidden;
+  padding:0 0 4px;scroll-snap-type:x proximity;scrollbar-width:none;
+}
+.page-home .home-track-card{flex:0 0 175px;min-width:0;scroll-snap-align:start}
+.page-home .home-track-art{
+  width:100%;aspect-ratio:1;position:relative;overflow:hidden;border-radius:6px;
+  background:#151515;box-shadow:none;
+}
+.page-home .home-track-art>.cover{width:100%;height:100%;border-radius:6px;box-shadow:none}
+.page-home .home-track-art:after{background:linear-gradient(180deg,rgba(0,0,0,.1),transparent 38%,rgba(0,0,0,.15))}
+.page-home .home-track-index{display:none!important}
+.page-home .home-track-play{display:none!important}
+.page-home .home-track-card>b{
+  margin-top:8px;font-size:14px;line-height:1.25;font-weight:500;color:#f1f1f2;
+}
+.page-home .home-track-card>small{margin-top:4px;font-size:13px;line-height:1.25;color:rgba(245,245,245,.45)}
+.page-home .empty{position:relative;z-index:1}
+
+/* Search is the Windows search surface without the mobile welcome/marketing hero. */
+.page-search{padding-top:0}
+.page-search .hero{display:none}
+.page-search .searchbox{
+  height:54px;margin:0 0 10px;padding:0 16px;gap:12px;
+  border:1px solid rgba(255,255,255,.08);border-radius:8px;
+  background:rgba(26,26,26,.92);color:rgba(245,245,245,.6);
+}
+.page-search .searchbox input{font-size:15px;color:#f5f5f5}
+.page-search .filter-pills{
+  display:flex;gap:6px;overflow-x:auto;padding:6px 0 10px;
+  scrollbar-width:none;border:0;
+}
+.page-search .filter-pills::-webkit-scrollbar{display:none}
+.page-search .filter-pills button{
+  height:34px;flex:none;padding:0 12px;border:0;border-radius:12px;
+  background:transparent;color:rgba(245,245,245,.58);
+  font-size:13px;font-weight:400;white-space:nowrap;
+}
+.page-search .filter-pills button.selected{
+  background:rgba(255,255,255,.08);color:#f5f5f5;font-weight:550;
+}
+.page-search .section-heading{margin:18px 0 10px}
+.page-search .section-heading h2{font-size:18px;font-weight:550}
+.page-search .track-row{min-height:60px}
+
+/* Library uses the native Windows tabs, compact search and grid/list controls. */
+.page-library{padding-top:0}
+.library-page-title{padding:36px 12px 10px}
+.library-page-title h1{
+  margin:0;color:#f3f3f4;font-size:26px;line-height:1.2;
+  letter-spacing:-.65px;font-weight:700;
+}
+.library-tab-row{
+  display:flex;align-items:center;gap:8px;overflow-x:auto;padding:0 12px 10px;
+  scrollbar-width:none;
+}
+.library-tab-row::-webkit-scrollbar{display:none}
+.library-tab-row button{
+  flex:none;height:34px;padding:0 15px;border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;background:rgba(70,70,70,.18);color:rgba(245,245,245,.7);
+  font-size:12px;font-weight:450;white-space:nowrap;
+}
+.library-tab-row button.active{
+  border-color:transparent;background:#f2f2f3;color:#101010;font-weight:550;
+}
+.library-toolbar{
+  display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 12px 10px;
+}
+.library-search{
+  height:36px;min-width:0;flex:1 1 140px;display:flex;align-items:center;gap:8px;
+  padding:0 10px;border:1px solid rgba(255,255,255,.055);border-radius:9px;
+  background:rgba(70,70,70,.18);color:rgba(245,245,245,.62);
+}
+.library-search input{
+  width:100%;min-width:0;height:32px;padding:0;border:0;outline:0;
+  background:transparent;color:#f5f5f5;font-size:12px;
+}
+.library-search input::placeholder{color:rgba(245,245,245,.38)}
+.library-view-controls{display:flex;align-items:center;gap:4px}
+.library-view-controls button,.library-import-link{
+  width:36px;height:36px;flex:none;display:grid;place-items:center;
+  border:1px solid rgba(255,255,255,.055);border-radius:9px;
+  background:rgba(70,70,70,.18);color:rgba(245,245,245,.66);
+}
+.library-view-controls button.selected{background:rgba(255,255,255,.12);color:#f5f5f5;border-color:transparent}
+.library-create-button{
+  min-height:36px;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 11px;border:0;border-radius:9px;background:#f2f2f3;color:#111;
+  font-size:11px;font-weight:550;white-space:nowrap;
+}
+.library-content-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:start;gap:20px 14px;padding:4px 12px 12px;
+}
+.library-content-grid.list{display:flex;flex-direction:column;gap:2px;padding-top:0}
+.library-item-card{
+  min-width:0;width:100%;display:flex;flex-direction:column;gap:0;
+  padding:0;border:0;border-radius:0;background:transparent;text-align:left;
+  color:#f2f2f3;overflow:hidden;
+}
+.library-item-art{
+  width:100%;aspect-ratio:1;position:relative;display:grid;place-items:center;
+  overflow:hidden;border-radius:6px;background:#171717;background-size:cover;background-position:center;
+  color:rgba(255,255,255,.86);
+}
+.library-item-art svg{width:27px;height:27px}
+.library-item-card>b{
+  display:block;min-width:0;margin-top:8px;color:#f2f2f3;
+  font-size:14px;line-height:1.25;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.library-item-card>small{
+  display:block;margin-top:4px;color:rgba(245,245,245,.46);
+  font-size:13px;line-height:1.25;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.library-content-grid.list .library-item-card{
+  display:flex;flex-direction:row;align-items:center;gap:14px;
+  min-height:64px;padding:8px;border-radius:7px;
+}
+.library-content-grid.list .library-item-art{width:48px;height:48px;flex:none;border-radius:6px}
+.library-content-grid.list .library-item-card>b{margin:0;flex:1;font-size:15px;font-weight:400}
+.library-content-grid.list .library-item-card>small{margin:0 0 0 auto;font-size:13px}
+.library-content-grid.list .library-row,.library-content-grid.list .imported-row{min-height:64px;padding:8px;border-radius:7px}
+.library-section-heading{margin:22px 12px 10px!important}
+.library-section-heading h2{font-size:20px!important;font-weight:560!important;letter-spacing:-.45px}
+.library-local-actions{display:flex;align-items:center;gap:10px}
+.library-local-actions button{display:flex;align-items:center;gap:5px;font-size:11px}
+.page-library .track-list{padding:0 12px}
+.page-library .track-row{min-height:60px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.055)}
+.page-library .track-copy b{font-size:13px;font-weight:500}
+.page-library .track-copy small{font-size:12px}
+.page-library .empty{padding:24px 10px}
+
+/* Shared typography, surface and touch sizing for the other Windows-style pages. */
+.page .hero{padding:12px 0 16px}
+.page .hero h1{font-size:30px;letter-spacing:-.8px;font-weight:650}
+.page .eyebrow{font-size:9px;letter-spacing:1.4px}
+.page .muted{font-size:13px;color:rgba(245,245,245,.53)}
+.page .filter-pills button,.page .period-pills button{
+  border:1px solid rgba(255,255,255,.055);border-radius:10px;
+  background:rgba(70,70,70,.16);color:rgba(245,245,245,.64);
+}
+.page .filter-pills button.selected,.page .period-pills button.selected{
+  border-color:transparent;background:rgba(255,255,255,.12);color:#f5f5f5;
+}
+.page .section-heading{margin:22px 0 10px}
+.page .section-heading h2{font-size:20px;letter-spacing:-.45px;font-weight:560}
+.page .track-row{min-height:60px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.page .track-copy b{font-size:13px;font-weight:500}
+.page .track-copy small{font-size:12px}
+.page .cover{width:48px;height:48px;border-radius:6px}
+.page .plain-icon{padding:7px;color:rgba(245,245,245,.6)}
+
+/* Match Windows theme tokens in the light palette without leaving dark controls behind. */
+:root[data-theme=light] .app-shell{background:#f5f5f7!important}
+:root[data-theme=light] .app-shell:before{
+  opacity:.45;filter:blur(32px) saturate(120%);
+  background-image:linear-gradient(to bottom,rgba(255,255,255,.08) 0%,rgba(255,255,255,.65) 100%),var(--current-artwork);
+}
+:root[data-theme=light] .top-actions{background:rgba(255,255,255,.55)}
+:root[data-theme=light] .top-actions .avatar{background:rgba(0,0,0,.05);color:#18181b}
+:root[data-theme=light] .app-dock.windows-sidebar{background:rgba(255,255,255,.55)}
+:root[data-theme=light] .app-dock.windows-sidebar button{color:rgba(0,0,0,.58)}
+:root[data-theme=light] .app-dock.windows-sidebar button.active{color:#18181b}
+:root[data-theme=light] .mini-player{
+  background:rgba(255,255,255,.58);border-color:rgba(0,0,0,.08);
+}
+:root[data-theme=light] .mini-player-open .mini-copy b{color:#18181b}
+:root[data-theme=light] .mini-player-open .mini-copy small,:root[data-theme=light] .mini-player-controls .plain-icon,:root[data-theme=light] .mini-player-extras .plain-icon{color:rgba(0,0,0,.58)}
+:root[data-theme=light] .mini-player-controls .mini-play{color:#18181b}
+:root[data-theme=light] .windows-daily-mixes-heading h1,:root[data-theme=light] .page-home .section-heading h2,
+:root[data-theme=light] .page-home .home-track-card>b,:root[data-theme=light] .page-home .mix-tile>b,
+:root[data-theme=light] .library-page-title h1,:root[data-theme=light] .library-item-card>b{color:#18181b}
+:root[data-theme=light] .page-home .section-note,:root[data-theme=light] .page-home .home-track-card>small,
+:root[data-theme=light] .page-home .mix-tile>small,:root[data-theme=light] .library-item-card>small{color:rgba(0,0,0,.48)}
+:root[data-theme=light] .library-tab-row button,:root[data-theme=light] .library-search,
+:root[data-theme=light] .library-view-controls button,:root[data-theme=light] .library-import-link{
+  background:rgba(0,0,0,.045);border-color:rgba(0,0,0,.075);color:rgba(0,0,0,.7);
+}
+:root[data-theme=light] .library-tab-row button.active{background:#18181b;color:#fff}
+:root[data-theme=light] .library-search input{color:#18181b}
+:root[data-theme=light] .library-search input::placeholder{color:rgba(0,0,0,.4)}
+:root[data-theme=light] .library-view-controls button.selected{background:rgba(0,0,0,.1);color:#18181b}
+:root[data-theme=light] .library-create-button{background:#18181b;color:#fff}
+:root[data-theme=light] .library-item-card,:root[data-theme=light] .library-item-card>b{color:#18181b}
+:root[data-theme=light] .page-search .searchbox{background:rgba(255,255,255,.84);border-color:rgba(0,0,0,.09);color:rgba(0,0,0,.6)}
+:root[data-theme=light] .page-search .searchbox input{color:#18181b}
+:root[data-theme=light] .page-search .filter-pills button{color:rgba(0,0,0,.58)}
+:root[data-theme=light] .page-search .filter-pills button.selected{background:rgba(0,0,0,.08);color:#18181b}
+:root[data-theme=light] .page .filter-pills button,:root[data-theme=light] .page .period-pills button{background:rgba(0,0,0,.045);color:rgba(0,0,0,.6)}
+:root[data-theme=light] .page .filter-pills button.selected,:root[data-theme=light] .page .period-pills button.selected{background:rgba(0,0,0,.09);color:#18181b}
+:root[data-theme=light] .page .section-heading h2,:root[data-theme=light] .page .hero h1{color:#18181b}
+:root[data-theme=light] .page .muted{color:rgba(0,0,0,.55)}
+@media(max-width:390px){
+  .page{left:64px;right:5px;padding-left:10px;padding-right:10px}
+  .app-dock.windows-sidebar{width:58px}
+  .mini-player{left:64px;right:5px}
+  .mini-player .cover{width:36px;height:36px}
+  .mini-player-controls .mini-transport{display:none}
+  .mini-player-controls .plain-icon,.mini-player-extras .plain-icon{width:27px}
+  .page-home .mix-card,.page-home .home-track-card{flex-basis:175px;width:175px}
+  .page-home .mix-grid,.page-home .home-card-rail{gap:28px}
+  .library-content-grid{gap:18px 12px}
+}
+@media(max-width:350px){
+  .page{left:64px;padding-left:8px;padding-right:8px}
+  .app-dock.windows-sidebar{width:58px}
+  .mini-player{left:64px}
+  .mini-player-extras{display:none}
+  .library-toolbar{gap:6px}
+  .library-create-button{min-height:34px;padding:0 8px;font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){
+  .mix-fluid-square:before,.mix-fluid-square:after,.mix-fluid-square i{animation:none!important}
+}
