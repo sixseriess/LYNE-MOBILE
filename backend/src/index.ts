@@ -14,7 +14,7 @@ interface Env {
 type TrackRow = {
   id: string; title: string; artist: string; artistId: string; album?: string | null;
   albumId?: string | null; durationMs: number; explicit: number; genre?: string | null;
-  artworkKey?: string | null; audioKey: string; audioMime: string; audioSize: number;
+  artworkKey?: string | null; audioKey: string; audioMime: string; audioSize: number; lyrics?: string | null;
 };
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
@@ -99,12 +99,12 @@ function publicTrack(row: TrackRow) {
     album: row.album || undefined, albumId: row.albumId || undefined,
     durationMs: row.durationMs, explicit: !!row.explicit, genre: row.genre || undefined,
     audioMime: row.audioMime, audioSize: row.audioSize,
-    artwork: mediaUrl(row.artworkKey), audioUrl: mediaUrl(row.audioKey),
+    artwork: mediaUrl(row.artworkKey), audioUrl: mediaUrl(row.audioKey), lyrics: row.lyrics || undefined,
   };
 }
 const TRACK_SELECT = `SELECT t.id, t.title, a.name AS artist, a.id AS artistId, al.title AS album,
   al.id AS albumId, t.duration_ms AS durationMs, t.explicit, t.genre, t.artwork_key AS artworkKey,
-  t.audio_key AS audioKey, t.audio_mime AS audioMime, t.audio_size AS audioSize
+  t.audio_key AS audioKey, t.audio_mime AS audioMime, t.audio_size AS audioSize, t.lyrics
   FROM tracks t JOIN artists a ON a.id=t.artist_id LEFT JOIN albums al ON al.id=t.album_id`;
 
 function cors(request: Request, env: Env) {
@@ -392,7 +392,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     await requireAdmin(request,env);
     const form=await request.formData();
     const title=String(form.get("title")||"").trim(); const artistName=String(form.get("artist")||"").trim();
-    const albumTitle=String(form.get("album")||"").trim(); const rights=String(form.get("rightsStatus")||"");
+    const albumTitle=String(form.get("album")||"").trim(); const lyrics=String(form.get("lyrics")||"").trim().slice(0,50000); const rights=String(form.get("rightsStatus")||"");
     const rightsReference=String(form.get("rightsReference")||"").trim();
     const rightsConfirmed=String(form.get("rightsConfirmed")||"")==="true";
     const audio=form.get("audio"); const image=form.get("artwork");
@@ -414,8 +414,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
       }
       await env.MEDIA.put(audioKey,audio.stream(),{httpMetadata:{contentType:audio.type,cacheControl:"public, max-age=31536000, immutable"}});
       if(image instanceof File){await env.MEDIA.put(imageKey!,image.stream(),{httpMetadata:{contentType:image.type,cacheControl:"public, max-age=31536000, immutable"}});}
-      await env.DB.prepare("INSERT INTO tracks (id,title,artist_id,album_id,duration_ms,genre,explicit,audio_key,audio_mime,audio_size,artwork_key,rights_status,rights_reference,published) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)")
-        .bind(trackId,title,artistId,albumId,Math.max(0,Number(form.get("durationMs")||0)),String(form.get("genre")||"").slice(0,80)||null,String(form.get("explicit")||"")==="true"?1:0,audioKey,audio.type,audio.size,imageKey,rights,rightsReference.slice(0,500)).run();
+      await env.DB.prepare("INSERT INTO tracks (id,title,artist_id,album_id,duration_ms,genre,explicit,audio_key,audio_mime,audio_size,artwork_key,rights_status,rights_reference,lyrics,published) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)")
+        .bind(trackId,title,artistId,albumId,Math.max(0,Number(form.get("durationMs")||0)),String(form.get("genre")||"").slice(0,80)||null,String(form.get("explicit")||"")==="true"?1:0,audioKey,audio.type,audio.size,imageKey,rights,rightsReference.slice(0,500),lyrics||null).run();
     }catch(error){
       await env.MEDIA.delete([audioKey,...(imageKey?[imageKey]:[])]);
       return fail(error instanceof Error?error.message:"Unable to save track.",500);
