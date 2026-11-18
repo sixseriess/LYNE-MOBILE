@@ -26,7 +26,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Create playlists and save external song / playlist / album links. Imported collections can also accept additional LYNE catalogue tracks after import; those additions are saved locally on the device.
 - [x] Full playlist editing: rename, description, account-synced custom artwork, reorder, remove tracks, and delete.
 - [x] Local audio track title, artist, album and artwork editing is saved in IndexedDB alongside the audio; system-level file/folder access and cross-device local-file sync remain browser-limited.
-- [x] Save individual first-party LYNE catalogue tracks to device storage for offline playback, with a configurable download limit and remove controls. Offline mixes remain a future enhancement.
+- [x] Save individual first-party LYNE catalogue tracks and LYNE catalogue mixes to device storage for offline playback, with cumulative storage-limit checks, partial-failure feedback, saved-mix cards and remove controls. Offline mixes are local to this device; third-party provider embeds are not downloaded or rehosted.
 - [x] Import preview, provider/source attribution, local duplicate detection, progress states, and retry of failed account sync from the still-open preview; bulk import reports partial sync failures.
 - [x] Spotify, SoundCloud, YouTube, and Apple Music imports use provider metadata APIs when configured, plus public oEmbed / catalogue lookup fallbacks for eligible single items. Official provider embeds play source media; full playlist and some album track lists still require provider credentials. Imports do not copy or rehost provider audio.
 
@@ -62,7 +62,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
 - [x] System theme detection is implemented; full Windows language/translation parity remains outstanding.
 - [x] Dark / light / system theme, reduce-motion preference, and persistent custom background images. English is the only mobile UI language at this stage.
-- [x] **Storage:** device usage, local music management, catalogue-track offline saves with a configurable limit, and safe temporary-cache clearing. Offline mixes remain a future enhancement.
+- [x] **Storage:** device usage, local music management, catalogue-track and mix offline saves with a configurable limit, and safe temporary-cache clearing. Saved mixes remain available from the home mix section when the catalogue API is offline.
 - [x] PWA version and build SHA shown in About; checks for service-worker updates on launch and refreshes when a new worker takes control.
 - [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
 
@@ -79,6 +79,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, imported-collection track additions, saved artists, shareable artist links, an offline banner, PWA update checks, a Windows-matched 10-band equalizer, dominant cover-colour extraction, and recent-listening recommendations. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
+The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, downloadable offline mix groups with saved-mix cards, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, imported-collection track additions, saved artists, shareable artist links, an offline banner, PWA update checks, a Windows-matched 10-band equalizer, dominant cover-colour extraction, and recent-listening recommendations. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
