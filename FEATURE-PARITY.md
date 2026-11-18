@@ -44,8 +44,8 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Media-session metadata and lock-screen / headset transport controls where supported (Media Session API handlers are present; device-specific behavior still needs iOS Safari and Android Chrome testing).
 
 ### Account, profile, and personalization
-- [x] Basic LYNE account sign-in / registration UI and local profile image selection.
-- [x] Best-effort account restore: temporary API failures retain the saved session, while explicit 401/403 responses clear rejected credentials; library and listening data sync independently.
+- [x] Basic LYNE account sign-in / registration UI, local profile image selection, R2-backed avatar upload/removal, and signed-in preference sync.
+- [x] Best-effort account restore: temporary API failures retain the saved session, while explicit 401/403 responses clear rejected credentials; library, imports, listening history, preferences, and profile photos sync independently.
 - [ ] Account profile editing and server-side avatar sync.
 - [x] Profile picture is optimized and persists locally on the device.
 - [ ] Full statistics experience, including day / week / month / year filters and top songs / artists.
@@ -62,12 +62,12 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
 - [ ] **Appearance:** system theme detection and full Windows language parity.
 - [x] Dark / light theme, language preference, reduce-motion preference, and persistent custom background images.
-- [ ] **Storage:** usage overview, cache limits, clear cache, local music management, saved downloads, and offline availability.
+- [x] **Storage:** device usage, local music management, catalogue-track offline saves with a configurable limit, and safe temporary-cache clearing. Offline mixes remain a future enhancement.
 - [ ] **About:** app version, build information, and update information appropriate to a PWA.
 - [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
 
 ### Install and release checks
-- [ ] Regenerate the 192px / 512px PNG and iOS Apple touch icon from the final LYNE mark; verify installed icons on iOS and Android.
+- [x] Regenerated LYNE-branded 192px / 512px PNG and 180px iOS Apple touch icons, with icon links and service-worker cache refresh. Installed-icon verification remains a real-device release check.
 - [ ] Publish the PWA after Cloudflare API configuration and device testing.
 
 ### Desktop-specific feature adaptations
