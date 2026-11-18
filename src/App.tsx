@@ -10,14 +10,52 @@ import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type 
 
 type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
 type Period = "day" | "week" | "month" | "year";
-type EqualizerPreset = "Flat" | "Polaris Mono" | "Wordly" | "Custom";
-const EQ_FREQUENCIES = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const EQ_LABELS = ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
-const EQ_PRESETS: Record<Exclude<EqualizerPreset, "Custom">, number[]> = {
-  Flat: [0,0,0,0,0,0,0,0,0,0],
-  "Polaris Mono": [-2,-1,0,2,3,3,2,1,-1,-2],
-  Wordly: [2,2,1,0,-1,-1,0,2,3,2],
+type EqualizerCategory = "enhance" | "genre" | "accent" | "custom";
+type EqCustomPreset = { id: string; name: string; gains: number[] };
+type EqPreset = { id: string; category: Exclude<EqualizerCategory, "custom">; gains: number[] };
+const EQ_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+const EQ_LABELS = ["32", "64", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
+const EQ_PRESETS: EqPreset[] = [
+  {id:"hifi",category:"enhance",gains:[2,1.5,.5,0,-.5,0,.5,1.5,2,2.5]},
+  {id:"clarity",category:"enhance",gains:[0,0,-.5,-1.5,-1,0,1.5,2,1.5,1]},
+  {id:"warmth",category:"enhance",gains:[1.5,2,1.5,.5,0,0,-.5,-1,-1,-1.5]},
+  {id:"spacious",category:"enhance",gains:[1,1,0,-1,-1.5,-1,0,1,2,2.5]},
+  {id:"headphones",category:"enhance",gains:[2.5,2,1,0,-.5,0,1,1.5,.5,-.5]},
+  {id:"laptop",category:"enhance",gains:[-4,-1,2,2.5,1,0,1,1.5,1,0]},
+  {id:"night",category:"enhance",gains:[-2,-1.5,-.5,0,.5,1,1,0,-1,-2]},
+  {id:"punch",category:"enhance",gains:[1,2,1.5,0,-1.5,-.5,1,1.5,.5,0]},
+  {id:"smooth",category:"enhance",gains:[.5,.5,.5,0,0,0,-1,-2,-1,0]},
+  {id:"pop",category:"genre",gains:[-1,0,1.5,2.5,2,.5,-.5,0,1,1.5]},
+  {id:"rock",category:"genre",gains:[3,2.5,1,-.5,-1,-.5,1,2,2.5,2.5]},
+  {id:"hiphop",category:"genre",gains:[4,3.5,1.5,.5,-.5,-.5,.5,0,1,1.5]},
+  {id:"electronic",category:"genre",gains:[3.5,3,1,0,-1.5,0,1,1,2.5,3]},
+  {id:"jazz",category:"genre",gains:[2,1.5,.5,1,-1,-1,0,1,1.5,2]},
+  {id:"classical",category:"genre",gains:[2,1.5,1,.5,0,0,0,1,1.5,2]},
+  {id:"acoustic",category:"genre",gains:[1.5,1,1,1.5,.5,.5,1,1.5,1,.5]},
+  {id:"rnb",category:"genre",gains:[3,3,1.5,0,-1,0,1,1,1.5,2]},
+  {id:"lofi",category:"genre",gains:[1,1.5,2,1,0,-.5,-1.5,-2.5,-4,-6]},
+  {id:"bass",category:"accent",gains:[6,5,4,2,0,0,0,0,0,0]},
+  {id:"deep_bass",category:"accent",gains:[9,8,5,1,-1,0,0,0,0,0]},
+  {id:"less_bass",category:"accent",gains:[-6,-5,-3,-1,0,0,0,0,0,0]},
+  {id:"vocal",category:"accent",gains:[-2,-2,-1,0,2,4,4,2,0,-1]},
+  {id:"treble",category:"accent",gains:[0,0,0,0,0,0,2,4,5,6]},
+  {id:"loudness",category:"accent",gains:[5,4,2,0,-1,0,0,2,4,5]},
+];
+const EQ_PRESET_LABELS: Record<string,string> = {
+  hifi:"Hi-Fi",clarity:"Clarity",warmth:"Warmth",spacious:"Spacious",headphones:"Headphones",
+  laptop:"Laptop",night:"Night",punch:"Punch",smooth:"Smooth",pop:"Pop",rock:"Rock",
+  hiphop:"Hip-Hop",electronic:"Electronic",jazz:"Jazz",classical:"Classical",acoustic:"Acoustic",
+  rnb:"R&B",lofi:"Lo-Fi",bass:"Bass",deep_bass:"Deep Bass",less_bass:"Less Bass",
+  vocal:"Vocal",treble:"Treble",loudness:"Loudness"
 };
+const EQ_PRESET_CATEGORIES: Exclude<EqualizerCategory,"custom">[] = ["enhance","genre","accent"];
+const EQ_MAX_CUSTOM_PRESETS = 12;
+const EQ_PRESET_NAME_MAX = 24;
+const EQ_BAND_Q = 1.4;
+const FLAT_EQ = [0,0,0,0,0,0,0,0,0,0];
+const clampEqGain = (gain:number) => Math.max(-12,Math.min(12,Math.round(gain*2)/2));
+const eqPreampGain = (gains:number[]) => Math.pow(10,(-Math.max(0,...gains))/20);
+
 type PlayRecord = { id: string; title: string; artist: string; ms: number; day: string };
 const STORE = "lyne.mobile.v1";
 type StoredAudio = { id: string; name: string; file: File; track?: Track };
@@ -61,7 +99,7 @@ async function removeAudioFile(id:string):Promise<void>{
     tx.onerror=()=>reject(tx.error||new Error("Could not remove this audio file."));
   }).finally(()=>db.close());
 }
-const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500, audioQuality: "auto" as "auto"|"lossless", lyricsOffsetMs: 0, ambientVisualMode: "soft" as "soft"|"glow"|"off", equalizerEnabled: false, equalizerPreset: "Flat" as EqualizerPreset, equalizerBands: [0,0,0,0,0,0,0,0,0,0] as number[] } };
+const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500, audioQuality: "auto" as "auto"|"lossless", lyricsOffsetMs: 0, ambientVisualMode: "soft" as "soft"|"glow"|"off", equalizerEnabled: false, equalizerPreset: "hifi", equalizerCategory: "enhance" as EqualizerCategory, equalizerBands: [...FLAT_EQ] as number[], equalizerCustomPresets: [] as EqCustomPreset[] } };
 const providerName = (provider: string) => ({spotify:"Spotify",soundcloud:"SoundCloud",youtube:"YouTube",apple_music:"Apple Music"} as Record<string,string>)[provider] || provider;
 const artwork = (track: Track) => track.artwork || "";
 function getAudioSourceQuality(track:Track):{label:string;lossless:boolean;format:string}{
@@ -190,8 +228,11 @@ export default function App() {
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
   const [ambientColor,setAmbientColor]=useState("200,245,106");
   const [equalizerError,setEqualizerError]=useState("");
+  const [equalizerTab,setEqualizerTab]=useState<EqualizerCategory>(()=>state.preferences.equalizerCategory);
+  const [equalizerPresetName,setEqualizerPresetName]=useState("");
   const audioContextRef=useRef<AudioContext|null>(null);
   const equalizerSourceRef=useRef<MediaElementAudioSourceNode|null>(null);
+  const equalizerPreampRef=useRef<GainNode|null>(null);
   const equalizerFiltersRef=useRef<BiquadFilterNode[]>([]);
   const playerTouchStart=useRef<{x:number;y:number}|null>(null);
   const haptic=useCallback(()=>{if(state.preferences.haptics&&typeof navigator!=="undefined"&&typeof navigator.vibrate==="function")navigator.vibrate(8);},[state.preferences.haptics]);
@@ -205,18 +246,22 @@ export default function App() {
       try{
         audio.crossOrigin="anonymous";
         const source=context.createMediaElementSource(audio);
+        const preamp=context.createGain();
+        preamp.gain.value=1;
         const filters=EQ_FREQUENCIES.map((frequency,index)=>{
           const filter=context.createBiquadFilter();
           filter.type=index===0?"lowshelf":index===EQ_FREQUENCIES.length-1?"highshelf":"peaking";
           filter.frequency.value=frequency;
-          filter.Q.value=index===0||index===EQ_FREQUENCIES.length-1?0.707:1;
+          filter.Q.value=EQ_BAND_Q;
           filter.gain.value=0;
           return filter;
         });
-        source.connect(filters[0]);
+        source.connect(preamp);
+        preamp.connect(filters[0]);
         filters.slice(1).forEach((filter,index)=>filters[index].connect(filter));
         filters[filters.length-1].connect(context.destination);
         equalizerSourceRef.current=source;
+        equalizerPreampRef.current=preamp;
         equalizerFiltersRef.current=filters;
         audioContextRef.current=context;
       }catch(error){
@@ -252,8 +297,34 @@ export default function App() {
       setEqualizerError("");
     }
   },[ensureEqualizerGraph]);
-  const setEqualizerPreset=(preset:EqualizerPreset)=>{
-    setState(old=>({...old,preferences:{...old.preferences,equalizerPreset:preset,...(preset==="Custom"?{}:{equalizerBands:[...EQ_PRESETS[preset]]})}}));
+  const applyEqualizerGains=(gains:number[],presetId:string,category:EqualizerCategory)=>{
+    const normalized=gains.map(clampEqGain);
+    setState(old=>({...old,preferences:{...old.preferences,equalizerEnabled:true,equalizerPreset:presetId,equalizerCategory:category,equalizerBands:normalized}}));
+    const context=audioContextRef.current;
+    if(context){
+      equalizerFiltersRef.current.forEach((filter,index)=>filter.gain.setTargetAtTime(normalized[index]??0,context.currentTime,0.02));
+      if(equalizerPreampRef.current)equalizerPreampRef.current.gain.setTargetAtTime(eqPreampGain(normalized),context.currentTime,0.02);
+    }else if(audioRef.current?.src){
+      void ensureEqualizerGraph().catch(error=>setEqualizerError(error instanceof Error?error.message:"Equalizer could not be enabled."));
+    }
+  };
+  const setEqualizerPreset=(preset:EqPreset)=>{
+    setEqualizerTab(preset.category);
+    setEqualizerError("");
+    applyEqualizerGains(preset.gains,preset.id,preset.category);
+  };
+  const saveEqualizerPreset=()=>{
+    const name=equalizerPresetName.trim().slice(0,EQ_PRESET_NAME_MAX);
+    if(!name){setEqualizerError("Enter a name for this preset.");return;}
+    if(state.preferences.equalizerCustomPresets.length>=EQ_MAX_CUSTOM_PRESETS){setEqualizerError("You can save up to 12 custom presets.");return;}
+    const preset:EqCustomPreset={id:`custom-${Date.now()}`,name,gains:state.preferences.equalizerBands.map(clampEqGain)};
+    setState(old=>({...old,preferences:{...old.preferences,equalizerCustomPresets:[...old.preferences.equalizerCustomPresets,preset],equalizerPreset:preset.id,equalizerCategory:"custom"}}));
+    setEqualizerTab("custom");
+    setEqualizerPresetName("");
+    setEqualizerError("");
+  };
+  const deleteEqualizerPreset=(id:string)=>{
+    setState(old=>({...old,preferences:{...old.preferences,equalizerCustomPresets:old.preferences.equalizerCustomPresets.filter(preset=>preset.id!==id),...(old.preferences.equalizerPreset===id?{equalizerPreset:"custom"}:{})}}));
   };
   const [customBackground,setCustomBackground]=useState(()=>localStorage.getItem("lyne.mobile.background")||"");
   const backgroundFileRef=useRef<HTMLInputElement|null>(null);
@@ -421,10 +492,12 @@ export default function App() {
   useEffect(()=>{
     const context=audioContextRef.current;
     if(!context||!equalizerFiltersRef.current.length)return;
+    const enabled=state.preferences.equalizerEnabled;
+    const gains=state.preferences.equalizerBands;
     equalizerFiltersRef.current.forEach((filter,index)=>{
-      const value=state.preferences.equalizerEnabled?Number(state.preferences.equalizerBands[index]||0):0;
-      filter.gain.setTargetAtTime(value,context.currentTime,0.035);
+      filter.gain.setTargetAtTime(enabled?Number(gains[index]||0):0,context.currentTime,0.02);
     });
+    if(equalizerPreampRef.current)equalizerPreampRef.current.gain.setTargetAtTime(enabled?eqPreampGain(gains):1,context.currentTime,0.02);
   },[state.preferences.equalizerEnabled,state.preferences.equalizerBands]);
   useEffect(()=>{if(audioRef.current)audioRef.current.playbackRate=playbackRate;},[playbackRate,current?.id]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{ const audio=audioRef.current; if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);} },500); return ()=>window.clearInterval(timer); },[playing,current?.id]);
@@ -942,7 +1015,7 @@ export default function App() {
       {modal==="import"&&<><p className="import-help">Paste a song, playlist or album link. LYNE will look it up using the provider's official API.</p><label className="field-label">Music link<input autoFocus value={importUrl} onChange={e=>{setImportUrl(e.target.value);setImportPreview(null);setImportError("");}} placeholder="Paste Spotify, SoundCloud, YouTube or Apple Music link" inputMode="url"/></label><button className="primary-button" onClick={()=>void resolveImportLink()} disabled={!importUrl.trim()||importBusy}>{importBusy?"Looking up link...":"Preview link"}</button>{importError&&<p className="import-error">{importError}</p>}{importPreview&&<div className="import-preview"><div className="import-preview-main"><div className="cover" style={importPreview.artwork?{backgroundImage:`url("${importPreview.artwork}")`}:undefined}>{!importPreview.artwork&&<Music2/>}</div><div><b>{importPreview.title}</b><small>{importPreview.subtitle}</small><small>{providerName(importPreview.provider)} · {importPreview.kind}</small></div></div><p>{importPreview.kind==="track"?"This song will be added to Liked Songs.":`This ${importPreview.kind} will be added to your Library.`} {importPreview.tracks.length? `${importPreview.tracks.length} track references found.`:""}</p><button className="primary-button" disabled={importSaving} onClick={()=>void saveImportedLink()}>{importSaving?"Saving...":importPreview.kind==="track"?"Add to Liked Songs":"Add to Library"}</button><button className="provider-open" onClick={()=>window.open(importPreview.externalUrl,"_blank","noopener,noreferrer")}>Open in {providerName(importPreview.provider)} <ExternalLink size={14}/></button></div>}<p className="modal-note">Supported: Spotify, SoundCloud, YouTube and Apple Music. Provider credentials must be configured on LYNE's backend. Imported items keep their original source link; tracks play through the provider's approved player or stream path.</p></>}
       {modal==="playlist"&&<><label className="field-label">Playlist name<input autoFocus value={playlistName} onChange={e=>setPlaylistName(e.target.value)} placeholder="My playlist"/></label><button className="primary-button" onClick={createPlaylist} disabled={!playlistName.trim()}>Create playlist</button></>}
       {modal==="profileEdit"&&<><p className="modal-note">Your username is shown on your LYNE profile and public playlists. Use 3–24 letters, numbers or underscores.</p><label className="field-label">Username<input value={editUsername} onChange={e=>setEditUsername(e.target.value)} maxLength={24} autoComplete="username"/></label><button className="primary-button" disabled={profileUpdateBusy||!editUsername.trim()} onClick={()=>void saveUsername()}>{profileUpdateBusy?"Saving...":"Save username"}</button></>}
-      {modal==="equalizer"&&<><div className="eq-topline"><div><b>10-band equalizer</b><small>Shape the sound of your current playback</small></div><button type="button" className={state.preferences.equalizerEnabled?"toggle on":"toggle"} aria-label="Enable equalizer" aria-pressed={state.preferences.equalizerEnabled} onClick={()=>void toggleEqualizer(!state.preferences.equalizerEnabled)}/></div><div className="setting-line eq-preset-line"><span><b>Preset</b><small>Choose a starting sound profile</small></span><select value={state.preferences.equalizerPreset} onChange={e=>setEqualizerPreset(e.target.value as EqualizerPreset)}><option>Flat</option><option>Polaris Mono</option><option>Wordly</option><option>Custom</option></select></div><div className="eq-scale"><span>+12 dB</span><span>0 dB</span><span>−12 dB</span></div><div className={"eq-bands"+(state.preferences.equalizerEnabled?"":" is-disabled")}>{EQ_FREQUENCIES.map((frequency,index)=><label className="eq-band" key={frequency}><span>{Number(state.preferences.equalizerBands[index]||0)>0?"+":""}{Number(state.preferences.equalizerBands[index]||0)}</span><input className="eq-slider" aria-label={frequency+" Hz equalizer band"} type="range" min="-12" max="12" step="1" value={Number(state.preferences.equalizerBands[index]||0)} disabled={!state.preferences.equalizerEnabled} onChange={e=>setState(old=>({...old,preferences:{...old.preferences,equalizerPreset:"Custom",equalizerBands:old.preferences.equalizerBands.map((value,bandIndex)=>bandIndex===index?Number(e.target.value):value)}}))}/><small>{EQ_LABELS[index]}</small></label>)}</div>{equalizerError&&<p className="import-error" role="alert">{equalizerError}</p>}<p className="eq-note">The equalizer uses your device's browser audio processing. Some streaming sources must allow cross-origin audio for EQ to work.</p><button className="secondary-action full-action" type="button" onClick={()=>{setEqualizerPreset("Flat");setEqualizerError("");}}>Reset to flat</button></>}
+      {modal==="equalizer"&&<><div className="eq-topline"><div><b>10-band equalizer</b><small>Shape the sound band by band</small></div><button type="button" className={state.preferences.equalizerEnabled?"toggle on":"toggle"} aria-label="Enable equalizer" aria-pressed={state.preferences.equalizerEnabled} onClick={()=>void toggleEqualizer(!state.preferences.equalizerEnabled)}/></div><div className="eq-tabs">{EQ_PRESET_CATEGORIES.concat("custom" as const).map(tab=><button key={tab} type="button" className={equalizerTab===tab?"active":""} onClick={()=>setEqualizerTab(tab)}>{({enhance:"Enhance",genre:"Genres",accent:"Accents",custom:"Mine"} as Record<EqualizerCategory,string>)[tab]}</button>)}</div>{equalizerTab!=="custom"?<div className="eq-preset-grid">{EQ_PRESETS.filter(preset=>preset.category===equalizerTab).map(preset=><button key={preset.id} type="button" className={state.preferences.equalizerEnabled&&state.preferences.equalizerPreset===preset.id?"active":""} onClick={()=>setEqualizerPreset(preset)}>{EQ_PRESET_LABELS[preset.id]}</button>)}</div>:<div className="eq-custom-panel">{state.preferences.equalizerCustomPresets.length>0?<div className="eq-preset-grid">{state.preferences.equalizerCustomPresets.map(preset=><div className="eq-custom-preset" key={preset.id}><button type="button" className={state.preferences.equalizerPreset===preset.id?"active":""} onClick={()=>applyEqualizerGains(preset.gains,preset.id,"custom")}>{preset.name}</button><button type="button" className="eq-delete-preset" aria-label={"Delete "+preset.name} onClick={()=>deleteEqualizerPreset(preset.id)}><X size={13}/></button></div>)}</div>:<p className="eq-note">Tune the bands and save a curve to reuse it later.</p>}<div className="eq-save-row"><input aria-label="Preset name" maxLength={EQ_PRESET_NAME_MAX} value={equalizerPresetName} onChange={e=>setEqualizerPresetName(e.target.value)} placeholder="Preset name"/><button type="button" disabled={!equalizerPresetName.trim()||state.preferences.equalizerCustomPresets.length>=EQ_MAX_CUSTOM_PRESETS} onClick={saveEqualizerPreset}>Save current</button></div></div>}<div className="eq-scale"><span>+12 dB</span><span>0 dB</span><span>−12 dB</span></div><div className={"eq-bands"+(state.preferences.equalizerEnabled?"":" is-disabled")}>{EQ_FREQUENCIES.map((frequency,index)=><label className="eq-band" key={frequency}><span>{Number(state.preferences.equalizerBands[index]||0)>0?"+":""}{Number(state.preferences.equalizerBands[index]||0).toFixed(1).replace(/\.0$/,"")}</span><input className="eq-slider" aria-label={frequency+" Hz equalizer band"} type="range" min="-12" max="12" step="0.5" value={Number(state.preferences.equalizerBands[index]||0)} disabled={!state.preferences.equalizerEnabled} onChange={e=>{const gains=state.preferences.equalizerBands.map((value,bandIndex)=>bandIndex===index?clampEqGain(Number(e.target.value)):value);applyEqualizerGains(gains,"custom","custom");}}/><small>{EQ_LABELS[index]}</small></label>)}</div>{equalizerError&&<p className="import-error" role="alert">{equalizerError}</p>}<p className="eq-note">EQ curves, frequency bands and gain range match the Windows LYNE equalizer. Boosts are automatically pre-attenuated to help prevent clipping.</p><button className="secondary-action full-action" type="button" onClick={()=>applyEqualizerGains(FLAT_EQ,"flat","enhance")}>Reset to flat</button></>}
        {modal==="account"&&<><div className="filter-pills"><button className={accountMode==="login"?"selected":""} onClick={()=>setAccountMode("login")}>Sign in</button><button className={accountMode==="register"?"selected":""} onClick={()=>setAccountMode("register")}>Create account</button></div><label className="field-label">Username<input value={accountName} onChange={e=>setAccountName(e.target.value)} autoComplete="username"/></label>{accountMode==="register"&&<label className="field-label">Email<input value={accountEmail} onChange={e=>setAccountEmail(e.target.value)} type="email" autoComplete="email"/></label>}<label className="field-label">Password<input value={accountPassword} onChange={e=>setAccountPassword(e.target.value)} type="password" autoComplete={accountMode==="login"?"current-password":"new-password"}/></label><button className="primary-button" onClick={()=>void submitAccount()}>{accountMode==="login"?"Sign in":"Create account"}</button>{accountMessage&&<p className="modal-note">{accountMessage}</p>}</>}
       {modal==="settings"&&<div className="settings-layout">
         <div className="settings-tabs">{(["Profile","Playback","Listening","Shortcuts","Appearance","Overlay","YouTube","Discord","Storage","About"] as const).map(item=><button key={item} className={settingsSection===item?"active":""} onClick={()=>setSettingsSection(item)}>{item}</button>)}</div>
