@@ -144,42 +144,54 @@ function hslToRgb(h:number,saturation:number,l:number):[number,number,number]{
   else rgb=[c,0,x];
   return rgb.map(value=>Math.round((value+m)*255)) as [number,number,number];
 }
-function extractCoverAccent(image:HTMLImageElement):string{
-  const canvas=document.createElement("canvas");canvas.width=48;canvas.height=48;
-  const context=canvas.getContext("2d",{willReadFrequently:true});
-  if(!context)throw new Error("Cover colour sampling is unavailable.");
-  context.drawImage(image,0,0,48,48);
-  const pixels=context.getImageData(0,0,48,48).data;
-  const buckets=Array.from({length:12},()=>({count:0,saturation:0,hue:0}));
-  let total=0,coloured=0;
-  const brightSum=[0,0,0];let brightCount=0;
-  const darkSum=[0,0,0];let darkCount=0;
-  for(let i=0;i<pixels.length;i+=4){
-    if(pixels[i+3]<128)continue;
-    const red=pixels[i],green=pixels[i+1],blue=pixels[i+2];
-    const [h,s,l]=rgbToHsl(red,green,blue);total++;
-    if(l<.25){darkSum[0]+=red;darkSum[1]+=green;darkSum[2]+=blue;darkCount++;}
-    else if(l>.65){brightSum[0]+=red;brightSum[1]+=green;brightSum[2]+=blue;brightCount++;}
-    if(s>=.16&&l>=.12&&l<=.88){
-      const bucket=buckets[Math.min(11,Math.floor(h*12))];
-      bucket.count++;bucket.saturation+=s;bucket.hue+=h;coloured++;
+type CoverFluidColors={color1:string;color2:string;logoColor:string};
+const DEFAULT_COVER_FLUID:CoverFluidColors={color1:"rgb(20,22,28)",color2:"rgb(120,140,175)",logoColor:"rgb(235,242,250)"};
+function extractCoverFluidColors(image:HTMLImageElement):CoverFluidColors{
+  try{
+    const canvas=document.createElement("canvas");canvas.width=48;canvas.height=48;
+    const context=canvas.getContext("2d",{willReadFrequently:true});
+    if(!context)return DEFAULT_COVER_FLUID;
+    context.drawImage(image,0,0,48,48);
+    const pixels=context.getImageData(0,0,48,48).data;
+    const buckets=Array.from({length:12},()=>({count:0,sSum:0,hSum:0}));
+    let total=0,coloured=0;
+    const darkSum=[0,0,0],brightSum=[0,0,0];let darkCount=0,brightCount=0;
+    for(let i=0;i<pixels.length;i+=4){
+      if(pixels[i+3]<128)continue;
+      const red=pixels[i],green=pixels[i+1],blue=pixels[i+2];
+      const [h,s,l]=rgbToHsl(red,green,blue);total++;
+      if(l<.25){darkSum[0]+=red;darkSum[1]+=green;darkSum[2]+=blue;darkCount++;}
+      else if(l>.65){brightSum[0]+=red;brightSum[1]+=green;brightSum[2]+=blue;brightCount++;}
+      if(s>=.16&&l>=.12&&l<=.88){const bucket=buckets[Math.min(11,Math.floor(h*12))];bucket.count++;bucket.sSum+=s;bucket.hSum+=h;coloured++;}
     }
-  }
-  if(total===0)throw new Error("Cover artwork has no readable pixels.");
-  if(coloured/total<.05){
-    const fallback=brightCount?brightSum.map(value=>Math.max(160,Math.round(value/brightCount))):darkCount?darkSum.map(value=>Math.min(210,Math.round(value/darkCount+85))):[200,245,106];
-    return fallback.join(",");
-  }
-  let best=-1,bestScore=-1;
-  buckets.forEach((bucket,index)=>{
-    if(!bucket.count)return;
-    const score=bucket.count*(.3+(bucket.saturation/bucket.count)*.7);
-    if(score>bestScore){bestScore=score;best=index;}
-  });
-  if(best<0)throw new Error("No dominant cover colour could be extracted.");
-  const selected=buckets[best];
-  const accent=hslToRgb(selected.hue/selected.count,Math.min(selected.saturation/selected.count*1.15,.95),.52);
-  return accent.join(",");
+    if(total===0)return DEFAULT_COVER_FLUID;
+    if(coloured/total<.05){
+      const dark=darkCount>0?darkSum.map(v=>Math.min(Math.round(v/darkCount),30)):[18,20,24];
+      const bright=brightCount>0?brightSum.map(v=>Math.max(Math.round(v/brightCount),180)):[190,200,215];
+      return {color1:`rgb(${dark.join(", ")})`,color2:`rgb(${bright.join(", ")})`,logoColor:"rgb(235,242,250)"};
+    }
+    const findBest=(exclude=-1,minRatio=0)=>{
+      let best=-1,score=-1;
+      const threshold=exclude>=0&&minRatio>0?buckets[exclude].count*minRatio:0;
+      for(let i=0;i<buckets.length;i++){
+        if(i===exclude)continue;
+        const b=buckets[i];if(!b.count||b.count<threshold)continue;
+        if(exclude>=0){const diff=Math.abs(i-exclude);if(Math.min(diff,buckets.length-diff)<2)continue;}
+        const candidate=b.count*(.3+(b.sSum/b.count)*.7);
+        if(candidate>score){score=candidate;best=i;}
+      }
+      return best;
+    };
+    const best=findBest();if(best<0)return DEFAULT_COVER_FLUID;
+    const dominant=buckets[best],h=dominant.hSum/dominant.count,s=dominant.sSum/dominant.count;
+    const bright=hslToRgb(h,Math.min(s*1.15,.95),.52);
+    const logo=hslToRgb(h,Math.min(s*.7,.45),.88);
+    const second=findBest(best,.2);
+    const dark=second!==-1
+      ? hslToRgb(buckets[second].hSum/buckets[second].count,Math.max((buckets[second].sSum/buckets[second].count)*.85,.35),.24)
+      : hslToRgb(h,Math.max(s*.9,.35),.24);
+    return {color1:`rgb(${dark.join(", ")})`,color2:`rgb(${bright.join(", ")})`,logoColor:`rgb(${logo.join(", ")})`};
+  }catch{return DEFAULT_COVER_FLUID;}
 }
 
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
@@ -235,24 +247,20 @@ function Row({ track, active, liked, onPlay, onLike, onMore }: { track: Track; a
 }
 
 function MixArtwork({artworkUrl,number}:{artworkUrl?:string;number:number}){
-  const [accent,setAccent]=useState("200,245,106");
+  const [colors,setColors]=useState<CoverFluidColors>(DEFAULT_COVER_FLUID);
   useEffect(()=>{
-    if(!artworkUrl){setAccent("200,245,106");return;}
+    if(!artworkUrl){setColors(DEFAULT_COVER_FLUID);return;}
     let active=true;
-    const image=new Image();
-    image.crossOrigin="anonymous";
-    image.onload=()=>{
-      if(!active)return;
-      try{setAccent(extractCoverAccent(image));}catch{setAccent("200,245,106");}
-    };
+    const image=new Image();image.crossOrigin="anonymous";
+    image.onload=()=>{if(active)setColors(extractCoverFluidColors(image));};
+    image.onerror=()=>{if(active)setColors(DEFAULT_COVER_FLUID);};
     image.src=artworkUrl;
     return ()=>{active=false;image.onload=null;image.onerror=null;};
   },[artworkUrl]);
-  const backgroundImage=artworkUrl
-    ? `linear-gradient(45deg,rgba(${accent},.58) 0%,rgba(0,0,0,.2) 100%),url("${artworkUrl}")`
-    : `linear-gradient(45deg,rgba(${accent},.85) 0%,rgba(0,0,0,.38) 100%)`;
-  return <div className="mix-artwork" style={{backgroundImage}}>
-    <span className="mix-artwork-logo">LYNE</span>
+  return <div className="mix-artwork" style={{backgroundImage:artworkUrl?`linear-gradient(45deg,${colors.color1} 0%,rgba(0,0,0,.2) 100%),url("${artworkUrl}")`:`linear-gradient(45deg,${colors.color1} 0%,rgba(0,0,0,.2) 100%)`}}>
+    <svg viewBox="0 0 80 28" className="mix-artwork-logo" style={{fill:colors.logoColor}} aria-hidden="true">
+      <text x="0" y="22" fontFamily="Arial, Helvetica, sans-serif" fontSize="24" fontWeight="800" letterSpacing="-1.5">LYNE</text>
+    </svg>
     <span className="mix-artwork-word">MIX</span>
     <span className="mix-artwork-number">{String(number).padStart(2,"0")}</span>
   </div>;
