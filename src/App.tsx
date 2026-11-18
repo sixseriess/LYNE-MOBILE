@@ -204,13 +204,27 @@ export default function App() {
       return;
     }
     setCurrent(track);
-    setQueue(list.length?list.filter(t=>t.id!==track.id):[track]);
+    setQueue(list.length?list:[track]);
     setPlaying(true);setExpanded(false);
     setState(old=>({...old,history:[track,...old.history.filter(t=>t.id!==track.id)].slice(0,50)}));
   },[state.preferences.audioQuality,current,position,reportListening]);
   const toggleLike=(track:Track)=>setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));
-  const next=()=>{if(!queue.length)return;const idx=queue.findIndex(t=>t.id===current?.id);const target=shuffle?queue[Math.floor(Math.random()*queue.length)]:queue[(idx+1)%queue.length];if(target)play(target,queue);};
-  const previous=()=>{if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}const idx=queue.findIndex(t=>t.id===current?.id);const target=queue[(idx-1+queue.length)%queue.length];if(target)play(target,queue);};
+  const next=()=>{
+    if(!queue.length){setPlaying(false);return;}
+    const idx=queue.findIndex(t=>t.id===current?.id);
+    if(shuffle){const choices=queue.filter(t=>t.id!==current?.id);const target=choices[Math.floor(Math.random()*choices.length)];if(target){play(target,queue);return;}}
+    if(idx>=0&&idx<queue.length-1){play(queue[idx+1],queue);return;}
+    if(state.repeat==="all"&&queue.length){play(queue[0],queue);return;}
+    if(state.preferences.autoplaySimilar){const played=new Set(queue.map(t=>t.id));const candidates=homeTracks.filter(t=>!played.has(t.id));const target=candidates[0]||homeTracks.find(t=>t.id!==current?.id);if(target){play(target,[...queue,target]);return;}}
+    setPlaying(false);
+  };
+  const previous=()=>{
+    if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}
+    const idx=queue.findIndex(t=>t.id===current?.id);
+    if(idx>0){play(queue[idx-1],queue);return;}
+    if(state.repeat==="all"&&queue.length){play(queue[queue.length-1],queue);return;}
+    if(current&&audioRef.current){audioRef.current.currentTime=0;setPosition(0);}
+  };
   useEffect(()=>{
     const session=navigator.mediaSession;
     if(!session)return;
