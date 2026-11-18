@@ -1661,3 +1661,38 @@ html,body,#root{background:#0a0a0a;color:#f4f4f5}
 .home-track-art{width:160px;height:160px;border-radius:6px}
 .home-track-card>b{font-size:14px;font-weight:500;margin-top:8px}
 .home-track-card>small{font-size:12px;margin-top:4px}
+
+
+/* Modal stacking and settings sheet: keep overlays above the Windows-style shell. */
+.modal-backdrop{z-index:80;isolation:isolate}
+.modal{position:relative;z-index:81}
+.modal-settings{
+  width:100%;max-width:520px;height:min(760px,calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+  max-height:calc(100dvh - 12px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height:0;display:flex;flex-direction:column;overflow:hidden;
+  margin:0;padding:14px 14px calc(12px + env(safe-area-inset-bottom));
+  border:1px solid rgba(255,255,255,.09);border-radius:14px;
+  background:rgba(17,17,19,.98);backdrop-filter:blur(28px) saturate(140%);
+  -webkit-backdrop-filter:blur(28px) saturate(140%);
+}
+.modal-settings .modal-head{
+  position:relative;z-index:2;flex:none;margin:0 0 12px;padding:0 0 10px;
+  border-bottom:1px solid rgba(255,255,255,.075);
+}
+.modal-settings .settings-layout{
+  flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;
+}
+.modal-settings .settings-tabs{
+  flex:none;max-width:100%;padding:2px 0 9px;overscroll-behavior-x:contain;
+}
+.modal-settings .settings-content{
+  flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:0 2px 18px 0;
+  overscroll-behavior:contain;scrollbar-width:thin;
+}
+.modal-settings .settings-content::-webkit-scrollbar{width:3px}
+.modal-settings .settings-content::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:3px}
+@media(max-width:380px){
+  .modal-backdrop{padding:5px}
+  .modal-settings{height:calc(100dvh - 10px - env(safe-area-inset-top) - env(safe-area-inset-bottom));max-height:calc(100dvh - 10px - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding-left:11px;padding-right:11px}
+}
+:root[data-theme=light] .modal-settings{background:rgba(250,250,252,.985);border-color:rgba(0,0,0,.1)}
