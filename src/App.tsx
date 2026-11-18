@@ -198,6 +198,12 @@ const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).
 async function resizePlaylistImage(file: File): Promise<string> { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext("2d"); if (!context) { bitmap.close(); throw new Error("Could not process that image."); } context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg", 0.82); }
 async function resizeBackgroundImage(file: File): Promise<string> { const bitmap=await createImageBitmap(file); const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)); const canvas=document.createElement("canvas"); canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale)); const context=canvas.getContext("2d"); if(!context){bitmap.close();throw new Error("Could not process that background.");} context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg",0.82); }
 function dataUrlToFile(value:string,name:string):File{const match=/^data:([^;,]+);base64,(.+)$/.exec(value);if(!match)throw new Error("Invalid saved playlist artwork.");const bytes=Uint8Array.from(atob(match[2]),character=>character.charCodeAt(0));return new File([bytes],name,{type:match[1]});}
+function mergeLocalCollectionTracks(remote:SavedImport[],local:SavedImport[]):SavedImport[]{
+  return remote.map(item=>{
+    const previous=local.find(old=>old.provider===item.provider&&old.providerId===item.providerId&&old.kind===item.kind);
+    return previous?.addedTracks?.length?{...item,addedTracks:previous.addedTracks}:item;
+  });
+}
 async function syncPendingPlaylists(items: Playlist[]): Promise<Playlist[]> {
   return Promise.all(items.map(async playlist=>{
     if(playlist.synced)return playlist;
@@ -498,7 +504,7 @@ export default function App() {
         profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},
         playlists:mergedPlaylists,
         importedLikes:imports.status==="fulfilled"?(imports.value.likes||[]):old.importedLikes,
-        importedCollections:imports.status==="fulfilled"?(imports.value.collections||[]):old.importedCollections,
+        importedCollections:imports.status==="fulfilled"?mergeLocalCollectionTracks(imports.value.collections||[],old.importedCollections):old.importedCollections,
         stats:history.status==="fulfilled"?(history.value.stats||[]):old.stats,
         preferences:preferences.status==="fulfilled"?({...old.preferences,...preferences.value.preferences} as typeof old.preferences):old.preferences,
         theme:preferences.status==="fulfilled"&&["dark","light","system"].includes(String(preferences.value.preferences.theme))?String(preferences.value.preferences.theme):old.theme
@@ -797,7 +803,8 @@ export default function App() {
   const resolveImportLink=async()=>{if(!importUrl.trim())return;setImportBusy(true);setImportError("");setImportPreview(null);try{const item=await lyneApi.resolveImport(importUrl.trim());setImportPreview(item);}catch(e){setImportError(e instanceof Error?e.message:"LYNE couldn't read that link.");}finally{setImportBusy(false);}};
   const saveImportedLink=async()=>{
     if(!importPreview||importSaving)return;
-    const saved:SavedImport={...importPreview};
+    const previousCollection=state.importedCollections.find(item=>item.provider===importPreview.provider&&item.providerId===importPreview.providerId&&item.kind===importPreview.kind);
+    const saved:SavedImport={...importPreview,...(previousCollection?.addedTracks?.length?{addedTracks:previousCollection.addedTracks}:{})};
     const alreadySaved= saved.kind==="track"
       ?state.importedLikes.some(item=>item.provider===saved.provider&&item.providerId===saved.providerId)
       :state.importedCollections.some(item=>item.provider===saved.provider&&item.providerId===saved.providerId&&item.kind===saved.kind);
@@ -946,7 +953,7 @@ export default function App() {
         const remotePlaylists=remote.playlists.map(item=>({...item,synced:true}));
         const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
         setUser({id:profile.id,username:profile.username});
-        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[],preferences:{...old.preferences,...preferences.preferences} as typeof old.preferences,theme:["dark","light","system"].includes(String(preferences.preferences.theme))?String(preferences.preferences.theme):old.theme}));
+        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:mergeLocalCollectionTracks(imports.collections||[],old.importedCollections),stats:history.stats||[],preferences:{...old.preferences,...preferences.preferences} as typeof old.preferences,theme:["dark","light","system"].includes(String(preferences.preferences.theme))?String(preferences.preferences.theme):old.theme}));
         setAccountSyncReady(true);
       }catch{setAccountSyncReady(true);setNotice("Signed in. Some account library data could not be loaded yet; local settings will be kept.");}
       setAccountMessage("You're signed in.");setModal(null);setNotice("Signed in to LYNE.");
