@@ -436,6 +436,7 @@ export default function App() {
   useEffect(()=>{
     const [red,green,blue]=ambientColor.split(",").map(value=>Math.max(0,Math.min(255,Number(value)||0)));
     const root=document.documentElement;
+    root.style.setProperty("--lime-rgb",`${red},${green},${blue}`);
     root.style.setProperty("--lime",`rgb(${red} ${green} ${blue})`);
     root.style.setProperty("--lime-soft",`rgba(${red}, ${green}, ${blue}, .14)`);
     root.style.setProperty("--artwork-glow",`rgba(${red}, ${green}, ${blue}, .22)`);
