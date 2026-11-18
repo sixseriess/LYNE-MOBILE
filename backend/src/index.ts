@@ -264,7 +264,19 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const userId = await tokenUser(request,env);
     const popular = await env.DB.prepare(TRACK_SELECT + " WHERE t.published=1 ORDER BY t.plays_count DESC,t.created_at DESC LIMIT 16").all<TrackRow>();
     const recent = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY MAX(le.played_at) DESC LIMIT 10").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
-    return json({ recentlyPlayed: recent.results.map(publicTrack), popular: popular.results.map(publicTrack), mixes: [] });
+    const personalized = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY SUM(le.listened_ms) DESC LIMIT 12").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
+    const dailyTracks=(personalized.results.length?personalized.results:popular.results).map(publicTrack);
+    const repeatTracks=personalized.results.map(publicTrack);
+    const favoriteIds=new Set(personalized.results.map(track=>track.id));
+    const discoveryTracks=popular.results.filter(track=>!favoriteIds.has(track.id)).map(publicTrack);
+    const recentTracks=recent.results.map(publicTrack);
+    const mixes=[
+      {id:"daily-mix",title:"Daily Mix",tracks:dailyTracks.slice(0,10)},
+      ...(repeatTracks.length?[{id:"on-repeat",title:"On Repeat",tracks:repeatTracks.slice(0,10)}]:[]),
+      {id:"discovery",title:"Discovery Mix",tracks:(discoveryTracks.length?discoveryTracks:dailyTracks).slice(0,10)},
+      ...(recentTracks.length?[{id:"recently-played",title:"Your Recent Mix",tracks:recentTracks.slice(0,10)}]:[])
+    ].filter(mix=>mix.tracks.length>0).map(mix=>({...mix,artwork:mix.tracks[0]?.artwork||""}));
+    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), mixes });
   }
 
   if (path === "/v1/tracks" && request.method === "GET") {
