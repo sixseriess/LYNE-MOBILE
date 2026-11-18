@@ -61,7 +61,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Discord Rich Presence limitation explained in Settings; a preference can be retained, but mobile-browser RPC is not available through this PWA.
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
 - [x] System theme detection is implemented; full Windows language/translation parity remains outstanding.
-- [x] Dark / light theme, language preference, reduce-motion preference, and persistent custom background images.
+- [x] Dark / light / system theme, reduce-motion preference, and persistent custom background images. English is the only mobile UI language at this stage.
 - [x] **Storage:** device usage, local music management, catalogue-track offline saves with a configurable limit, and safe temporary-cache clearing. Offline mixes remain a future enhancement.
 - [x] PWA version and build SHA shown in About; checks for service-worker updates on launch and refreshes when a new worker takes control.
 - [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
