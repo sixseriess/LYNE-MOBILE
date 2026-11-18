@@ -692,3 +692,11 @@ body{font-feature-settings:"ss01" on,"cv11" on}
 
 .local-meta-form{border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0;background:var(--surface)}
 .local-art-preview{height:112px;width:112px;border-radius:10px;background-size:cover;background-position:center;border:1px solid var(--border);margin:10px auto}
+
+.external-player-heading{display:flex;align-items:center;gap:12px;margin:4px 0 14px}
+.external-player-heading .cover{width:54px;height:54px;flex:none}
+.external-player-heading>div:last-child{display:flex;min-width:0;flex-direction:column;gap:5px}
+.external-player-heading b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.external-player-heading small{font-size:10px;color:var(--muted)}
+.provider-embed{display:block;width:100%;height:430px;min-height:180px;border:0;border-radius:12px;background:#111}
+@media(max-width:480px){.provider-embed{height:380px}}
