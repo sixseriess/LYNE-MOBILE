@@ -1,9 +1,10 @@
 export type Track = {
   id: string; title: string; artist: string; album?: string; artwork?: string;
   audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
-  lyrics?: string;
+  lyrics?: string; offline?: boolean;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
+export type SearchPlaylist = { id: string; name: string; description?: string; owner: string; cover?: string };
 export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
 export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
 export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
@@ -58,7 +59,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(API_URL + path, {
       ...init, credentials: "omit",
-      headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
+      headers: { Accept: "application/json", ...(init.body && !(typeof FormData!=="undefined" && init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
     });
   } catch { throw new ApiError("Can't reach the LYNE API. Check your connection."); }
   if (!response.ok) {
@@ -70,18 +71,27 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),
-  home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string }[] }>("/v1/home"),
-  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string; tracks: Track[] }[] }>("/v1/home"),
+  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: SearchPlaylist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  publicPlaylist: (id: string) => api<{ playlist: SearchPlaylist & { trackIds: string[] }; tracks: Track[] }>(`/v1/playlists/${encodeURIComponent(id)}`),
   tracks: (limit = 30, offset = 0) => api<{ tracks: Track[]; total: number }>(`/v1/tracks?limit=${limit}&offset=${offset}`),
   artist: (id: string) => api<{ artist: {id:string;name:string;bio?:string;artwork?:string}; tracks: Track[]; albums: {id:string;title:string;releaseDate?:string;artwork?:string}[] }>(`/v1/artists/${encodeURIComponent(id)}`),
   album: (id: string) => api<{ album: {id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string}; tracks: Track[] }>(`/v1/albums/${encodeURIComponent(id)}`),
   me: () => api<{ id: string; username: string; avatar?: string }>("/v1/me"),
+  updateProfile: (username:string) => api<{username:string}>("/v1/me/profile",{method:"PUT",body:JSON.stringify({username})}),
+  preferences: () => api<{preferences:Record<string,unknown>}>("/v1/me/preferences"),
+  savePreferences: (preferences:Record<string,unknown>) => api<{saved:boolean}>("/v1/me/preferences",{method:"PUT",body:JSON.stringify({preferences})}),
+  uploadAvatar: (file:File) => { const form=new FormData(); form.append("avatar",file); return api<{avatar:string}>("/v1/me/avatar",{method:"POST",body:form}); },
+  removeAvatar: () => api<{avatar:string}>("/v1/me/avatar",{method:"DELETE"}),
   login: (username: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/login", { method: "POST", body: JSON.stringify({ username, password }) }),
   register: (username: string, email: string, password: string) => api<{ accessToken: string; user: { id: string; username: string } }>("/v1/auth/register", { method: "POST", body: JSON.stringify({ username, email, password }) }),
   playlists: () => api<{ playlists: Playlist[] }>("/v1/me/playlists"),
   createPlaylist: (name: string, description = "") => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify({ name, description }) }),
   updatePlaylist: (playlist: Playlist) => api<Playlist>(`/v1/me/playlists/${encodeURIComponent(playlist.id)}`, { method: "PUT", body: JSON.stringify({ name: playlist.name, description: playlist.description || "", trackIds: playlist.trackIds }) }),
+  uploadPlaylistCover: (id: string, file: File) => { const form=new FormData(); form.append("artwork",file); return api<{cover:string}>(`/v1/me/playlists/${encodeURIComponent(id)}/cover`, { method:"POST", body:form }); },
+  removePlaylistCover: (id: string) => api<{cover:string}>(`/v1/me/playlists/${encodeURIComponent(id)}/cover`, { method:"DELETE" }),
   deletePlaylist: (id: string) => api<void>(`/v1/me/playlists/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  listeningHistory: () => api<{ stats: { id:string; title:string; artist:string; ms:number; day:string }[] }>("/v1/me/listening"),
   listening: (event: { trackId: string; listenedMs: number; playedAt: string }) => api<void>("/v1/me/listening", { method: "POST", body: JSON.stringify(event) }),
   resolveImport: (url: string) => api<ResolvedImport>(`/v1/import/resolve?url=${encodeURIComponent(url)}`),
   saveImport: (item: ResolvedImport) => api<{ saved:boolean; kind:string; id:string }>("/v1/me/imports", { method:"POST", body:JSON.stringify(item) }),

@@ -20,7 +20,7 @@ Set `VITE_API_URL` to the deployed first-party LYNE API origin. Until that backe
 GitHub Actions builds and deploys `dist` to GitHub Pages on pushes to `main`. In repository **Settings → Pages**, set the source to **GitHub Actions**. The first deployment will fail until Pages is enabled.
 
 ## LYNE's own catalogue backend
-The `backend/` folder contains LYNE's own Cloudflare Worker API, D1 migration and R2 media-storage integration. See [backend/README.md](backend/README.md) for deployment and catalogue upload instructions. This is a new backend, not a proxy to another music service.
+The `backend/` folder contains LYNE's own Cloudflare Worker API and D1 migration, with Supabase Storage for hosted audio and artwork. See [backend/README.md](backend/README.md) for deployment and catalogue upload instructions. This is a new backend, not a proxy to another music service.
 
 ## Project boundaries
 - This repository is independent from the LYNE Windows application repository.
@@ -30,4 +30,4 @@ The `backend/` folder contains LYNE's own Cloudflare Worker API, D1 migration an
 - A complete commercial music catalogue requires a separate distribution licence and authorized catalogue source. Canadian rights holders include record-label/master-rights organizations and songwriter/publisher organizations; see [Music Canada](https://musiccanada.com/resources/licensing/) and [CMRRA](https://cmrra.ca/get-licensed/).
 
 ## Current mobile foundation
-Mobile navigation, expandable playback controls, queue controls, local audio import/playback, likes, playlist creation, profile picture selection, playback settings, listening stats, top-10 song/artist rankings and share-your-stats are included. Remote commercial catalogue, account sync, synced playlist covers, lyrics, hosted downloads and media streaming require the LYNE backend and catalogue to be deployed and populated.
+Mobile navigation, expandable playback controls, player swipe gestures and haptics, editable queue, official in-app provider embeds for supported Spotify/SoundCloud/YouTube/Apple Music links, playlist discovery and detail pages, offline saves for LYNE catalogue tracks, local audio import with editable metadata and artwork, playlist creation and editing, signed-in username/profile-photo/preferences sync, timed lyrics with adjustable offset, system theme and reduced-motion controls, ambient cover-colour player modes, day/week/month/year listening stats, top-10 song/artist rankings, LYNE Wrapped and shareable stats images are included. Remote commercial catalogue, account sync, synced playlist covers, lyrics, hosted downloads and media streaming require the LYNE backend and catalogue to be deployed and populated.

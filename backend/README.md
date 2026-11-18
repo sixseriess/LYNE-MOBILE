@@ -3,22 +3,22 @@
 This service is a first-party LYNE API. It uses:
 - **Cloudflare Workers** for API routing and authentication.
 - **Cloudflare D1** for user accounts, artists, albums, track metadata, playlists and listening events.
-- **Cloudflare R2** for audio files and artwork, delivered by the Worker with HTTP byte-range support for seeking.
+- **Supabase Storage** for audio files and artwork, delivered by the Worker with HTTP byte-range support for seeking.
 
 Cloudflare references:
 - [D1 Worker API](https://developers.cloudflare.com/d1/worker-api/)
-- [R2 Workers API](https://developers.cloudflare.com/r2/api/workers/workers-api-reference/)
+- [Supabase Storage API](https://supabase.com/docs/guides/storage)
 - [Workers configuration](https://developers.cloudflare.com/workers/wrangler/configuration/)
 
 ## One-click setup and deployment
 
-The repository includes **Actions → Deploy LYNE API**. It now creates or reuses the `lyne-catalog` D1 database and `lyne-media` R2 bucket automatically, applies migrations, deploys the Worker, and installs the private secrets.
+The repository includes **Actions → Deploy LYNE API**. It creates or reuses the `lyne-catalog` D1 database, applies migrations, deploys the Worker, and installs the private secrets. Create a public Supabase Storage bucket named `lyne-media` before deploying.
 
-You only need to provide the Cloudflare account credentials and two LYNE secrets:
+You need the Cloudflare account credentials, two LYNE authentication secrets, and the Supabase project URL and server secret key:
 
 1. Open [LYNE-MOBILE repository secrets](https://github.com/sixseriess/LYNE-MOBILE/settings/secrets/actions).
-2. Add these four **repository secrets**:
-   - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with **D1:Edit**, **Workers Scripts:Edit**, and **R2 Storage:Edit** permissions for your account.
+2. Add these six **repository secrets**:
+   - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with **D1:Edit** and **Workers Scripts:Edit** permissions for your account.
    - `CLOUDFLARE_ACCOUNT_ID` — your 32-character Cloudflare account ID.
    - `LYNE_AUTH_SECRET` — a long random secret (at least 32 characters). Keep it stable between deployments; changing it signs every existing user out.
    - `LYNE_ADMIN_API_TOKEN` — a separate random admin token (at least 24 characters).
@@ -27,7 +27,7 @@ You only need to provide the Cloudflare account credentials and two LYNE secrets
 
 Generate both LYNE secrets locally with a password manager or a cryptographically secure random generator. Do not commit secrets or paste them into source code, chat messages, or any `VITE_*` variable. The deployment workflow never prints secret values.
 
-The Cloudflare API token is used only by the GitHub Actions workflow. The setup script creates the named resources only when they do not already exist, so rerunning deployment does not replace or delete your database or media bucket. The D1 database is requested in the western North America region when Cloudflare makes that location available.
+The Cloudflare API token is used only by the GitHub Actions workflow. The setup script creates the D1 database only when it does not already exist. Supabase Storage is managed by Supabase, and the workflow uses the existing `lyne-media` bucket. The D1 database is requested in the western North America region when Cloudflare makes that location available.
 
 ## Add catalogue content
 
@@ -35,6 +35,7 @@ Use `POST /v1/admin/tracks` with the `x-admin-token` header and multipart form f
 - `title`, `artist`, optional `album`, `durationMs`, `genre`, `explicit`
 - `audio` (MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM, up to 45 MB)
 - optional `artwork` (JPG, PNG, WebP or AVIF, up to 7 MB)
+- optional `lyrics` (plain text or LRC timed lyrics, up to 50,000 characters)
 - `rightsConfirmed=true`, `rightsStatus=owned|licensed|public_domain`, and `rightsReference`
 
 The admin token is a server secret and must never be placed in the mobile app. Tracks are only added through this authenticated admin route. You must have the right to distribute every recording and artwork you upload. The rights fields are an audit declaration, not a substitute for a licence.
@@ -60,8 +61,13 @@ Account:
 - `POST /v1/auth/register`
 - `POST /v1/auth/login`
 - `GET /v1/me`
+- `PUT /v1/me/profile` — update the authenticated account username (3–24 letters, numbers or underscores)
+- `GET|PUT /v1/me/preferences` — sync mobile preferences to the signed-in account
+- `POST|DELETE /v1/me/avatar` — upload or remove the account profile photo in Supabase Storage
 - `GET|POST /v1/me/playlists`
-- `POST /v1/me/listening`
+- `PUT|DELETE /v1/me/playlists/:id`
+- `POST|DELETE /v1/me/playlists/:id/cover` — upload or remove account-synced playlist artwork
+- `GET|POST /v1/me/listening` — retrieve and record per-track daily listening totals.
 
 Admin:
 - `POST /v1/admin/tracks`
@@ -80,4 +86,4 @@ Add provider credentials as Worker secrets only when those integrations are appr
 
 Spotify and SoundCloud public resources use app tokens; YouTube uses a Data API key; Apple Music uses a signed developer token. Private or user-library resources need their own user authorization flow, which is not included in this public-link resolver.
 
-For local development, run `npm install`, `npx wrangler dev` in `backend/`. Do not run a production deploy until the Cloudflare secrets above are configured.
+For local development, run `npm install`, `npx wrangler dev` in `backend/`. Do not run a production deploy until the Cloudflare and Supabase secrets above are configured.

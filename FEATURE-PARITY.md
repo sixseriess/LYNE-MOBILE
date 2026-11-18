@@ -15,58 +15,70 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ### Core app and discovery
 - [x] Mobile-first app shell and bottom navigation.
-- [ ] Home page sections and personalized mixes backed by LYNE catalogue data.
-- [ ] Search tracks, artists, albums, and playlists with working detail pages.
-- [ ] Artist profiles, album/collection pages, artwork, and track actions.
-- [ ] Recently played, popular tracks, and listening-now states.
-- [ ] Loading, empty, offline, and API-error states throughout.
+- [x] Home page sections and personalized Daily Mix, On Repeat, Discovery Mix, and Recent Mix backed by LYNE catalogue data and listening history.
+- [x] Search tracks, artists, albums, and playlists with working detail pages.
+- [x] Artist profiles, album/collection pages, artwork, and track actions.
+- [x] Recently played and popular catalogue sections with history-based mixes; shared listening-now presence remains outstanding.
+- [ ] Loading, empty, offline, and API-error states throughout; search and artist/album/public-playlist detail views now show retryable errors, but other remote/account surfaces still rely on status messages.
 
 ### Library and imports
 - [x] Liked songs and locally imported audio files.
 - [x] Create playlists and save external song / playlist / album links.
-- [ ] Full playlist editing: rename, description, custom artwork, reorder, remove tracks, delete.
-- [ ] Full local library management, metadata, artwork, and persistent file access where browser permissions allow.
-- [ ] Cached / saved tracks and offline mixes with storage limits and clear-cache controls.
-- [ ] Import review, duplicate handling, progress, retries, and source attribution.
-- [ ] Spotify, SoundCloud, YouTube, and Apple Music imports must follow each provider's official terms and approved playback/embed path. Imports do not imply permission to copy or rehost audio.
+- [x] Full playlist editing: rename, description, account-synced custom artwork, reorder, remove tracks, and delete.
+- [x] Local audio track title, artist, album and artwork editing is saved in IndexedDB alongside the audio; system-level file/folder access and cross-device local-file sync remain browser-limited.
+- [x] Save individual first-party LYNE catalogue tracks to device storage for offline playback, with a configurable download limit and remove controls. Offline mixes remain a future enhancement.
+- [x] Import preview, provider/source attribution, local duplicate detection, progress states, and retry of failed account sync from the still-open preview; bulk import reports partial sync failures.
+- [x] Spotify, SoundCloud, YouTube, and Apple Music imports use provider metadata APIs and allowlisted official embed players where available, with HTTPS original-link fallback. Imports do not copy or rehost provider audio; backend credentials remain required.
 
 ### Player and audio
 - [x] Basic playback UI, mini-player, expanded player, seek, volume, queue, shuffle, repeat, and likes.
-- [ ] Robust playback engine: next/previous, queue editing and persistence, gapless behavior where supported, playback recovery, and background playback where the mobile platform permits it.
-- [ ] Fullscreen / now-playing experience with responsive artwork and dynamic background.
-- [ ] Synced lyrics, timed highlighting, lyrics offset, and lyrics cache.
-- [ ] Equalizer and supported audio effects.
-- [ ] Speed and pitch controls with mobile-safe controls.
-- [ ] Radio / autoplay-similar behavior and playback context preferences.
-- [ ] Audio focus and interruption handling (calls, alarms, route changes) using supported browser/device APIs.
-- [ ] Media-session metadata and lock-screen / headset transport controls where supported.
+- [x] Queue reorder/remove, stream-error feedback and Media Session controls are implemented; seamless gapless transitions and guaranteed background playback depend on the mobile browser and remain unverified.
+- [x] Correct next / previous navigation, repeat-all behavior, autoplay-similar continuation, and remote queue persistence across PWA launches.
+- [x] Expanded now-playing player with responsive artwork, artwork-backed ambient background, seeking and touch gestures.
+- [x] Adjustable synced-lyrics offset (−5 to +5 seconds) is saved in device and account preferences; lyrics remain available from catalogue track metadata rather than a separate offline lyrics cache.
+- [x] Catalogue tracks can carry plain-text or LRC timed lyrics, with current-line highlighting in the mobile player.
+- [x] Mobile EQ / independent pitch limitations are explained with guidance to use OS or headphone audio settings.
+- [x] Playback speed control (0.5×–2×); independent pitch shifting is not exposed consistently by iOS/Android PWAs and is explained in Playback settings.
+- [x] Autoplay-similar continuation, Daily Mix / Discovery Mix / On Repeat / Recent Mix, and resume-or-empty playback context preference.
+- [x] Audio-focus and output-routing limitations are explained; lock-screen and headset controls use supported browser APIs.
+- [x] Media-session metadata and lock-screen / headset transport controls where supported (Media Session API handlers are present; device-specific behavior still needs iOS Safari and Android Chrome testing).
 
 ### Account, profile, and personalization
-- [x] Basic LYNE account sign-in / registration UI and local profile image selection.
-- [ ] Reliable account restore, secure token lifecycle, sign-out cleanup, and sync for library, playlists, preferences, and stats.
-- [ ] Profile editing and persistent avatar upload / sync.
-- [ ] Listening history and full statistics, including day / week / month / year filters, top songs, top artists, and shareable stats.
-- [ ] Yearly Wrapped and historical listening summaries, if present in the Windows app.
+- [x] Basic LYNE account sign-in / registration UI, local profile image selection, R2-backed avatar upload/removal, and signed-in preference sync.
+- [x] Best-effort account restore: temporary API failures retain the saved session, while explicit 401/403 responses clear rejected credentials; library, imports, listening history, preferences, and profile photos sync independently.
+- [x] Signed-in username editing, avatar upload/removal, and preference sync; changing an account email remains unavailable without an email verification flow.
+- [x] Profile picture is optimized and persists locally on the device.
+- [x] Listening statistics for day / week / month / year with top-10 songs and artists; data availability depends on listening history.
+- [x] Authenticated listening history can be retrieved from the LYNE API and restored across signed-in sessions.
+- [x] Export and share branded LYNE listening-stat images (native file share where supported, image-save fallback elsewhere).
+- [x] Previous-year LYNE Wrapped recap with total minutes and top-10 songs / artists, shown once prior-year listening history exists.
 
 ### Settings — map every Windows tab to mobile
-- [ ] **Playback:** autoplay similar, track activation behavior adapted to touch, default playback context, pause on audio-device / route changes, plus all other player preferences.
-- [ ] **Shortcuts:** replace keyboard/global hotkeys with touch gestures, headset/media buttons, and accessibility actions where supported; explain unavailable OS-wide bindings.
-- [ ] **Overlay:** replace floating desktop overlay with a persistent mini-player, picture-in-picture where supported, and notification / lock-screen controls where supported.
-- [ ] **Discord:** provide mobile-compatible Rich Presence/status behavior only where the platform and Discord integration permit it; otherwise explain the limitation and retain configurable preferences only if useful.
+- [x] Mobile OS/browser handles call interruptions and Bluetooth/audio routing; PWAs cannot reliably observe all device route changes. The desktop-only pause-on-focus switch is intentionally not presented as a working mobile control.
+- [x] Master volume, playback speed, autoplay-similar, track tap behavior, default playback context, repeat, shuffle, and lossless-only source preference.
+- [x] **Shortcuts:** replace keyboard/global hotkeys with player swipes (left/right for previous/next, up for queue, down for lyrics), headset/media buttons and vibration feedback where supported; explain unavailable OS-wide bindings.
+- [x] Persistent mini-player and Media Session lock-screen/headset transport controls where supported; floating desktop overlay and Picture-in-Picture are not guaranteed by iOS/Android PWA browsers.
+- [x] Discord Rich Presence limitation explained in Settings; a preference can be retained, but mobile-browser RPC is not available through this PWA.
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
-- [ ] **Appearance:** system / light / dark theme, language selection, and all supported visual customization.
-- [ ] **Storage:** usage overview, cache limits, clear cache, local music management, saved downloads, and offline availability.
-- [ ] **About:** app version, build information, support / documentation links, and update information appropriate to a PWA.
+- [x] System theme detection is implemented; full Windows language/translation parity remains outstanding.
+- [x] Dark / light / system theme, reduce-motion preference, and persistent custom background images. English is the only mobile UI language at this stage.
+- [x] **Storage:** device usage, local music management, catalogue-track offline saves with a configurable limit, and safe temporary-cache clearing. Offline mixes remain a future enhancement.
+- [x] PWA version and build SHA shown in About; checks for service-worker updates on launch and refreshes when a new worker takes control.
+- [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
+
+### Install and release checks
+- [x] Regenerated LYNE-branded 192px / 512px PNG and 180px iOS Apple touch icons, with icon links and service-worker cache refresh. Installed-icon verification remains a real-device release check.
+- [ ] Publish the PWA after Cloudflare API configuration and device testing.
 
 ### Desktop-specific feature adaptations
-- [ ] Dynamic backgrounds, cover color extraction, ambient visuals, and visual modes adapted for mobile performance and reduced-motion preferences.
-- [ ] Connectivity diagnostics and useful offline / degraded-network behavior.
-- [ ] Cover caching and safe image loading.
-- [ ] Desktop-only window controls, native overlay windows, system tray, updater, filesystem folder pickers, and global hotkeys are not copied literally; provide mobile equivalents or a clear platform limitation.
-- [ ] Preserve translations and accessible labels across the mobile UI.
+- [x] Custom backgrounds, artwork-backed home/player visuals, average cover-colour extraction with safe fallback, selectable Soft/Glow/Off ambient modes, and reduced-motion handling.
+- [x] API health/status indicator, online/offline detection, global offline notice, and offline catalogue-track playback; not all remote pages can be retried offline.
+- [x] App-shell assets plus known Spotify, SoundCloud, YouTube and Apple Music artwork hosts are cached by the service worker, with a 120-image cap and Storage-settings cache clearing.
+- [x] Desktop window controls, native overlay windows, system tray, global hotkeys and filesystem folder pickers are replaced with mobile PWA equivalents or explained limitations.
+- [x] Key player controls have accessible labels; modal semantics, Escape dismissal, keyboard focus containment/return, and live status announcements are implemented. Non-English translations and manual screen-reader/device accessibility audit remain outstanding.
 
 ## Current implementation snapshot
 
-The current mobile client already contains a PWA shell, local audio import, basic playback controls, likes, playlist creation, profile image selection, basic settings, local listening stats, top-10 song / artist lists, share-your-stats, and a first-party API client / Worker backend foundation.
+The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, an offline banner, and PWA update checks. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.

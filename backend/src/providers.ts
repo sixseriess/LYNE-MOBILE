@@ -111,6 +111,11 @@ async function youtubeImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
   const track:ImportedTrack={providerId:videoId,title:clean(v.snippet?.title),artist:clean(v.snippet?.channelTitle),externalUrl:"https://www.youtube.com/watch?v="+videoId,artwork:firstImage(v.snippet?.thumbnails),embedUrl:"https://www.youtube-nocookie.com/embed/"+videoId};
   return {provider:"youtube",kind:"track",providerId:videoId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]};
 }
+function appleEmbedUrl(raw?:string):string|undefined{
+  if(!raw)return undefined;
+  try{const embed=new URL(raw);if(embed.protocol!=="https:"||embed.hostname!=="music.apple.com")return undefined;embed.hostname="embed.music.apple.com";return embed.toString();}
+  catch{return undefined;}
+}
 async function appleImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   if(!env.APPLE_MUSIC_DEVELOPER_TOKEN)throw new Error("Apple Music import isn't configured on LYNE yet. Add an Apple Music developer token to the LYNE backend.");
   const match=url.pathname.match(/^\/([a-z]{2})\/(album|playlist|song)\/.*\/(\d+)\/?$/i);
@@ -124,8 +129,8 @@ async function appleImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> 
   const item=data.data?.[0];if(!item)throw new Error("Apple Music item wasn't found in that storefront.");
   const attrs=item.attributes||{};
   const rawTracks=kind==="track"?[item]:(item.relationships?.tracks?.data||[]);
-  const tracks:ImportedTrack[]=rawTracks.slice(0,100).map((t:any)=>({providerId:t.id,title:clean(t.attributes?.name),artist:clean(t.attributes?.artistName),externalUrl:t.attributes?.url||url.toString(),artwork:t.attributes?.artwork?.url?.replace("{w}","600").replace("{h}","600"),durationMs:Number(t.attributes?.durationInMillis)||undefined,embedUrl:t.attributes?.url}));
-  return {provider:"apple_music",kind,providerId:id,title:clean(attrs.name)||"Apple Music item",subtitle:clean(attrs.artistName)||clean(attrs.curatorName)||"Apple Music",externalUrl:attrs.url||url.toString(),artwork:attrs.artwork?.url?.replace("{w}","600").replace("{h}","600"),embedUrl:attrs.url,tracks};
+  const tracks:ImportedTrack[]=rawTracks.slice(0,100).map((t:any)=>({providerId:t.id,title:clean(t.attributes?.name),artist:clean(t.attributes?.artistName),externalUrl:t.attributes?.url||url.toString(),artwork:t.attributes?.artwork?.url?.replace("{w}","600").replace("{h}","600"),durationMs:Number(t.attributes?.durationInMillis)||undefined,embedUrl:appleEmbedUrl(t.attributes?.url)}));
+  return {provider:"apple_music",kind,providerId:id,title:clean(attrs.name)||"Apple Music item",subtitle:clean(attrs.artistName)||clean(attrs.curatorName)||"Apple Music",externalUrl:attrs.url||url.toString(),artwork:attrs.artwork?.url?.replace("{w}","600").replace("{h}","600"),embedUrl:appleEmbedUrl(attrs.url),tracks};
 }
 export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<ResolvedImport> {
   let url:URL;

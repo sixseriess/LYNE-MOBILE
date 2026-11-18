@@ -5,7 +5,9 @@ interface Env {
   SOUNDCLOUD_CLIENT_ID?: string; SOUNDCLOUD_CLIENT_SECRET?: string;
   YOUTUBE_API_KEY?: string; APPLE_MUSIC_DEVELOPER_TOKEN?: string;
   DB: D1Database;
-  MEDIA: R2Bucket;
+  SUPABASE_URL?: string;
+  SUPABASE_SECRET_KEY?: string;
+  SUPABASE_BUCKET?: string;
   ADMIN_API_TOKEN: string;
   AUTH_SECRET: string;
   CORS_ORIGIN?: string;
@@ -14,7 +16,7 @@ interface Env {
 type TrackRow = {
   id: string; title: string; artist: string; artistId: string; album?: string | null;
   albumId?: string | null; durationMs: number; explicit: number; genre?: string | null;
-  artworkKey?: string | null; audioKey: string; audioMime: string; audioSize: number;
+  artworkKey?: string | null; audioKey: string; audioMime: string; audioSize: number; lyrics?: string | null;
 };
 
 const JSON_HEADERS = { "content-type": "application/json; charset=utf-8" };
@@ -92,19 +94,57 @@ async function verifyPassword(password: string, stored: string) {
   const actual = b64url(new Uint8Array(bits));
   return actual.length === expected.length && [...actual].every((c, i) => c === expected[i]);
 }
-function mediaUrl(key: string | null | undefined) { return key ? "/v1/media/" + key.split("/").map(encodeURIComponent).join("/") : ""; }
+function mediaUrl(key: string | null | undefined) {
+  if (!key) return "";
+  if (key.startsWith("data:image/")) return key;
+  return "/v1/media/" + key.split("/").map(encodeURIComponent).join("/");
+}
+function storageReady(env: Env) {
+  return !!env.SUPABASE_URL?.trim() && !!env.SUPABASE_SECRET_KEY?.trim();
+}
+function storageObjectUrl(env: Env, key: string, isPublic = false) {
+  const base = env.SUPABASE_URL!.replace(/\/+$/, "");
+  const bucket = encodeURIComponent(env.SUPABASE_BUCKET || "lyne-media");
+  const object = key.split("/").map(encodeURIComponent).join("/");
+  return `${base}/storage/v1/object/${isPublic ? "public/" : ""}${bucket}/${object}`;
+}
+function storageHeaders(env: Env) {
+  return { apikey: env.SUPABASE_SECRET_KEY! };
+}
+async function storageUpload(env: Env, key: string, file: File) {
+  if (!storageReady(env)) throw new Error("Supabase media storage is not configured.");
+  const response = await fetch(storageObjectUrl(env, key), {
+    method: "POST",
+    headers: { ...storageHeaders(env), "content-type": file.type, "x-upsert": "false" },
+    body: await file.arrayBuffer(),
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(`Supabase upload failed (${response.status})${message ? `: ${message.slice(0, 240)}` : ""}`);
+  }
+}
+async function storageDelete(env: Env, key: string | null | undefined) {
+  if (!key || key.startsWith("data:image/") || !storageReady(env)) return;
+  const response = await fetch(storageObjectUrl(env, key), {
+    method: "DELETE",
+    headers: storageHeaders(env),
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Supabase delete failed (${response.status}).`);
+  }
+}
 function publicTrack(row: TrackRow) {
   return {
     id: row.id, title: row.title, artist: row.artist, artistId: row.artistId,
     album: row.album || undefined, albumId: row.albumId || undefined,
     durationMs: row.durationMs, explicit: !!row.explicit, genre: row.genre || undefined,
     audioMime: row.audioMime, audioSize: row.audioSize,
-    artwork: mediaUrl(row.artworkKey), audioUrl: mediaUrl(row.audioKey),
+    artwork: mediaUrl(row.artworkKey), audioUrl: mediaUrl(row.audioKey), lyrics: row.lyrics || undefined,
   };
 }
 const TRACK_SELECT = `SELECT t.id, t.title, a.name AS artist, a.id AS artistId, al.title AS album,
   al.id AS albumId, t.duration_ms AS durationMs, t.explicit, t.genre, t.artwork_key AS artworkKey,
-  t.audio_key AS audioKey, t.audio_mime AS audioMime, t.audio_size AS audioSize
+  t.audio_key AS audioKey, t.audio_mime AS audioMime, t.audio_size AS audioSize, t.lyrics
   FROM tracks t JOIN artists a ON a.id=t.artist_id LEFT JOIN albums al ON al.id=t.album_id`;
 
 function cors(request: Request, env: Env) {
@@ -138,31 +178,27 @@ async function requireAdmin(request: Request, env: Env) {
 }
 
 async function media(request: Request, env: Env, key: string) {
-  if (!/^(audio|artwork|avatars|playlists)\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes("..")) return fail("Media not found.",404);
-  const object = await env.MEDIA.get(key, { range: request.headers });
-  if (!object || !("body" in object) || !object.body) return fail("Media not found.",404);
+  if (!/^(audio|artwork|avatars|playlists)\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes("..")) return fail("Media not found.", 404);
+  if (!storageReady(env)) return fail("Media storage is not configured.", 503);
   const headers = new Headers();
-  object.writeHttpMetadata(headers);
-  headers.set("etag", object.httpEtag);
-  headers.set("accept-ranges", "bytes");
-  headers.set("cache-control", "public, max-age=31536000, immutable");
-  headers.set("x-content-type-options", "nosniff");
-  if (object.range) {
-    let start: number;
-    let length: number;
-    if ("suffix" in object.range) {
-      length = Math.min(object.range.suffix, object.size);
-      start = object.size - length;
-    } else {
-      start = object.range.offset ?? 0;
-      length = object.range.length ?? Math.max(0, object.size - start);
-    }
-    headers.set("content-range", `bytes ${start}-${start + length - 1}/${object.size}`);
-    headers.set("content-length", String(length));
-    return new Response(request.method === "HEAD" ? null : object.body, { status: 206, headers });
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
+  const upstream = await fetch(storageObjectUrl(env, key, true), {
+    method: request.method,
+    headers,
+  });
+  if (!upstream.ok) return fail("Media not found.", upstream.status === 404 ? 404 : 502);
+  const responseHeaders = new Headers();
+  for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
   }
-  headers.set("content-length", String(object.size));
-  return new Response(request.method === "HEAD" ? null : object.body, { status: 200, headers });
+  responseHeaders.set("cache-control", "public, max-age=3600");
+  responseHeaders.set("x-content-type-options", "nosniff");
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
 }
 
 async function handle(request: Request, env: Env): Promise<Response> {
@@ -180,7 +216,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     } catch {
       // Keep the health response useful without exposing internal database errors.
     }
-    const storage = env.MEDIA ? "configured" : "missing";
+    const storage = storageReady(env) ? "configured" : "missing";
     const auth = env.AUTH_SECRET ? "configured" : "missing";
     const admin = env.ADMIN_API_TOKEN ? "configured" : "missing";
     const ok = database === "connected" && schema === "ready" && storage === "configured" && auth === "configured" && admin === "configured";
@@ -218,6 +254,64 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare("SELECT id,username,avatar_key AS avatarKey FROM users WHERE id=?").bind(userId).first<{id:string;username:string;avatarKey:string|null}>();
     if (!row) return fail("Account not found.",404);
     return json({ id:row.id, username:row.username, avatar:mediaUrl(row.avatarKey) });
+  }
+  
+  if (path === "/v1/me/profile" && request.method === "PUT") {
+    const userId = await requireUser(request,env);
+    const body = await request.json() as { username?: string };
+    const username = body.username?.trim() || "";
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) return fail("Username must be 3–24 characters using letters, numbers, and underscores.");
+    const usernameNorm = normalized(username);
+    const duplicate = await env.DB.prepare("SELECT id FROM users WHERE username_norm=? AND id<>?").bind(usernameNorm,userId).first<{id:string}>();
+    if (duplicate) return fail("That username is already in use.",409);
+    const updated = await env.DB.prepare("UPDATE users SET username=?,username_norm=? WHERE id=?").bind(username,usernameNorm,userId).run();
+    if (!updated.meta.changes) return fail("Account not found.",404);
+    return json({ username });
+  }
+
+
+
+  if(path==="/v1/me/preferences" && request.method==="GET"){
+    const userId=await requireUser(request,env);
+    const row=await env.DB.prepare("SELECT preferences_json AS preferencesJson FROM users WHERE id=?").bind(userId).first<{preferencesJson:string|null}>();
+    if(!row)return fail("Account not found.",404);
+    let preferences:Record<string,unknown>={};
+    try{const value=JSON.parse(row.preferencesJson||"{}");if(value&&typeof value==="object"&&!Array.isArray(value))preferences=value;}catch{}
+    return json({preferences});
+  }
+  if(path==="/v1/me/preferences" && request.method==="PUT"){
+    const userId=await requireUser(request,env);
+    const body=await request.json() as {preferences?:unknown};
+    if(!body.preferences||typeof body.preferences!=="object"||Array.isArray(body.preferences))return fail("Preferences must be an object.");
+    const serialized=JSON.stringify(body.preferences);
+    if(serialized.length>12000)return fail("Preferences are too large.");
+    await env.DB.prepare("UPDATE users SET preferences_json=? WHERE id=?").bind(serialized,userId).run();
+    return json({saved:true});
+  }
+  if(path==="/v1/me/avatar" && (request.method==="POST"||request.method==="DELETE")){
+    const userId=await requireUser(request,env);
+    const previous=await env.DB.prepare("SELECT avatar_key AS avatarKey FROM users WHERE id=?").bind(userId).first<{avatarKey:string|null}>();
+    if(!previous)return fail("Account not found.",404);
+    if(request.method==="DELETE"){
+      await env.DB.prepare("UPDATE users SET avatar_key=NULL WHERE id=?").bind(userId).run();
+      await storageDelete(env, previous.avatarKey);
+      return json({avatar:""});
+    }
+    const form=await request.formData();
+    const image=form.get("avatar");
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>5*1024*1024)return fail("Profile photo must be JPG, PNG, WebP or AVIF and no larger than 5 MB.");
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="avatars/"+userId+"/"+id()+"."+extension;
+    try{
+      await storageUpload(env,key,image);
+      await env.DB.prepare("UPDATE users SET avatar_key=? WHERE id=?").bind(key,userId).run();
+      await storageDelete(env,previous.avatarKey);
+      return json({avatar:mediaUrl(key)});
+    }catch(error){
+      await storageDelete(env,key).catch(()=>{});
+      return fail(error instanceof Error?error.message:"Could not save profile photo.",500);
+    }
   }
 
   if(path==="/v1/import/resolve" && request.method==="GET"){
@@ -264,7 +358,19 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const userId = await tokenUser(request,env);
     const popular = await env.DB.prepare(TRACK_SELECT + " WHERE t.published=1 ORDER BY t.plays_count DESC,t.created_at DESC LIMIT 16").all<TrackRow>();
     const recent = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY MAX(le.played_at) DESC LIMIT 10").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
-    return json({ recentlyPlayed: recent.results.map(publicTrack), popular: popular.results.map(publicTrack), mixes: [] });
+    const personalized = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY SUM(le.listened_ms) DESC LIMIT 12").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
+    const dailyTracks=(personalized.results.length?personalized.results:popular.results).map(publicTrack);
+    const repeatTracks=personalized.results.map(publicTrack);
+    const favoriteIds=new Set(personalized.results.map(track=>track.id));
+    const discoveryTracks=popular.results.filter(track=>!favoriteIds.has(track.id)).map(publicTrack);
+    const recentTracks=recent.results.map(publicTrack);
+    const mixes=[
+      {id:"daily-mix",title:"Daily Mix",tracks:dailyTracks.slice(0,10)},
+      ...(repeatTracks.length?[{id:"on-repeat",title:"On Repeat",tracks:repeatTracks.slice(0,10)}]:[]),
+      {id:"discovery",title:"Discovery Mix",tracks:(discoveryTracks.length?discoveryTracks:dailyTracks).slice(0,10)},
+      ...(recentTracks.length?[{id:"recently-played",title:"Your Recent Mix",tracks:recentTracks.slice(0,10)}]:[])
+    ].filter(mix=>mix.tracks.length>0).map(mix=>({...mix,artwork:mix.tracks[0]?.artwork||""}));
+    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), mixes });
   }
 
   if (path === "/v1/tracks" && request.method === "GET") {
@@ -297,7 +403,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const tracks = type==="all"||type==="tracks" ? await env.DB.prepare(TRACK_SELECT+" WHERE t.published=1 AND (t.title LIKE ? OR a.name LIKE ? OR al.title LIKE ?) ORDER BY t.plays_count DESC LIMIT 30").bind(like,like,like).all<TrackRow>() : {results:[] as TrackRow[]};
     const artists = type==="all"||type==="artists" ? await env.DB.prepare("SELECT id,name,bio,CASE WHEN image_key IS NULL THEN '' ELSE '/v1/media/' || image_key END AS artwork FROM artists WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT 20").bind(like).all() : {results:[]};
     const albums = type==="all"||type==="albums" ? await env.DB.prepare("SELECT al.id,al.title,a.name AS artist,a.id AS artistId,CASE WHEN al.artwork_key IS NULL THEN '' ELSE '/v1/media/' || al.artwork_key END AS artwork FROM albums al JOIN artists a ON a.id=al.artist_id WHERE al.title LIKE ? OR a.name LIKE ? ORDER BY al.title LIMIT 20").bind(like,like).all() : {results:[]};
-    const playlists = type==="all"||type==="playlists" ? await env.DB.prepare("SELECT p.id,p.name,p.description,u.username AS owner FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.name LIKE ? LIMIT 20").bind(like).all() : {results:[]};
+    const playlists = type==="all"||type==="playlists" ? await env.DB.prepare("SELECT p.id,p.name,p.description,u.username AS owner,CASE WHEN p.cover_key IS NULL THEN '' ELSE '/v1/media/' || p.cover_key END AS cover FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.name LIKE ? ORDER BY p.updated_at DESC LIMIT 20").bind(like).all() : {results:[]};
     return json({ tracks:tracks.results.map(publicTrack), artists:artists.results, albums:albums.results, playlists:playlists.results });
   }
 
@@ -319,6 +425,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if(path==="/v1/me/playlists" && request.method==="GET"){
+  const publicPlaylistMatch=path.match(/^\/v1\/playlists\/([a-f0-9-]+)$/i);
+  if(publicPlaylistMatch && request.method==="GET"){
+    const playlist=await env.DB.prepare("SELECT p.id,p.name,p.description,p.cover_key AS coverKey,u.username AS owner FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.id=?").bind(publicPlaylistMatch[1]).first<{id:string;name:string;description:string|null;coverKey:string|null;owner:string}>();
+    if(!playlist)return fail("Playlist not found.",404);
+    const items=await env.DB.prepare("SELECT track_id AS id FROM playlist_tracks WHERE playlist_id=? ORDER BY position ASC,added_at ASC").bind(publicPlaylistMatch[1]).all<{id:string}>();
+    const ids=items.results.map(item=>item.id);
+    const found=ids.length?await env.DB.prepare(TRACK_SELECT+` WHERE t.published=1 AND t.id IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<TrackRow>():{results:[] as TrackRow[]};
+    const byId=new Map(found.results.map(track=>[track.id,publicTrack(track)]));
+    return json({playlist:{id:playlist.id,name:playlist.name,description:playlist.description||"",owner:playlist.owner,cover:mediaUrl(playlist.coverKey),trackIds:ids},tracks:ids.map(id=>byId.get(id)).filter(Boolean)});
+  }
+
+
     const userId=await requireUser(request,env);
     const playlists=await env.DB.prepare("SELECT id,name,description,cover_key AS coverKey,updated_at AS updatedAt FROM playlists WHERE user_id=? ORDER BY updated_at DESC").bind(userId).all();
     const hydrated=await Promise.all(playlists.results.map(async (p:any)=>{
@@ -333,6 +451,29 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const name=body.name?.trim()||""; if(!name||name.length>80)return fail("Playlist name must be 1–80 characters.");
     const playlistId=id(); await env.DB.prepare("INSERT INTO playlists (id,user_id,name,description) VALUES (?,?,?,?)").bind(playlistId,userId,name,body.description?.slice(0,500)||null).run();
     return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:[],updatedAt:Date.now()},201);
+  }
+
+  const playlistCoverMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)\/cover$/i);
+  if(playlistCoverMatch && (request.method==="POST"||request.method==="DELETE")){
+    const userId=await requireUser(request,env);
+    const playlistId=playlistCoverMatch[1];
+    const playlist=await env.DB.prepare("SELECT cover_key AS coverKey FROM playlists WHERE id=? AND user_id=?").bind(playlistId,userId).first<{coverKey:string|null}>();
+    if(!playlist)return fail("Playlist not found.",404);
+    if(request.method==="DELETE"){
+      await env.DB.prepare("UPDATE playlists SET cover_key=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(playlistId,userId).run();
+      await storageDelete(env,playlist.coverKey);
+      return json({cover:""});
+    }
+    const form=await request.formData();
+    const image=form.get("artwork");
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>7*1024*1024)return fail("Playlist artwork must be JPG, PNG, WebP or AVIF and no larger than 7 MB.");
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="playlists/"+playlistId+"/"+id()+"."+extension;
+    await storageUpload(env,key,image);
+    await env.DB.prepare("UPDATE playlists SET cover_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(key,playlistId,userId).run();
+    await storageDelete(env,playlist.coverKey);
+    return json({cover:mediaUrl(key)});
   }
 
   const playlistMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)$/i);
@@ -367,6 +508,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return new Response(null,{status:204});
   }
 
+  if(path==="/v1/me/listening" && request.method==="GET"){
+    const userId=await requireUser(request,env);
+    const history=await env.DB.prepare(`SELECT le.track_id AS id,t.title,a.name AS artist,SUM(le.listened_ms) AS ms,substr(le.played_at,1,10) AS day
+      FROM listening_events le JOIN tracks t ON t.id=le.track_id JOIN artists a ON a.id=t.artist_id
+      WHERE le.user_id=? GROUP BY le.track_id,substr(le.played_at,1,10) ORDER BY day DESC,ms DESC LIMIT 5000`).bind(userId).all<{id:string;title:string;artist:string;ms:number;day:string}>();
+    return json({stats:history.results.map(item=>({...item,ms:Number(item.ms)||0}))});
+  }
+
   if(path==="/v1/me/listening" && request.method==="POST"){
     const userId=await requireUser(request,env); const body=await request.json() as {trackId?:string;listenedMs?:number;playedAt?:string};
     const ms=Math.max(0,Math.min(60*60*1000,Math.floor(body.listenedMs||0)));
@@ -382,9 +531,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   if(path==="/v1/admin/tracks" && request.method==="POST"){
     await requireAdmin(request,env);
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
     const form=await request.formData();
     const title=String(form.get("title")||"").trim(); const artistName=String(form.get("artist")||"").trim();
-    const albumTitle=String(form.get("album")||"").trim(); const rights=String(form.get("rightsStatus")||"");
+    const albumTitle=String(form.get("album")||"").trim(); const lyrics=String(form.get("lyrics")||"").trim().slice(0,50000); const rights=String(form.get("rightsStatus")||"");
     const rightsReference=String(form.get("rightsReference")||"").trim();
     const rightsConfirmed=String(form.get("rightsConfirmed")||"")==="true";
     const audio=form.get("audio"); const image=form.get("artwork");
@@ -393,7 +543,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if(!AUDIO_TYPES.has(audio.type))return fail("Unsupported audio format. Use MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM.");
     if(image && (!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size>7*1024*1024))return fail("Artwork must be JPG, PNG, WebP or AVIF and no larger than 7 MB.");
     if(!rightsConfirmed||!["owned","licensed","public_domain"].includes(rights)||!rightsReference)return fail("Confirm your rights to distribute this recording and provide a rights reference.");
-    const trackId=id(); const audioKey="audio/"+trackId+"."+safeName(audio.name).split(".").pop()!.toLowerCase();
+    const trackId=id(); const audioExtension=safeName(audio.name).split(".").pop()!.toLowerCase();
+    const audioKey="audio/"+trackId+"."+audioExtension;
     const imageKey=image instanceof File?"artwork/"+trackId+"."+image.type.split("/")[1].replace("jpeg","jpg"):null;
     let artistId=""; let albumId:string|null=null;
     try{
@@ -404,12 +555,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
         albumId=found?.id||id();
         if(!found)await env.DB.prepare("INSERT INTO albums (id,title,artist_id) VALUES (?,?,?)").bind(albumId,albumTitle,artistId).run();
       }
-      await env.MEDIA.put(audioKey,audio.stream(),{httpMetadata:{contentType:audio.type,cacheControl:"public, max-age=31536000, immutable"}});
-      if(image instanceof File){await env.MEDIA.put(imageKey!,image.stream(),{httpMetadata:{contentType:image.type,cacheControl:"public, max-age=31536000, immutable"}});}
-      await env.DB.prepare("INSERT INTO tracks (id,title,artist_id,album_id,duration_ms,genre,explicit,audio_key,audio_mime,audio_size,artwork_key,rights_status,rights_reference,published) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,1)")
-        .bind(trackId,title,artistId,albumId,Math.max(0,Number(form.get("durationMs")||0)),String(form.get("genre")||"").slice(0,80)||null,String(form.get("explicit")||"")==="true"?1:0,audioKey,audio.type,audio.size,imageKey,rights,rightsReference.slice(0,500)).run();
+      await storageUpload(env,audioKey,audio);
+      if(image instanceof File)await storageUpload(env,imageKey!,image);
+      await env.DB.prepare("INSERT INTO tracks (id,title,artist_id,album_id,duration_ms,genre,explicit,audio_key,audio_mime,audio_size,artwork_key,rights_status,rights_reference,lyrics,published) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)")
+        .bind(trackId,title,artistId,albumId,Math.max(0,Number(form.get("durationMs")||0)),String(form.get("genre")||"").slice(0,80)||null,String(form.get("explicit")||"")==="true"?1:0,audioKey,audio.type,audio.size,imageKey,rights,rightsReference.slice(0,500),lyrics||null).run();
     }catch(error){
-      await env.MEDIA.delete([audioKey,...(imageKey?[imageKey]:[])]);
+      await Promise.all([storageDelete(env,audioKey),storageDelete(env,imageKey)].map(p=>p.catch(()=>{})));
       return fail(error instanceof Error?error.message:"Unable to save track.",500);
     }
     return json({id:trackId,title,artist:artistName,album:albumTitle||undefined,durationMs:Number(form.get("durationMs")||0),artwork:mediaUrl(imageKey),audioUrl:mediaUrl(audioKey),published:true},201);

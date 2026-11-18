@@ -68,40 +68,8 @@ async function ensureDatabase() {
   return database.uuid;
 }
 
-async function listBuckets() {
-  const buckets = [];
-  let cursor = "";
-  do {
-    const suffix = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
-    const result = await cloudflare("/r2/buckets" + suffix);
-    buckets.push(...(Array.isArray(result?.buckets) ? result.buckets : []));
-    cursor = result?.truncated && result?.cursor ? result.cursor : "";
-  } while (cursor);
-  return buckets;
-}
-
-async function ensureBucket() {
-  let bucket = (await listBuckets()).find((item) => item.name === "lyne-media");
-  if (!bucket) {
-    try {
-      await cloudflare("/r2/buckets", {
-        method: "POST",
-        body: JSON.stringify({ name: "lyne-media" }),
-      });
-      console.log("Created R2 bucket: lyne-media");
-    } catch (error) {
-      // Recover from a concurrent setup run that created the same named bucket.
-      bucket = (await listBuckets()).find((item) => item.name === "lyne-media");
-      if (!bucket) throw error;
-      console.log("R2 bucket already exists: lyne-media");
-    }
-  } else {
-    console.log("Using existing R2 bucket: lyne-media");
-  }
-}
 
 const databaseId = await ensureDatabase();
-await ensureBucket();
 
 // The value is a Cloudflare-generated UUID, validated above, so it is safe for
 // a single-line GitHub Actions output.
