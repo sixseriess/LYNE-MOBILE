@@ -61,7 +61,7 @@ Account:
 - `POST /v1/auth/login`
 - `GET /v1/me`
 - `GET|POST /v1/me/playlists`
-- `POST /v1/me/listening`
+- `GET|POST /v1/me/listening` — retrieve and record per-track daily listening totals.
 
 Admin:
 - `POST /v1/admin/tracks`
