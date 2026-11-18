@@ -18,7 +18,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Home page sections and personalized Daily Mix, On Repeat, Discovery Mix, and Recent Mix backed by LYNE catalogue data and listening history.
 - [x] Search tracks, artists, albums, and playlists with working detail pages.
 - [x] Artist profiles, album/collection pages, artwork, and track actions.
-- [x] Recently played and popular catalogue sections with history-based mixes; shared listening-now presence remains outstanding.
+- [x] Recently played, all-time popular, and “What everyone’s on” recommendations aggregated from catalogue listens in the last 12 hours, alongside history-based mixes. This is recent listening activity, not live per-user presence.
 - [ ] Loading, empty, offline, and API-error states throughout; search and artist/album/public-playlist detail views now show retryable errors, but other remote/account surfaces still rely on status messages.
 
 ### Library and imports
@@ -37,7 +37,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Expanded now-playing player with responsive artwork, artwork-backed ambient background, seeking and touch gestures.
 - [x] Adjustable synced-lyrics offset (−5 to +5 seconds) is saved in device and account preferences; lyrics remain available from catalogue track metadata rather than a separate offline lyrics cache.
 - [x] Catalogue tracks can carry plain-text or LRC timed lyrics, with current-line highlighting in the mobile player.
-- [x] Mobile EQ / independent pitch limitations are explained with guidance to use OS or headphone audio settings.
+- [x] Windows-matched 10-band equalizer with the same 32 Hz–16 kHz bands, 0.5 dB steps, preset curves, custom profiles and boost-compensating preamp; EQ requires a cross-origin-compatible audio source. Independent pitch shifting remains a mobile browser limitation.
 - [x] Playback speed control (0.5×–2×); independent pitch shifting is not exposed consistently by iOS/Android PWAs and is explained in Playback settings.
 - [x] Autoplay-similar continuation, Daily Mix / Discovery Mix / On Repeat / Recent Mix, and resume-or-empty playback context preference.
 - [x] Audio-focus and output-routing limitations are explained; lock-screen and headset controls use supported browser APIs.
@@ -79,6 +79,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, an offline banner, and PWA update checks. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
+The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, an offline banner, PWA update checks, a Windows-matched 10-band equalizer, and recent-listening recommendations. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
