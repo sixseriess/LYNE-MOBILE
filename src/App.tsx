@@ -271,6 +271,8 @@ export default function App() {
         return entry.track?{...entry.track,audioUrl,audioMime:entry.file.type||entry.track.audioMime,audioSize:entry.file.size,offline:true}:{id:entry.id,title:entry.name.replace(/\.[^.]+$/,""),artist:"Local file",audioUrl,audioMime:entry.file.type,audioSize:entry.file.size,durationMs:0,source:"local" as const};
       });
       setLocalTracks(restored);
+      setCurrent(previous=>previous?restored.find(track=>track.id===previous.id)||previous:previous);
+      setQueue(previous=>previous.map(track=>restored.find(saved=>saved.id===track.id)||track));
     }).catch(()=>{if(!cancelled)setNotice("Saved device audio could not be restored in this browser.");});
     return ()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};
   },[]);
