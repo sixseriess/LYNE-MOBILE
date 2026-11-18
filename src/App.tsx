@@ -84,12 +84,14 @@ function parseSyncedLyrics(raw:string):LyricLine[]{
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 async function resizePlaylistImage(file: File): Promise<string> { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext("2d"); if (!context) { bitmap.close(); throw new Error("Could not process that image."); } context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg", 0.82); }
 async function resizeBackgroundImage(file: File): Promise<string> { const bitmap=await createImageBitmap(file); const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)); const canvas=document.createElement("canvas"); canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale)); const context=canvas.getContext("2d"); if(!context){bitmap.close();throw new Error("Could not process that background.");} context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg",0.82); }
+function dataUrlToFile(value:string,name:string):File{const match=/^data:([^;,]+);base64,(.+)$/.exec(value);if(!match)throw new Error("Invalid saved playlist artwork.");const bytes=Uint8Array.from(atob(match[2]),character=>character.charCodeAt(0));return new File([bytes],name,{type:match[1]});}
 async function syncPendingPlaylists(items: Playlist[]): Promise<Playlist[]> {
   return Promise.all(items.map(async playlist=>{
     if(playlist.synced)return playlist;
     try{
       const remote=await lyneApi.createPlaylist(playlist.name,playlist.description||"");
-      const synced={...playlist,id:remote.id,synced:true};
+      let synced={...playlist,id:remote.id,synced:true};
+      if(playlist.cover?.startsWith("data:")){try{const artworkFile=dataUrlToFile(playlist.cover,"playlist-artwork.jpg");const uploaded=await lyneApi.uploadPlaylistCover(remote.id,artworkFile);synced={...synced,cover:uploaded.cover};}catch{}}
       await lyneApi.updatePlaylist(synced);
       return synced;
     }catch{return playlist;}
