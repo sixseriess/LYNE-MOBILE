@@ -35,6 +35,7 @@ Use `POST /v1/admin/tracks` with the `x-admin-token` header and multipart form f
 - `title`, `artist`, optional `album`, `durationMs`, `genre`, `explicit`
 - `audio` (MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM, up to 45 MB)
 - optional `artwork` (JPG, PNG, WebP or AVIF, up to 7 MB)
+- optional `lyrics` (plain text or LRC timed lyrics, up to 50,000 characters)
 - `rightsConfirmed=true`, `rightsStatus=owned|licensed|public_domain`, and `rightsReference`
 
 The admin token is a server secret and must never be placed in the mobile app. Tracks are only added through this authenticated admin route. You must have the right to distribute every recording and artwork you upload. The rights fields are an audit declaration, not a substitute for a licence.
