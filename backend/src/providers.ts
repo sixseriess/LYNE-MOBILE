@@ -40,12 +40,22 @@ function spotifyParts(url: URL) {
   return { kind: match[1] as string, id: match[2] };
 }
 async function spotifyToken(env: ProviderEnv) {
-  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) throw new Error("Spotify import isn't configured on LYNE yet. Add the Spotify API credentials to the LYNE backend.");
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyOembedImport(url);
   const basic = btoa(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET);
   const form = new URLSearchParams({ grant_type: "client_credentials" });
   const token = await providerJson("https://accounts.spotify.com/api/token", { method:"POST", headers:{ Authorization:"Basic "+basic, "Content-Type":"application/x-www-form-urlencoded" }, body:form });
   if (!token.access_token) throw new Error("Spotify didn't provide an API token.");
   return token.access_token as string;
+}
+async function spotifyOembedImport(url:URL):Promise<ResolvedImport>{
+  const {kind,id}=spotifyParts(url);
+  if(kind==="artist")throw new Error("Paste a Spotify song, album or playlist link. Artist-only imports aren't library items yet.");
+  const data=await providerJson("https://open.spotify.com/oembed?url="+encodeURIComponent(url.toString()));
+  const title=clean(data.title)||"Spotify item";
+  const artwork=firstImage(data.thumbnail_url);
+  const embedUrl=`https://open.spotify.com/embed/${kind}/${id}`;
+  const track:ImportedTrack={providerId:id,title,artist:"Spotify",externalUrl:url.toString(),artwork,embedUrl};
+  return {provider:"spotify",kind:kind as ImportKind,providerId:id,title,subtitle:"Spotify",externalUrl:url.toString(),artwork,embedUrl,tracks:kind==="track"?[track]:[]};
 }
 async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   const { kind, id } = spotifyParts(url);
@@ -68,12 +78,23 @@ async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
   return { provider:"spotify",kind:kind as ImportKind,providerId:id,title:clean(data.name)||"Untitled",subtitle:kind==="track"?(tracks[0]?.artist||"Spotify"):(kind==="album"?(data.artists||[]).map((a:any)=>a.name).join(", "):clean(data.owner?.display_name)||"Spotify playlist"),externalUrl,artwork:firstImage(kind==="track"?data.album?.images:data.images),embedUrl:`https://open.spotify.com/embed/${kind}/${id}`,tracks };
 }
 async function soundcloudToken(env: ProviderEnv) {
-  if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) throw new Error("SoundCloud import isn't configured on LYNE yet. Add the SoundCloud API credentials to the LYNE backend.");
+  if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) return soundcloudOembedImport(url);
   const basic=btoa(env.SOUNDCLOUD_CLIENT_ID+":"+env.SOUNDCLOUD_CLIENT_SECRET);
   const form=new URLSearchParams({ grant_type:"client_credentials" });
   const data=await providerJson("https://secure.soundcloud.com/oauth/token",{method:"POST",headers:{Authorization:"Basic "+basic,"Content-Type":"application/x-www-form-urlencoded"},body:form});
   if(!data.access_token)throw new Error("SoundCloud didn't provide an API token.");
   return data.access_token as string;
+}
+async function soundcloudOembedImport(url:URL):Promise<ResolvedImport>{
+  const data=await providerJson("https://soundcloud.com/oembed?format=json&url="+encodeURIComponent(url.toString()));
+  const playlist=/\/sets\//i.test(url.pathname);
+  const kind:ImportKind=playlist?"playlist":"track";
+  const title=clean(data.title)||"SoundCloud item";
+  const artwork=firstImage(data.thumbnail_url);
+  const embedUrl="https://w.soundcloud.com/player/?url="+encodeURIComponent(url.toString())+"&auto_play=false";
+  const by=title.match(/^(.*?)\s+by\s+(.+)$/i);
+  const track:ImportedTrack={providerId:url.pathname.replace(/^\/+|\/+$/g,""),title:by?.[1]||title,artist:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl};
+  return {provider:"soundcloud",kind,providerId:track.providerId,title,subtitle:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl,tracks:kind==="track"?[track]:[]};
 }
 async function soundcloudImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   const token=await soundcloudToken(env);
@@ -88,8 +109,22 @@ function youtubeIdFromUrl(url: URL) {
   const match=url.pathname.match(/\/(?:shorts|embed|live)\/([^/?]+)/);
   return match?.[1]||"";
 }
+async function youtubeOembedImport(url:URL):Promise<ResolvedImport>{
+  const playlistId=url.searchParams.get("list");
+  const videoId=youtubeIdFromUrl(url);
+  if(playlistId)throw new Error("This YouTube playlist needs a YouTube Data API key to import its track list. Single video links can still be imported without one.");
+  if(!videoId)throw new Error("Paste a YouTube video link. YouTube playlist track lists require the official Data API key.");
+  const data=await providerJson("https://www.youtube.com/oembed?format=json&url="+encodeURIComponent(url.toString()));
+  const title=clean(data.title)||"YouTube video";
+  const artist=clean(data.author_name)||"YouTube";
+  const artwork=firstImage(data.thumbnail_url);
+  const externalUrl="https://www.youtube.com/watch?v="+videoId;
+  const embedUrl="https://www.youtube-nocookie.com/embed/"+videoId;
+  const track:ImportedTrack={providerId:videoId,title,artist,externalUrl,artwork,embedUrl};
+  return {provider:"youtube",kind:"track",providerId:videoId,title,subtitle:artist,externalUrl,artwork,embedUrl,tracks:[track]};
+}
 async function youtubeImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
-  if(!env.YOUTUBE_API_KEY)throw new Error("YouTube import isn't configured on LYNE yet. Add a YouTube Data API key to the LYNE backend.");
+  if(!env.YOUTUBE_API_KEY)return youtubeOembedImport(url);
   const playlistId=url.searchParams.get("list");
   const videoId=youtubeIdFromUrl(url);
   const apiBase="https://www.googleapis.com/youtube/v3/";
@@ -116,14 +151,41 @@ function appleEmbedUrl(raw?:string):string|undefined{
   try{const embed=new URL(raw);if(embed.protocol!=="https:"||embed.hostname!=="music.apple.com")return undefined;embed.hostname="embed.music.apple.com";return embed.toString();}
   catch{return undefined;}
 }
+async function appleItunesLookup(url:URL,id:string,kind:ImportKind,storefront:string):Promise<ResolvedImport>{
+  if(kind==="playlist")throw new Error("Apple Music playlist track lists require an Apple Music developer token. Song and album links can be imported without one.");
+  const query=new URLSearchParams({id,country:storefront});
+  if(kind==="album")query.set("entity","song");
+  const data=await providerJson("https://itunes.apple.com/lookup?"+query.toString());
+  const results=Array.isArray(data.results)?data.results:[];
+  const songResults=results.filter((item:any)=>item.wrapperType==="track"&&item.kind==="song");
+  const albumResult=results.find((item:any)=>item.wrapperType==="collection");
+  if(kind==="track"&&!songResults.length)throw new Error("Apple couldn't find that song through its public music catalogue.");
+  if(kind==="album"&&!albumResult)throw new Error("Apple couldn't find that album through its public music catalogue.");
+  const tracks:ImportedTrack[]=songResults.slice(0,100).map((item:any)=>({
+    providerId:String(item.trackId),
+    title:clean(item.trackName)||"Apple Music track",
+    artist:clean(item.artistName)||"Apple Music",
+    externalUrl:safeExternalUrl(item.trackViewUrl||url.toString()),
+    artwork:firstImage(item.artworkUrl600||item.artworkUrl100),
+    durationMs:Number(item.trackTimeMillis)||undefined,
+    embedUrl:appleEmbedUrl(item.trackViewUrl),
+  }));
+  const main=kind==="track"?songResults[0]:albumResult;
+  const title=clean(kind==="track"?main.trackName:main.collectionName)||"Apple Music item";
+  const subtitle=clean(main.artistName)||"Apple Music";
+  const externalUrl=safeExternalUrl((kind==="track"?main.trackViewUrl:main.collectionViewUrl)||url.toString());
+  const artwork=firstImage(main.artworkUrl600||main.artworkUrl100);
+  const embedUrl=appleEmbedUrl(externalUrl);
+  return {provider:"apple_music",kind,providerId:id,title,subtitle,externalUrl,artwork,embedUrl,tracks:kind==="track"?tracks.slice(0,1):tracks};
+}
 async function appleImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
-  if(!env.APPLE_MUSIC_DEVELOPER_TOKEN)throw new Error("Apple Music import isn't configured on LYNE yet. Add an Apple Music developer token to the LYNE backend.");
   const match=url.pathname.match(/^\/([a-z]{2})\/(album|playlist|song)\/.*\/(\d+)\/?$/i);
   const songId=url.searchParams.get("i");
   const storefront=match?.[1]||"us";
   const kind:ImportKind=songId||match?.[2]==="song"?"track":match?.[2]==="playlist"?"playlist":"album";
   const id=songId||match?.[3];
   if(!id)throw new Error("Paste an Apple Music song, album or playlist link.");
+  if(!env.APPLE_MUSIC_DEVELOPER_TOKEN)return appleItunesLookup(url,id,kind,storefront);
   const resource=kind==="track"?"songs":kind==="playlist"?"playlists":"albums";
   const data=await providerJson(`https://api.music.apple.com/v1/catalog/${storefront}/${resource}/${id}?include=tracks`,{headers:{Authorization:"Bearer "+env.APPLE_MUSIC_DEVELOPER_TOKEN}});
   const item=data.data?.[0];if(!item)throw new Error("Apple Music item wasn't found in that storefront.");
@@ -137,7 +199,13 @@ export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<R
   try{url=new URL(raw.trim());}catch{throw new Error("Paste a valid music link.");}
   const externalUrl=safeExternalUrl(url.toString());
   const host=url.hostname.toLowerCase().replace(/^www\./,"");
-  if(host==="open.spotify.com"||host==="spotify.link")return spotifyImport(url,env);
+  if(host==="spotify.link"){
+    const redirected=await fetch(url.toString(),{redirect:"follow",signal:timeout()});
+    const resolvedUrl=new URL(redirected.url);
+    if(resolvedUrl.hostname.replace(/^www\./,"")!=="open.spotify.com")throw new Error("That Spotify short link didn't resolve to a supported Spotify item.");
+    return spotifyImport(resolvedUrl,env);
+  }
+  if(host==="open.spotify.com")return spotifyImport(url,env);
   if(host==="soundcloud.com"||host==="m.soundcloud.com")return soundcloudImport(url,env);
   if(host==="youtu.be"||host==="youtube.com"||host==="music.youtube.com"||host==="www.youtube.com")return youtubeImport(url,env);
   if(host==="music.apple.com")return appleImport(url,env);
