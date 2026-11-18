@@ -158,6 +158,7 @@ export default function App() {
   const [accountMessage,setAccountMessage]=useState("");
   const [user,setUser]=useState<{id:string;username:string}|null>(null);
   const [guestMode,setGuestMode]=useState(false);
+  const [accountSyncReady,setAccountSyncReady]=useState(false);
   const [accountBusy,setAccountBusy]=useState(false);
   const [period,setPeriod]=useState<Period>("week");
   const [wrappedOpen,setWrappedOpen]=useState(false);
@@ -176,6 +177,11 @@ export default function App() {
   const listeningReportedRef=useRef<string|null>(null);
 
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); document.documentElement.dataset.theme=state.theme; },[state]);
+  useEffect(()=>{
+    if(!user||!accountSyncReady)return;
+    const timer=window.setTimeout(()=>{void lyneApi.savePreferences(state.preferences).catch(()=>setNotice("Your settings are saved on this device; account sync will retry when LYNE is available."));},900);
+    return ()=>window.clearTimeout(timer);
+  },[user?.id,accountSyncReady,state.preferences]);
   useEffect(()=>{ currentRef.current=current; if(current&&current.source!=="local")localStorage.setItem("lyne.mobile.current",JSON.stringify(current));else localStorage.removeItem("lyne.mobile.current"); },[current]);
   useEffect(()=>{try{localStorage.setItem("lyne.mobile.queue",JSON.stringify(queue.filter(track=>track.source!=="local").slice(0,100)));}catch{}},[queue]);
   useEffect(()=>{
@@ -186,7 +192,7 @@ export default function App() {
       if(!active)return;
       setUser({id:profile.id,username:profile.username});
       setGuestMode(false);
-      const [remote,imports,history]=await Promise.allSettled([lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory()]);
+      const [remote,imports,history,preferences]=await Promise.allSettled([lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory(),lyneApi.preferences()]);
       if(!active)return;
       let mergedPlaylists=state.playlists;
       if(remote.status==="fulfilled"){
@@ -199,13 +205,16 @@ export default function App() {
         playlists:mergedPlaylists,
         importedLikes:imports.status==="fulfilled"?(imports.value.likes||[]):old.importedLikes,
         importedCollections:imports.status==="fulfilled"?(imports.value.collections||[]):old.importedCollections,
-        stats:history.status==="fulfilled"?(history.value.stats||[]):old.stats
+        stats:history.status==="fulfilled"?(history.value.stats||[]):old.stats,
+        preferences:preferences.status==="fulfilled"?({...old.preferences,...preferences.value.preferences} as typeof old.preferences):old.preferences
       }));
-      if(remote.status==="rejected"||imports.status==="rejected"||history.status==="rejected")setNotice("You're signed in. Some library or listening data couldn't sync yet; LYNE will keep your local data.");
+      setAccountSyncReady(true);
+      if(remote.status==="rejected"||imports.status==="rejected"||history.status==="rejected"||preferences.status==="rejected")setNotice("You're signed in. Some library or listening data couldn't sync yet; LYNE will keep your local data.");
     }).catch(error=>{
       if(!active)return;
       const status=(error as {status?:number})?.status;
       if(status===401||status===403){
+        setAccountSyncReady(false);
         localStorage.removeItem("lyne.accessToken");
         setUser(null);
         setGuestMode(true);
@@ -459,6 +468,26 @@ export default function App() {
     setModal(null);setSelectedPlaylistId(null);setNotice("Playlist deleted.");
   };
 
+
+  const updateProfileAvatar=async(file:File)=>{
+    try{
+      const localAvatar=await resizePlaylistImage(file);
+      setState(old=>({...old,profile:{...old.profile,avatar:localAvatar}}));
+      if(user){
+        try{
+          const uploaded=await lyneApi.uploadAvatar(dataUrlToFile(localAvatar,"lyne-avatar.jpg"));
+          setState(old=>({...old,profile:{...old.profile,avatar:uploaded.avatar}}));
+          setNotice("Profile photo updated and synced with your LYNE account.");
+        }catch{setNotice("Profile photo saved on this device, but account sync failed.");}
+      }else setNotice("Profile photo saved on this device.");
+    }catch(error){setNotice(error instanceof Error?error.message:"Could not save that profile photo.");}
+  };
+  const removeProfileAvatar=async()=>{
+    if(user){try{await lyneApi.removeAvatar();}catch{setNotice("Could not remove the synced profile photo. Try again.");return;}}
+    setState(old=>({...old,profile:{...old.profile,avatar:""}}));
+    setNotice("Profile photo removed.");
+  };
+
   const submitAccount=async()=>{
     if(!accountName.trim()||!accountPassword){setAccountMessage("Enter your username/email and password.");return;}
     if(accountMode==="register"&&(!accountEmail.trim()||accountPassword.length<10)){setAccountMessage("Enter a valid email and a password with at least 10 characters.");return;}
@@ -470,18 +499,19 @@ export default function App() {
       localStorage.setItem("lyne.accessToken",result.accessToken);
       setUser(result.user);setGuestMode(false);
       try{
-        const [profile,remote,imports,history]=await Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory()]);
+        const [profile,remote,imports,history,preferences]=await Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory(),lyneApi.preferences()]);
         const syncedLocal=await syncPendingPlaylists(state.playlists);
         const remotePlaylists=remote.playlists.map(item=>({...item,synced:true}));
         const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
         setUser({id:profile.id,username:profile.username});
-        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[]}));
-      }catch{setNotice("Signed in. Some account library data could not be loaded yet.");}
+        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[],preferences:{...old.preferences,...preferences.preferences} as typeof old.preferences}));
+        setAccountSyncReady(true);
+      }catch{setAccountSyncReady(true);setNotice("Signed in. Some account library data could not be loaded yet; local settings will be kept.");}
       setAccountMessage("You're signed in.");setModal(null);setNotice("Signed in to LYNE.");
     }catch(e){localStorage.removeItem("lyne.accessToken");setAccountMessage(e instanceof Error?e.message:"Couldn't connect to LYNE.");}
     finally{setAccountBusy(false);}
   };
-  const logout=()=>{localStorage.removeItem("lyne.accessToken");setUser(null);setGuestMode(false);setNotice("Signed out.");};
+  const logout=()=>{localStorage.removeItem("lyne.accessToken");setAccountSyncReady(false);setUser(null);setGuestMode(false);setNotice("Signed out.");};
 
   const connectApi=async()=>{
     setApiTesting(true);setApiMessage("Testing LYNE Worker...");
@@ -596,7 +626,7 @@ export default function App() {
         <div className="section-heading"><h2>Local files</h2><button className="subtle-action" onClick={()=>fileRef.current?.click()}>Add files</button></div>{renderRows(localTracks)}
       </>}
       {tab==="Stats"&&<><div className="hero"><p className="eyebrow">YOUR LISTENING ACTIVITY</p><h1>Your stats</h1><p className="muted">A closer look at what you've been listening to.</p></div><div className="period-pills">{(["day","week","month","year"] as Period[]).map(p=><button className={period===p?"selected":""} onClick={()=>setPeriod(p)} key={p}>{({day:"Day",week:"Week",month:"Month",year:"Year"} as Record<Period,string>)[p]}</button>)}</div><div className="stat-card"><span>TOTAL MINUTES LISTENED</span><strong>{totalMinutes.toLocaleString()}</strong><small>{period==="day"?"Today":period==="week"?"Last 7 days":period==="month"?"This month":"This year"}</small></div><div className="section-heading"><h2>Top 10 songs</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("title")}/><div className="section-heading"><h2>Top 10 artists</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("artist")}/><button className="share-button" onClick={()=>void shareStats()}><Share2/> Share your stats</button>{wrappedStats.length>0&&<><div className="section-heading"><h2>LYNE Wrapped {wrappedYear}</h2><span className="section-note">YOUR YEAR IN MUSIC</span></div><div className="stat-card"><span>MINUTES LISTENED IN {wrappedYear}</span><strong>{wrappedMinutes.toLocaleString()}</strong><small>Your yearly LYNE recap</small><button className="subtle-action" onClick={()=>setWrappedOpen(value=>!value)}>{wrappedOpen?"Hide Wrapped":"View Wrapped"}</button></div>{wrappedOpen&&<><div className="section-heading"><h2>Top songs of {wrappedYear}</h2></div><Rankings items={wrappedRanking("title")}/><div className="section-heading"><h2>Top artists of {wrappedYear}</h2></div><Rankings items={wrappedRanking("artist")}/></>}</>}<p className="footnote">Listening time is recorded on this device. Account sync becomes available through the LYNE API.</p></>}
-      {tab==="Profile"&&<><div className="profile-hero"><div className="profile-avatar">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</div><p className="eyebrow">YOUR LYNE ACCOUNT</p><h1>{state.profile.name}</h1><p className="muted">{user?(`Signed in as @${user.username}`):"Personalize your listening space."}</p></div><button className="profile-option" onClick={()=>setModal("account")}><UserRound/><span><b>{user?"Account details":"Sign in or create account"}</b><small>Sync your LYNE music and settings</small></span><ChevronRight/></button><label className="profile-option upload-avatar"><ImagePlus/><span><b>Change profile picture</b><small>Choose an image from your device</small></span><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)void resizePlaylistImage(f).then(avatar=>setState(s=>({...s,profile:{...s.profile,avatar}}))).catch(()=>setNotice("Could not save that profile picture."));e.currentTarget.value="";}}/></label><button className="profile-option" onClick={()=>setModal("settings")}><Settings/><span><b>App settings</b><small>Appearance and playback preferences</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>setTab("Stats")}><Clock3/><span><b>Listening stats</b><small>Your minutes, songs and artists</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>{setNotice("Offline downloads require LYNE's media storage API.");}}><Download/><span><b>Downloads & offline</b><small>Manage music available on this device</small></span><ChevronRight/></button>{user&&<button className="signout" onClick={logout}><LogOut/> Sign out</button>}</>}
+      {tab==="Profile"&&<><div className="profile-hero"><div className="profile-avatar">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</div><p className="eyebrow">YOUR LYNE ACCOUNT</p><h1>{state.profile.name}</h1><p className="muted">{user?(`Signed in as @${user.username}`):"Personalize your listening space."}</p></div><button className="profile-option" onClick={()=>setModal("account")}><UserRound/><span><b>{user?"Account details":"Sign in or create account"}</b><small>Sync your LYNE music and settings</small></span><ChevronRight/></button><label className="profile-option upload-avatar"><ImagePlus/><span><b>Change profile picture</b><small>{user?"Syncs to your LYNE account":"Saved on this device until you sign in"}</small></span><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)void updateProfileAvatar(f);e.currentTarget.value="";}}/></label>{state.profile.avatar&&<button className="provider-open" onClick={()=>void removeProfileAvatar()}>Remove profile picture</button>}<button className="profile-option" onClick={()=>setModal("settings")}><Settings/><span><b>App settings</b><small>Appearance and playback preferences</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>setTab("Stats")}><Clock3/><span><b>Listening stats</b><small>Your minutes, songs and artists</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>{setNotice("Offline downloads require LYNE's media storage API.");}}><Download/><span><b>Downloads & offline</b><small>Manage music available on this device</small></span><ChevronRight/></button>{user&&<button className="signout" onClick={logout}><LogOut/> Sign out</button>}</>}
     </section>
     {current&&state.preferences.miniPlayer&&<div className="mini-player" role="button" tabIndex={0} aria-label="Open player" onClick={()=>setExpanded(true)} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setExpanded(true);}}}><Cover track={current}/><span className="mini-copy"><b>{current.title}</b><small>{current.artist}</small></span><button className="plain-icon" onClick={e=>{e.stopPropagation();toggleLike(current);}}><Heart size={18} fill={state.likes.includes(current.id)?"currentColor":"none"}/></button><button className="plain-icon play-mini" onClick={e=>{e.stopPropagation();setPlaying(v=>!v);}}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button></div>}
     <nav className="bottom-nav">{([{id:"Home",icon:Home},{id:"Search",icon:Search},{id:"Library",icon:Library},{id:"Stats",icon:Disc3},{id:"Profile",icon:UserRound}] as const).map(({id,icon:Icon})=><button key={id} title={id} aria-label={id} className={tab===id?"active":""} onClick={()=>setTab(id)}><Icon size={21}/><span>{id}</span></button>)}</nav>
