@@ -70,7 +70,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),
-  home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string }[] }>("/v1/home"),
+  home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string; tracks: Track[] }[] }>("/v1/home"),
   search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
   tracks: (limit = 30, offset = 0) => api<{ tracks: Track[]; total: number }>(`/v1/tracks?limit=${limit}&offset=${offset}`),
   artist: (id: string) => api<{ artist: {id:string;name:string;bio?:string;artwork?:string}; tracks: Track[]; albums: {id:string;title:string;releaseDate?:string;artwork?:string}[] }>(`/v1/artists/${encodeURIComponent(id)}`),
