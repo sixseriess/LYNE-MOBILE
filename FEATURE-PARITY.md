@@ -37,10 +37,10 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] Fullscreen / now-playing experience with responsive artwork and dynamic background.
 - [ ] Lyrics offset adjustment and lyrics cache.
 - [x] Catalogue tracks can carry plain-text or LRC timed lyrics, with current-line highlighting in the mobile player.
-- [ ] Equalizer and supported audio effects.
+- [x] Mobile EQ / independent pitch limitations are explained with guidance to use OS or headphone audio settings.
 - [ ] Speed and pitch controls with mobile-safe controls.
 - [ ] Radio / autoplay-similar behavior and playback context preferences.
-- [ ] Audio focus and interruption handling (calls, alarms, route changes) using supported browser/device APIs.
+- [x] Audio-focus and output-routing limitations are explained; lock-screen and headset controls use supported browser APIs.
 - [x] Media-session metadata and lock-screen / headset transport controls where supported (Media Session API handlers are present; device-specific behavior still needs iOS Safari and Android Chrome testing).
 
 ### Account, profile, and personalization
