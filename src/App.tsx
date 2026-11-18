@@ -69,6 +69,18 @@ function getAudioSourceQuality(track:Track):{label:string;lossless:boolean;forma
   return {label:"Source quality not reported",lossless:false,format:"Unknown"};
 }
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
+type LyricLine = { timeMs:number; text:string };
+function parseSyncedLyrics(raw:string):LyricLine[]{
+  const output:LyricLine[]=[];
+  const stamp=/\[(\d{1,2}):(\d{2})(?:[.:](\d{1,3}))?\]/g;
+  for(const line of raw.split(/\r?\n/)){
+    const matches=[...line.matchAll(stamp)];
+    const text=line.replace(stamp,"").trim();
+    if(!text)continue;
+    for(const match of matches){const fraction=match[3]||"0";const millis=Number(fraction.padEnd(3,"0").slice(0,3));output.push({timeMs:Number(match[1])*60000+Number(match[2])*1000+millis,text});}
+  }
+  return output.sort((a,b)=>a.timeMs-b.timeMs);
+}
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 async function resizePlaylistImage(file: File): Promise<string> { const bitmap = await createImageBitmap(file); const scale = Math.min(1, 640 / Math.max(bitmap.width, bitmap.height)); const canvas = document.createElement("canvas"); canvas.width = Math.max(1, Math.round(bitmap.width * scale)); canvas.height = Math.max(1, Math.round(bitmap.height * scale)); const context = canvas.getContext("2d"); if (!context) { bitmap.close(); throw new Error("Could not process that image."); } context.drawImage(bitmap, 0, 0, canvas.width, canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg", 0.82); }
 async function resizeBackgroundImage(file: File): Promise<string> { const bitmap=await createImageBitmap(file); const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)); const canvas=document.createElement("canvas"); canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale)); const context=canvas.getContext("2d"); if(!context){bitmap.close();throw new Error("Could not process that background.");} context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg",0.82); }
@@ -264,6 +276,8 @@ export default function App() {
   const selectedPlaylist=state.playlists.find(p=>p.id===selectedPlaylistId)||null;
   const selectedPlaylistTracks=selectedPlaylist?selectedPlaylist.trackIds.map(id=>allTracks.find(track=>track.id===id)).filter(Boolean) as Track[]:[];
   const likedTracks=useMemo(()=>state.likes.map(id=>allTracks.find(t=>t.id===id)).filter(Boolean) as Track[],[state.likes,allTracks]);
+  const syncedLyrics=useMemo(()=>parseSyncedLyrics(current?.lyrics||""),[current?.lyrics]);
+  const activeLyricIndex=syncedLyrics.reduce((active,line,index)=>line.timeMs<=position?index:active,-1);
   const search=async(value:string,kind:SearchKind)=>{setQuery(value);setFilter(kind);if(value.trim().length<2){setResults([]);return;}setLoadingSearch(true);try{const data=await lyneApi.search(value,kind);setResults(data.tracks||[]);setArtistResults(data.artists||[]);setAlbumResults(data.albums||[]);}catch{setResults([]);setArtistResults([]);setAlbumResults([]);}finally{setLoadingSearch(false);}};
   const openArtist=async(id:string)=>{
     setDetailBusy(true);setArtistDetail(null);setModal("artistDetail");
@@ -520,7 +534,7 @@ export default function App() {
         </div>
       </div>}
       {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current?.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
-      {modal==="lyrics"&&<div className="lyrics-body">{current?.lyrics||"Lyrics aren't available for this track yet."}</div>}
+      {modal==="lyrics"&&<div className="lyrics-body">{syncedLyrics.length?syncedLyrics.map((line,index)=><p key={index} className={index===activeLyricIndex?"lyric-line active":"lyric-line"}>{line.text}</p>):<p>{current?.lyrics||"Synced lyrics aren't available for this track yet."}</p>}</div>}
     </div></div>}
     {notice&&<button className="notice" onClick={()=>setNotice("")}>{notice}<X size={15}/></button>}
   </main>;
