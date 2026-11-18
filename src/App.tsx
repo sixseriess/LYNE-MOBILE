@@ -231,6 +231,13 @@ export default function App() {
     return ()=>{active=false;image.onload=null;image.onerror=null;};
   },[current?.artwork,state.preferences.ambientVisualMode]);
   useEffect(()=>{
+    const [red,green,blue]=ambientColor.split(",").map(value=>Math.max(0,Math.min(255,Number(value)||0)));
+    const root=document.documentElement;
+    root.style.setProperty("--lime",`rgb(${red} ${green} ${blue})`);
+    root.style.setProperty("--lime-soft",`rgba(${red}, ${green}, ${blue}, .14)`);
+    root.style.setProperty("--artwork-glow",`rgba(${red}, ${green}, ${blue}, .22)`);
+  },[ambientColor]);
+  useEffect(()=>{
     const update=()=>setNetworkOnline(navigator.onLine);
     window.addEventListener("online",update);
     window.addEventListener("offline",update);
@@ -813,7 +820,7 @@ export default function App() {
     </header>
     {!networkOnline&&<div className="api-note network-banner"><span>You're offline</span><small>Your on-device library, saved catalogue tracks, profile and settings remain available. Catalogue search and account sync need a connection.</small></div>}
     <section className="page" key={tab}>
-      {tab==="Home"&&<><div className="home-art-backdrop" style={homeTracks[0]?.artwork?{backgroundImage:`url("${homeTracks[0].artwork}")`}:undefined}/>
+      {tab==="Home"&&<><div className="home-art-backdrop" style={(current?.artwork||homeTracks[0]?.artwork)?{backgroundImage:`url("${current?.artwork||homeTracks[0]?.artwork}")`}:undefined}/>
         <div className="home-heading"><div className="home-avatar">{state.profile.avatar?<img src={state.profile.avatar} alt=""/>:state.profile.name.slice(0,1).toUpperCase()}</div><div className="home-heading-copy"><h1>{greeting}{state.profile.name&&state.profile.name!=="Listener"?<span>, {state.profile.name}</span>:""}</h1><p><i/> {dateLabel}</p></div><button className="home-quick-play" onClick={()=>{const track=state.history[0]||homeTracks[0];if(track)play(track,[...state.history,...homeTracks]);else setTab("Search");}}><Play size={14} fill="currentColor"/> Play</button></div>
         <div className="home-filter-pills">{([{id:"all",label:"All"},{id:"speedDial",label:"Speed dial"},{id:"mixes",label:"Mixes"},{id:"charts",label:"Charts"},{id:"albums",label:"Albums"}] as const).map(item=><button key={item.id} className={homeFilter===item.id?"selected":""} onClick={()=>setHomeFilter(item.id)}>{item.label}</button>)}</div>
         {(homeFilter==="all"||homeFilter==="mixes")&&<><div className="section-heading mix-section-heading"><div className="mix-section-icon"><Sparkles size={17}/></div><div className="mix-section-copy"><h2>Your Mixes</h2><small>BASED ON YOUR LISTENING</small></div><span className="section-note">FOR YOU</span></div>{homeMixes.length>0?<div className="mix-grid">{homeMixes.map((mix,i)=><button className="mix-tile" key={mix.id} onClick={()=>{if(mix.tracks[0])play(mix.tracks[0],mix.tracks);}}><div className={`mix-art mix-${i%3}`} style={mix.artwork?{backgroundImage:`url("${mix.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{mix.title}</b><small>{mix.tracks.length} tracks</small></button>)}</div>:homeMixSeeds.length?<div className="mix-grid">{homeMixSeeds.map((track,i)=><button className="mix-tile" key={track.id} onClick={()=>play(track,homeMixSeeds)}><div className={`mix-art mix-${i%3}`} style={track.artwork?{backgroundImage:`url("${track.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{i===0?"Daily Mix":i===1?"On Repeat":i===2?"Discovery":`Your Mix ${i+1}`}</b><small>{track.artist}</small></button>)}</div>:<Empty title="Your mixes will show up here" text="Connect the LYNE catalogue to start building artwork-led mixes."/ >}
