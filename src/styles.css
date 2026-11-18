@@ -686,3 +686,6 @@ body{font-feature-settings:"ss01" on,"cv11" on}
 .lyrics-offset label{display:flex;flex-direction:column;gap:8px;font-size:10px;color:var(--muted)}
 .lyrics-offset input{width:100%;accent-color:var(--lime)}
 .lyrics-offset small{font-size:9px;color:var(--dim);text-align:right}
+
+:root[data-reduced-motion=true] *, :root[data-reduced-motion=true] *::before, :root[data-reduced-motion=true] *::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
+.network-banner{margin:8px 14px 0}
