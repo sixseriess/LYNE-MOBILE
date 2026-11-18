@@ -40,7 +40,7 @@ function spotifyParts(url: URL) {
   return { kind: match[1] as string, id: match[2] };
 }
 async function spotifyToken(env: ProviderEnv) {
-  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyOembedImport(url);
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) throw new Error("Spotify API credentials are not configured.");
   const basic = btoa(env.SPOTIFY_CLIENT_ID + ":" + env.SPOTIFY_CLIENT_SECRET);
   const form = new URLSearchParams({ grant_type: "client_credentials" });
   const token = await providerJson("https://accounts.spotify.com/api/token", { method:"POST", headers:{ Authorization:"Basic "+basic, "Content-Type":"application/x-www-form-urlencoded" }, body:form });
@@ -60,6 +60,7 @@ async function spotifyOembedImport(url:URL):Promise<ResolvedImport>{
 async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   const { kind, id } = spotifyParts(url);
   if (kind === "artist") throw new Error("Paste a Spotify song, album or playlist link. Artist-only imports aren't library items yet.");
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyOembedImport(url);
   const token = await spotifyToken(env);
   const data = await providerJson(`https://api.spotify.com/v1/${kind}s/${id}?market=CA`, { headers:{ Authorization:"Bearer "+token } });
   const externalUrl = data.external_urls?.spotify || url.toString();
@@ -78,7 +79,7 @@ async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
   return { provider:"spotify",kind:kind as ImportKind,providerId:id,title:clean(data.name)||"Untitled",subtitle:kind==="track"?(tracks[0]?.artist||"Spotify"):(kind==="album"?(data.artists||[]).map((a:any)=>a.name).join(", "):clean(data.owner?.display_name)||"Spotify playlist"),externalUrl,artwork:firstImage(kind==="track"?data.album?.images:data.images),embedUrl:`https://open.spotify.com/embed/${kind}/${id}`,tracks };
 }
 async function soundcloudToken(env: ProviderEnv) {
-  if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) return soundcloudOembedImport(url);
+  if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) throw new Error("SoundCloud API credentials are not configured.");
   const basic=btoa(env.SOUNDCLOUD_CLIENT_ID+":"+env.SOUNDCLOUD_CLIENT_SECRET);
   const form=new URLSearchParams({ grant_type:"client_credentials" });
   const data=await providerJson("https://secure.soundcloud.com/oauth/token",{method:"POST",headers:{Authorization:"Basic "+basic,"Content-Type":"application/x-www-form-urlencoded"},body:form});
@@ -97,6 +98,7 @@ async function soundcloudOembedImport(url:URL):Promise<ResolvedImport>{
   return {provider:"soundcloud",kind,providerId:track.providerId,title,subtitle:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl,tracks:kind==="track"?[track]:[]};
 }
 async function soundcloudImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
+  if(!env.SOUNDCLOUD_CLIENT_ID||!env.SOUNDCLOUD_CLIENT_SECRET)return soundcloudOembedImport(url);
   const token=await soundcloudToken(env);
   const data=await providerJson("https://api.soundcloud.com/resolve?url="+encodeURIComponent(url.toString()),{headers:{Authorization:"OAuth "+token,Accept:"application/json; charset=utf-8"}});
   const kind=(data.kind==="playlist"||data.kind==="system-playlist")?"playlist":"track";
