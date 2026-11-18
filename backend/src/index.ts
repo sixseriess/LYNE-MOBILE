@@ -364,13 +364,21 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const favoriteIds=new Set(personalized.results.map(track=>track.id));
     const discoveryTracks=popular.results.filter(track=>!favoriteIds.has(track.id)).map(publicTrack);
     const recentTracks=recent.results.map(publicTrack);
+    const popularAlbums=await env.DB.prepare(`SELECT al.id,al.title,a.name AS artist,a.id AS artistId,
+      al.release_date AS releaseDate,
+      CASE WHEN al.artwork_key IS NULL THEN '' ELSE '/v1/media/' || al.artwork_key END AS artwork,
+      (SELECT COUNT(*) FROM tracks t WHERE t.album_id=al.id AND t.published=1) AS trackCount
+      FROM albums al JOIN artists a ON a.id=al.artist_id
+      WHERE EXISTS (SELECT 1 FROM tracks t WHERE t.album_id=al.id AND t.published=1)
+      ORDER BY (SELECT COALESCE(SUM(t.plays_count),0) FROM tracks t WHERE t.album_id=al.id AND t.published=1) DESC,
+      al.created_at DESC LIMIT 12`).all();
     const mixes=[
       {id:"daily-mix",title:"Daily Mix",tracks:dailyTracks.slice(0,10)},
       ...(repeatTracks.length?[{id:"on-repeat",title:"On Repeat",tracks:repeatTracks.slice(0,10)}]:[]),
       {id:"discovery",title:"Discovery Mix",tracks:(discoveryTracks.length?discoveryTracks:dailyTracks).slice(0,10)},
       ...(recentTracks.length?[{id:"recently-played",title:"Your Recent Mix",tracks:recentTracks.slice(0,10)}]:[])
     ].filter(mix=>mix.tracks.length>0).map(mix=>({...mix,artwork:mix.tracks[0]?.artwork||""}));
-    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), mixes });
+    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), popularAlbums:popularAlbums.results, mixes });
   }
 
   if (path === "/v1/tracks" && request.method === "GET") {
