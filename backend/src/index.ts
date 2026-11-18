@@ -335,6 +335,28 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:[],updatedAt:Date.now()},201);
   }
 
+  const playlistCoverMatch=path.match(/^\\/v1\\/me\\/playlists\\/([a-f0-9-]+)\\/cover$/i);
+  if(playlistCoverMatch && (request.method==="POST"||request.method==="DELETE")){
+    const userId=await requireUser(request,env);
+    const playlistId=playlistCoverMatch[1];
+    const playlist=await env.DB.prepare("SELECT cover_key AS coverKey FROM playlists WHERE id=? AND user_id=?").bind(playlistId,userId).first<{coverKey:string|null}>();
+    if(!playlist)return fail("Playlist not found.",404);
+    if(request.method==="DELETE"){
+      await env.DB.prepare("UPDATE playlists SET cover_key=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(playlistId,userId).run();
+      if(playlist.coverKey)await env.MEDIA.delete(playlist.coverKey);
+      return json({cover:""});
+    }
+    const form=await request.formData();
+    const image=form.get("artwork");
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>7*1024*1024)return fail("Playlist artwork must be JPG, PNG, WebP or AVIF and no larger than 7 MB.");
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="playlists/"+playlistId+"/"+id()+"."+extension;
+    await env.MEDIA.put(key,image.stream(),{httpMetadata:{contentType:image.type,cacheControl:"public, max-age=31536000, immutable"}});
+    await env.DB.prepare("UPDATE playlists SET cover_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(key,playlistId,userId).run();
+    if(playlist.coverKey)await env.MEDIA.delete(playlist.coverKey);
+    return json({cover:mediaUrl(key)});
+  }
+
   const playlistMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)$/i);
   if(playlistMatch && request.method==="PUT"){
     const userId=await requireUser(request,env); const playlistId=playlistMatch[1];
