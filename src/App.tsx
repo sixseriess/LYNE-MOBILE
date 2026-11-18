@@ -199,10 +199,14 @@ async function resizePlaylistImage(file: File): Promise<string> { const bitmap =
 async function resizeBackgroundImage(file: File): Promise<string> { const bitmap=await createImageBitmap(file); const scale=Math.min(1,1600/Math.max(bitmap.width,bitmap.height)); const canvas=document.createElement("canvas"); canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale)); const context=canvas.getContext("2d"); if(!context){bitmap.close();throw new Error("Could not process that background.");} context.drawImage(bitmap,0,0,canvas.width,canvas.height); bitmap.close(); return canvas.toDataURL("image/jpeg",0.82); }
 function dataUrlToFile(value:string,name:string):File{const match=/^data:([^;,]+);base64,(.+)$/.exec(value);if(!match)throw new Error("Invalid saved playlist artwork.");const bytes=Uint8Array.from(atob(match[2]),character=>character.charCodeAt(0));return new File([bytes],name,{type:match[1]});}
 function mergeLocalCollectionTracks(remote:SavedImport[],local:SavedImport[]):SavedImport[]{
-  return remote.map(item=>{
+  const merged=remote.map(item=>{
     const previous=local.find(old=>old.provider===item.provider&&old.providerId===item.providerId&&old.kind===item.kind);
     return previous?.addedTracks?.length?{...item,addedTracks:previous.addedTracks}:item;
   });
+  for(const item of local){
+    if(!merged.some(existing=>existing.provider===item.provider&&existing.providerId===item.providerId&&existing.kind===item.kind))merged.push(item);
+  }
+  return merged;
 }
 async function syncPendingPlaylists(items: Playlist[]): Promise<Playlist[]> {
   return Promise.all(items.map(async playlist=>{
