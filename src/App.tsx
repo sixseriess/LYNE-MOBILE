@@ -736,6 +736,7 @@ export default function App() {
     if(track.audioUrl)URL.revokeObjectURL(track.audioUrl);
     setLocalTracks(items=>items.filter(item=>item.id!==track.id));
     setQueue(items=>items.filter(item=>item.id!==track.id));
+    setState(old=>({...old,offlineMixes:old.offlineMixes.map(mix=>({...mix,trackIds:mix.trackIds.filter(id=>id!==track.id)})).filter(mix=>mix.trackIds.length>0)}));
     if(current?.id===track.id){setPlaying(false);setCurrent(null);setPosition(0);}
     setModal(null);
     setNotice("Removed "+track.title+" from this device.");
