@@ -66,6 +66,10 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] **About:** app version, build information, and update information appropriate to a PWA.
 - [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
 
+### Install and release checks
+- [ ] Regenerate the 192px / 512px PNG and iOS Apple touch icon from the final LYNE mark; verify installed icons on iOS and Android.
+- [ ] Publish the PWA after Cloudflare API configuration and device testing.
+
 ### Desktop-specific feature adaptations
 - [ ] Dynamic backgrounds, cover color extraction, ambient visuals, and visual modes adapted for mobile performance and reduced-motion preferences.
 - [ ] Connectivity diagnostics and useful offline / degraded-network behavior.
