@@ -9,7 +9,7 @@ export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
 export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
 export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
 export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; tracks:ExternalTrack[] };
-export type SavedImport = ResolvedImport & { createdAt?:string };
+export type SavedImport = ResolvedImport & { createdAt?:string; addedTracks?:Track[] };
 
 export class ApiError extends Error { constructor(message: string, public status = 0) { super(message); this.name = "ApiError"; } }
 
