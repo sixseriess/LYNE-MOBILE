@@ -1,4 +1,6 @@
-const CACHE_NAME = "lyne-mobile-shell-v3";
+const CACHE_NAME = "lyne-mobile-shell-v4";
+const ART_CACHE_NAME = "lyne-mobile-art-v1";
+const ART_CACHE_LIMIT = 120;
 const SHELL_FILES = [
   "./",
   "./index.html",
@@ -20,7 +22,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)));
+    await Promise.all(keys.filter((key) => key !== CACHE_NAME && key !== ART_CACHE_NAME).map((key) => caches.delete(key)));
     await self.clients.claim();
   })());
 });
@@ -30,6 +32,42 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   const scope = new URL(self.registration.scope);
+  const artworkHosts = new Set([
+    "i.scdn.co",
+    "image-cdn-ak.spotifycdn.com",
+    "mosaic.scdn.co",
+    "i1.sndcdn.com",
+    "i2.sndcdn.com",
+    "i3.sndcdn.com",
+    "i4.sndcdn.com",
+    "i.ytimg.com",
+    "img.youtube.com"
+  ]);
+  const isArtworkHost = artworkHosts.has(url.hostname) || url.hostname.endsWith(".mzstatic.com");
+  if (url.protocol === "https:" && request.destination === "image" && isArtworkHost) {
+    event.respondWith((async () => {
+      const cache = await caches.open(ART_CACHE_NAME);
+      const cached = await cache.match(request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response.ok || response.type === "opaque") {
+          try {
+            await cache.put(request, response.clone());
+            const keys = await cache.keys();
+            if (keys.length > ART_CACHE_LIMIT) {
+              await Promise.all(keys.slice(0, keys.length - ART_CACHE_LIMIT).map((key) => cache.delete(key)));
+            }
+          } catch {}
+        }
+        return response;
+      } catch {
+        return (await cache.match(request)) || Response.error();
+      }
+    })());
+    return;
+  }
+
   if (url.origin !== scope.origin || !url.pathname.startsWith(scope.pathname)) return;
   if (url.pathname.includes("/v1/")) return;
 

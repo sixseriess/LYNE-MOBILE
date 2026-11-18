@@ -73,7 +73,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ### Desktop-specific feature adaptations
 - [ ] Custom backgrounds, artwork-backed home/player visuals and reduced-motion handling exist; automatic cover-colour extraction and selectable ambient visual modes remain outstanding.
 - [x] API health/status indicator, online/offline detection, global offline notice, and offline catalogue-track playback; not all remote pages can be retried offline.
-- [ ] App-shell assets are cached by the service worker and first-party media responses use immutable cache headers; a separate controlled cover cache for cross-origin provider artwork remains outstanding.
+- [x] App-shell assets plus known Spotify, SoundCloud, YouTube and Apple Music artwork hosts are cached by the service worker, with a 120-image cap and Storage-settings cache clearing.
 - [x] Desktop window controls, native overlay windows, system tray, global hotkeys and filesystem folder pickers are replaced with mobile PWA equivalents or explained limitations.
 - [ ] Common controls have accessible labels, modal semantics, Escape dismissal, focus containment and return, and live status announcements; non-English translations and a full accessibility audit remain outstanding.
 
