@@ -15,9 +15,9 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ### Core app and discovery
 - [x] Mobile-first app shell and bottom navigation.
-- [ ] Home page sections and personalized mixes backed by LYNE catalogue data.
+- [x] Home page sections and personalized Daily Mix, On Repeat, Discovery Mix, and Recent Mix backed by LYNE catalogue data and listening history.
 - [ ] Search tracks, artists, albums, and playlists with working detail pages.
-- [ ] Artist profiles, album/collection pages, artwork, and track actions.
+- [x] Artist profiles, album/collection pages, artwork, and track actions.
 - [ ] Recently played, popular tracks, and listening-now states.
 - [ ] Loading, empty, offline, and API-error states throughout.
 
