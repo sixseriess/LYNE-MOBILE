@@ -19,7 +19,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Search tracks, artists, albums, and playlists with working detail pages.
 - [x] Artist profiles, album/collection pages, artwork, and track actions.
 - [x] Recently played and popular catalogue sections with history-based mixes; shared listening-now presence remains outstanding.
-- [ ] Loading, empty, offline, and API-error states throughout; search errors, API health, empty lists, and a global offline banner are implemented, but not every detail view has a dedicated retry state.
+- [ ] Loading, empty, offline, and API-error states throughout; search and artist/album/public-playlist detail views now show retryable errors, but other remote/account surfaces still rely on status messages.
 
 ### Library and imports
 - [x] Liked songs and locally imported audio files.
@@ -75,7 +75,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] API health/status indicator, online/offline detection, global offline notice, and offline catalogue-track playback; not all remote pages can be retried offline.
 - [x] App-shell assets plus known Spotify, SoundCloud, YouTube and Apple Music artwork hosts are cached by the service worker, with a 120-image cap and Storage-settings cache clearing.
 - [x] Desktop window controls, native overlay windows, system tray, global hotkeys and filesystem folder pickers are replaced with mobile PWA equivalents or explained limitations.
-- [ ] Common controls have accessible labels, modal semantics, Escape dismissal, focus containment and return, and live status announcements; non-English translations and a full accessibility audit remain outstanding.
+- [x] Key player controls have accessible labels; modal semantics, Escape dismissal, keyboard focus containment/return, and live status announcements are implemented. Non-English translations and manual screen-reader/device accessibility audit remain outstanding.
 
 ## Current implementation snapshot
 
