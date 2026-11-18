@@ -61,6 +61,8 @@ Account:
 - `POST /v1/auth/register`
 - `POST /v1/auth/login`
 - `GET /v1/me`
+- `GET|PUT /v1/me/preferences` — sync mobile preferences to the signed-in account
+- `POST|DELETE /v1/me/avatar` — upload or remove the account profile photo in R2
 - `GET|POST /v1/me/playlists`
 - `PUT|DELETE /v1/me/playlists/:id`
 - `POST|DELETE /v1/me/playlists/:id/cover` — upload or remove account-synced playlist artwork
