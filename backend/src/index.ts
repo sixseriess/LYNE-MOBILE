@@ -335,7 +335,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({id:playlistId,name,description:body.description||"",cover:"",trackIds:[],updatedAt:Date.now()},201);
   }
 
-  const playlistCoverMatch=path.match(/^\\/v1\\/me\\/playlists\\/([a-f0-9-]+)\\/cover$/i);
+  const playlistCoverMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)\/cover$/i);
   if(playlistCoverMatch && (request.method==="POST"||request.method==="DELETE")){
     const userId=await requireUser(request,env);
     const playlistId=playlistCoverMatch[1];
