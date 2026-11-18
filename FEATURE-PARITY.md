@@ -56,7 +56,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ### Settings — map every Windows tab to mobile
 - [ ] **Playback:** pause on audio-device / route changes and remaining Windows-specific playback preferences.
 - [x] Master volume, playback speed, autoplay-similar, track tap behavior, default playback context, repeat, shuffle, and lossless-only source preference.
-- [ ] **Shortcuts:** replace keyboard/global hotkeys with touch gestures, headset/media buttons, and accessibility actions where supported; explain unavailable OS-wide bindings.
+- [x] **Shortcuts:** replace keyboard/global hotkeys with player swipes (left/right for previous/next, up for queue, down for lyrics), headset/media buttons and vibration feedback where supported; explain unavailable OS-wide bindings.
 - [ ] **Overlay:** replace floating desktop overlay with a persistent mini-player, picture-in-picture where supported, and notification / lock-screen controls where supported.
 - [ ] **Discord:** provide mobile-compatible Rich Presence/status behavior only where the platform and Discord integration permit it; otherwise explain the limitation and retain configurable preferences only if useful.
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
