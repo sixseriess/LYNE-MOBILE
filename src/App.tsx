@@ -194,6 +194,11 @@ function extractCoverFluidColors(image:HTMLImageElement):CoverFluidColors{
   }catch{return DEFAULT_COVER_FLUID;}
 }
 
+function extractCoverAccent(image:HTMLImageElement):string{
+  const match=extractCoverFluidColors(image).color2.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/);
+  return match?.[0]||"200,245,106";
+}
+
 const fmtTime = (ms: number) => { const s=Math.max(0,Math.floor(ms/1000)); return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`; };
 type LyricLine = { timeMs:number; text:string };
 function parseSyncedLyrics(raw:string):LyricLine[]{
