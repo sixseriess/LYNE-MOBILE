@@ -35,7 +35,8 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] Robust playback engine: queue editing, gapless behavior where supported, playback recovery, and background playback where the mobile platform permits it.
 - [x] Correct next / previous navigation, repeat-all behavior, autoplay-similar continuation, and remote queue persistence across PWA launches.
 - [ ] Fullscreen / now-playing experience with responsive artwork and dynamic background.
-- [ ] Synced lyrics, timed highlighting, lyrics offset, and lyrics cache.
+- [ ] Lyrics offset adjustment and lyrics cache.
+- [x] Catalogue tracks can carry plain-text or LRC timed lyrics, with current-line highlighting in the mobile player.
 - [ ] Equalizer and supported audio effects.
 - [ ] Speed and pitch controls with mobile-safe controls.
 - [ ] Radio / autoplay-similar behavior and playback context preferences.
