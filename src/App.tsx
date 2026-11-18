@@ -232,6 +232,15 @@ function Cover({ track, className = "" }: { track?: Track; className?: string })
 function Row({ track, active, liked, onPlay, onLike, onMore }: { track: Track; active: boolean; liked: boolean; onPlay:()=>void; onLike:()=>void; onMore:()=>void }) {
   return <div className={`track-row ${active?"is-active":""}`}><button className="track-main" onClick={onPlay}><Cover track={track}/><span className="track-copy"><b>{track.title}</b><small>{track.artist}{track.explicit?" · E":""}</small></span></button><button className={`plain-icon ${liked?"liked":""}`} aria-label="Like song" onClick={onLike}><Heart size={18} fill={liked?"currentColor":"none"}/></button><button className="plain-icon" aria-label={`More options for ${track.title}`} onClick={onMore}><MoreHorizontal size={19}/></button></div>;
 }
+
+function MixArtwork({artworkUrl,number}:{artworkUrl?:string;number:number}){
+  return <div className="mix-artwork" style={artworkUrl?{backgroundImage:`linear-gradient(45deg,rgba(0,0,0,.26),rgba(0,0,0,.08)),url("${artworkUrl}")`}:undefined}>
+    <span className="mix-artwork-logo">LYNE</span>
+    <span className="mix-artwork-word">MIX</span>
+    <span className="mix-artwork-number">{String(number).padStart(2,"0")}</span>
+  </div>;
+}
+
 export default function App() {
   const [tab,setTab]=useState<Tab>("Home");
   const [state,setState]=useState(loadState);
@@ -1046,10 +1055,11 @@ export default function App() {
   const greeting=hour>=5&&hour<12?"Good morning":hour>=12&&hour<17?"Good afternoon":hour>=17&&hour<22?"Good evening":"Good night";
   const dateLabel=new Intl.DateTimeFormat("en",{weekday:"long",month:"long",day:"numeric"}).format(new Date());
   const [libraryFilter,setLibraryFilter]=useState<"all"|"playlists"|"albums"|"artists">("all");
+  const [libraryQuery,setLibraryQuery]=useState("");
+  const [libraryViewMode,setLibraryViewMode]=useState<"grid"|"list">("grid");
   const renderRows=(items:Track[])=>items.length?<div className="track-list">{items.map(t=><Row key={t.id} track={t} active={current?.id===t.id} liked={state.likes.includes(t.id)} onPlay={()=>state.preferences.trackTapBehavior==="queue"?addNext(t):play(t,items)} onLike={()=>toggleLike(t)} onMore={()=>{setActiveTrack(t);setLocalMetaEdit(undefined);setModal("track");}}/>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
   const renderHomeCards=(items:Track[])=>items.length?<div className="home-card-rail">{items.map((track,index)=><button className="home-track-card" key={track.id} onClick={()=>play(track,items)}><div className="home-track-art"><Cover track={track}/><span className="home-track-play"><Play size={18} fill="currentColor"/></span></div><b>{track.title}</b><small>{track.artist}</small></button>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
   const renderAlbumCards=(items:typeof popularAlbums)=>items.length?<div className="home-card-rail">{items.map(album=><button className="home-track-card home-album-card" key={album.id} onClick={()=>void openAlbum(album.id)}><div className="home-track-art"><div className="cover" style={album.artwork?{backgroundImage:"url(\""+album.artwork+"\")"}:undefined}>{!album.artwork&&<Disc3 size={27}/>}</div><span className="home-track-play"><Play size={18} fill="currentColor"/></span></div><b>{album.title}</b><small>{album.artist}{album.trackCount?" · "+album.trackCount+" tracks":""}</small></button>)}</div>:<Empty title="No albums yet" text="Albums added to the LYNE catalogue will appear here."/>;
-  const homeMixSeeds=[...new Map([...homeTracks,...state.history].map(track=>[track.id,track])).values()].slice(0,8);
   if(!user&&!guestMode)return <main className="auth-shell">
     <div className="auth-glow"/>
     <header className="auth-brand"><span>LYNE</span><i/></header>
@@ -1085,9 +1095,6 @@ export default function App() {
         <img src="/LYNE-MOBILE/lyne-wordmark.png" alt="LYNE" width="54" height="27"/>
       </button>
       <div className="top-actions">
-        <button className="api-status-trigger" title="Configure LYNE API" aria-label="Configure LYNE API" onClick={()=>{setSettingsSection("About");setApiUrlInput(getApiUrl());setModal("settings");}}>
-          <span className={`api-dot ${apiStatus}`}/>
-        </button>
         
         <button className="avatar" onClick={()=>setTab("Profile")} aria-label="Open profile">
           {state.profile.avatar?<img src={state.profile.avatar} alt=""/>:state.profile.name.slice(0,1).toUpperCase()}
@@ -1097,17 +1104,34 @@ export default function App() {
     {!networkOnline&&<div className="api-note network-banner"><span>You're offline</span><small>Your on-device library, saved catalogue tracks, profile and settings remain available. Catalogue search and account sync need a connection.</small></div>}
     <section className={`page page-${tab.toLowerCase()}`} key={tab}>
       {tab==="Home"&&<>
-        <div className="home-art-backdrop" style={(current?.artwork||homeTracks[0]?.artwork)?{backgroundImage:`url("${current?.artwork||homeTracks[0]?.artwork}")`}:undefined}/>
-        {(homeMixes.length>0||homeMixSeeds.length>0||state.offlineMixes.length>0)&&<>
+        {homeMixes.length>0&&<>
           <div className="windows-daily-mixes-heading">
-            <div className="mix-fluid-square" style={homeMixes[0]?.artwork?{backgroundImage:`url("${homeMixes[0].artwork}")`}:undefined}>{!homeMixes[0]?.artwork&&<Sparkles size={18}/>}</div>
+            <div className="mix-fluid-square" aria-hidden="true"><i/><i/><i/></div>
             <h1>Your Mixes</h1>
           </div>
-          {state.offlineMixes.length>0&&<>
-            <div className="section-heading"><h2>Saved offline mixes</h2><span className="section-note">ON THIS DEVICE</span></div>
-            <div className="mix-grid">{state.offlineMixes.map((mix,i)=>{const tracks=mix.trackIds.map(id=>localTracks.find(track=>track.id===id&&track.offline)).filter((track):track is Track=>Boolean(track));return <div className="mix-card" key={mix.id}><button className="mix-tile" onClick={()=>{if(tracks[0])play(tracks[0],tracks);}}><div className={`mix-art mix-${i%3}`} style={mix.artwork?{backgroundImage:`url("${mix.artwork}")`}:undefined}><span className="mix-brand-label">OFFLINE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{mix.title}</b><small>{tracks.length} of {mix.trackIds.length} tracks available</small></button></div>;})}</div>
-          </>}
-          {homeMixes.length>0?<div className="mix-grid">{homeMixes.map((mix,i)=><div className="mix-card" key={mix.id}><button className="mix-tile" onClick={()=>{if(mix.tracks[0])play(mix.tracks[0],mix.tracks);}}><div className={`mix-art mix-${i%3}`} style={mix.artwork?{backgroundImage:`url("${mix.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{mix.title}</b><small>{mix.tracks.length} tracks</small></button><button type="button" className="mix-download-action" disabled={offlineMixId!==null||!mix.tracks.some(track=>Boolean(track.audioUrl))} onClick={()=>void downloadMixOffline(mix)}>{offlineMixId===mix.id?<LoaderCircle size={14} className="spin"/>:<Download size={14}/>} {offlineMixId===mix.id?"Saving offline...":"Download mix"}</button></div>)}</div>:homeMixSeeds.length?<div className="mix-grid">{homeMixSeeds.map((track,i)=><button className="mix-tile" key={track.id} onClick={()=>play(track,homeMixSeeds)}><div className={`mix-art mix-${i%3}`} style={track.artwork?{backgroundImage:`url("${track.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{i===0?"Daily Mix":i===1?"On Repeat":i===2?"Discovery":`Your Mix ${i+1}`}</b><small>{track.artist}</small></button>)}</div>:null}
+          <div className="mix-grid">
+            {homeMixes.map((mix,i)=><div className="mix-card" key={mix.id}>
+              <button className="mix-tile" onClick={()=>{if(mix.tracks[0])play(mix.tracks[0],mix.tracks);}} aria-label={`Play ${mix.title}`}>
+                <MixArtwork artworkUrl={mix.artwork} number={i+1}/>
+                <b>{mix.title}</b>
+                <small>{mix.tracks.slice(0,3).map(track=>track.artist).filter(Boolean).join(", ")||`${mix.tracks.length} tracks`}</small>
+              </button>
+              <button type="button" className="mix-download-action" title="Save mix offline" aria-label={`Save ${mix.title} offline`} disabled={offlineMixId!==null||!mix.tracks.some(track=>Boolean(track.audioUrl))} onClick={()=>void downloadMixOffline(mix)}>
+                {offlineMixId===mix.id?<LoaderCircle size={15} className="spin"/>:<Download size={15}/>}
+              </button>
+            </div>)}
+          </div>
+        </>}
+        {state.offlineMixes.length>0&&<>
+          <div className="section-heading windows-section-heading"><h2>Saved Offline</h2></div>
+          <div className="mix-grid">
+            {state.offlineMixes.map((mix,i)=>{const tracks=mix.trackIds.map(id=>localTracks.find(track=>track.id===id&&track.offline)).filter((track):track is Track=>Boolean(track));return <div className="mix-card" key={mix.id}>
+              <button className="mix-tile" onClick={()=>{if(tracks[0])play(tracks[0],tracks);}}>
+                <MixArtwork artworkUrl={mix.artwork} number={i+1}/>
+                <b>{mix.title}</b><small>{tracks.length} tracks saved</small>
+              </button>
+            </div>;})}
+          </div>
         </>}
         {popularAlbums.length>0&&<><div className="section-heading windows-section-heading"><h2>Popular Albums</h2></div>{renderAlbumCards(popularAlbums)}</>}
         {listeningNowTracks.length>0&&<><div className="section-heading windows-section-heading"><h2>What Everyone's On</h2></div>{renderHomeCards(listeningNowTracks)}</>}
@@ -1117,44 +1141,77 @@ export default function App() {
       </>}
       {tab==="Search"&&<><div className="hero"><p className="eyebrow">EXPLORE THE CATALOGUE</p><h1>Search</h1><p className="muted">Find tracks, artists, albums and playlists.</p></div><label className="searchbox"><Search/><input aria-label="Search tracks, artists, albums and playlists" value={query} onChange={e=>void search(e.target.value,filter)} placeholder="What do you want to listen to?"/></label><div className="filter-pills">{(["all","tracks","artists","albums","playlists"] as SearchKind[]).map(x=><button key={x} className={filter===x?"selected":""} onClick={()=>void search(query,x)}>{x[0].toUpperCase()+x.slice(1)}</button>)}</div>{loadingSearch?<div className="loading"><LoaderCircle className="spin"/> Searching LYNE...</div>:<>{(filter==="all"||filter==="artists")&&artistResults.length>0&&<><div className="section-heading"><h2>Artists</h2></div><div className="catalog-grid">{artistResults.map(a=><button className="catalog-card" key={a.id} onClick={()=>void openArtist(a.id)}><div className="artist-avatar"><UserRound/></div><b>{a.name}</b><small>Artist</small></button>)}</div></>}{(filter==="all"||filter==="albums")&&albumResults.length>0&&<><div className="section-heading"><h2>Albums</h2></div><div className="catalog-grid">{albumResults.map(a=><button className="catalog-card" key={a.id} onClick={()=>void openAlbum(a.id)}><div className="cover" style={a.artwork?{backgroundImage:`url("${a.artwork}")`}:undefined}>{!a.artwork&&<Disc3/>}</div><b>{a.title}</b><small>{a.artist}</small></button>)}</div></>}{(filter==="all"||filter==="playlists")&&playlistResults.length>0&&<><div className="section-heading"><h2>Playlists</h2></div><div className="catalog-grid">{playlistResults.map(playlist=><button className="catalog-card" key={playlist.id} onClick={()=>void openPublicPlaylist(playlist.id)}><div className="cover" style={playlist.cover?{backgroundImage:`url("${playlist.cover}")`}:undefined}>{!playlist.cover&&<ListMusic/>}</div><b>{playlist.name}</b><small>by {playlist.owner}</small></button>)}</div></>}{searchError&&<div className="api-note"><span>Search unavailable</span><small>{searchError}</small></div>}{results.length===0&&artistResults.length===0&&albumResults.length===0&&playlistResults.length===0&&query.trim().length>=2&&!loadingSearch&&!searchError&&<Empty title="No matches found" text="Try a different track, artist, album or playlist name."/>}{renderRows(results)}</>}</>}
       {tab==="Library"&&<>
-        <div className="library-page-header">
-          <div><p className="eyebrow">YOUR COLLECTION</p><h1>Your Library</h1></div>
-          <button className="library-create-button" onClick={()=>setModal("playlist")}><Plus size={17}/> New playlist</button>
-        </div>
-        <div className="library-actions">
-          
-          <button onClick={()=>fileRef.current?.click()}><Upload/> Import files</button>
-          <button onClick={()=>{setImportUrl("");setImportPreview(null);setImportError("");setModal("import");}}><Link2/> Paste link</button>
-          <input ref={fileRef} hidden type="file" accept="audio/*" multiple onChange={e=>{void importFiles(e.target.files);e.currentTarget.value="";}}/>
-        </div>
-        <div className="library-filter-tabs" role="tablist" aria-label="Library categories">
+        <div className="library-page-title"><h1>Your Library</h1></div>
+        <div className="library-tab-row" role="tablist" aria-label="Library categories">
           {(["all","playlists","albums","artists"] as const).map(item=><button type="button" key={item} role="tab" aria-selected={libraryFilter===item} className={libraryFilter===item?"active":""} onClick={()=>setLibraryFilter(item)}>{item==="all"?"All":item[0].toUpperCase()+item.slice(1)}</button>)}
         </div>
-        {libraryFilter==="all"&&<div className="library-featured-grid">
-          <div className="library-featured-card"><div className="library-art liked-art"><Heart fill="currentColor"/></div><span><b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} saved tracks</small></span></div>
-          <div className="library-featured-card"><div className="library-art local-art"><Headphones/></div><span><b>Local music</b><small>{localTracks.length} tracks on this device</small></span></div>
-        </div>}
-        {(libraryFilter==="all"||libraryFilter==="artists")&&state.savedArtists.length>0&&<>
-          <div className="section-heading windows-section-heading"><h2>Saved Artists</h2><span className="section-note">{state.savedArtists.length} SAVED</span></div>
-          {state.savedArtists.map(artist=><button className="library-row" key={artist.id} onClick={()=>void openArtist(artist.id)}><div className="library-art artist-library-art" style={artist.artwork?{backgroundImage:`url("${artist.artwork}")`,backgroundSize:"cover",backgroundPosition:"center"}:undefined}>{!artist.artwork&&<UserRound/>}</div><span><b>{artist.name}</b><small>Artist · Saved on this device</small></span><ChevronRight/></button>)}
-        </>}
-        {(libraryFilter==="all"||libraryFilter==="playlists")&&<>
-          <div className="section-heading windows-section-heading"><h2>Your Playlists</h2><button className="subtle-action" onClick={()=>setModal("playlist")}>New playlist</button></div>
-          {state.playlists.length?state.playlists.map(p=><button className="playlist-row" key={p.id} onClick={()=>openPlaylist(p)}><div className="library-art playlist-art" style={p.cover?{backgroundImage:`url("${p.cover}")`,backgroundSize:"cover",backgroundPosition:"center"}:undefined}>{!p.cover&&<ListMusic/>}</div><span><b>{p.name}</b><small>Playlist · {p.trackIds.length} tracks</small></span><ChevronRight/></button>):<Empty title="Make it yours" text="Create a playlist and add tracks as your collection grows."/>}
-        </>}
+        <div className="library-toolbar">
+          <label className="library-search"><Search size={16}/><input aria-label="Search your library" value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} placeholder="Search your library"/></label>
+          <div className="library-view-controls">
+            <button type="button" title="Grid view" aria-label="Grid view" aria-pressed={libraryViewMode==="grid"} className={libraryViewMode==="grid"?"selected":""} onClick={()=>setLibraryViewMode("grid")}><icon-placeholder-grid/></button>
+            <button type="button" title="List view" aria-label="List view" aria-pressed={libraryViewMode==="list"} className={libraryViewMode==="list"?"selected":""} onClick={()=>setLibraryViewMode("list")}><icon-placeholder-list/></button>
+          </div>
+          <button type="button" className="library-import-link" aria-label="Import music link" title="Import music link" onClick={()=>{setImportUrl("");setImportPreview(null);setImportError("");setModal("import");}}><Link2 size={17}/></button>
+          {libraryFilter==="playlists"&&<button className="library-create-button" onClick={()=>setModal("playlist")}><Plus size={16}/><span>Create playlist</span></button>}
+          <input ref={fileRef} hidden type="file" accept="audio/*" multiple onChange={e=>{void importFiles(e.target.files);e.currentTarget.value="";}}/>
+        </div>
+        <div className={`library-content-grid ${libraryViewMode}`}>
+          {libraryFilter==="all"&&<>
+            <div className="library-item-card">
+              <div className="library-item-art liked-art"><Heart fill="currentColor"/></div>
+              <b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small>
+            </div>
+            <div className="library-item-card">
+              <div className="library-item-art local-art"><Headphones/></div>
+              <b>Local Music</b><small>{localTracks.length} tracks</small>
+            </div>
+          </>}
+          {(libraryFilter==="all"||libraryFilter==="playlists")&&state.playlists.filter(item=>!libraryQuery.trim()||item.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(p=>libraryViewMode==="grid"
+            ?<button className="library-item-card" key={p.id} onClick={()=>openPlaylist(p)}>
+              <div className="library-item-art playlist-art" style={p.cover?{backgroundImage:`url("${p.cover}")`}:undefined}>{!p.cover&&<ListMusic/>}</div><b>{p.name}</b><small>{p.trackIds.length} tracks</small>
+            </button>
+            :<button className="library-row" key={p.id} onClick={()=>openPlaylist(p)}>
+              <div className="library-art playlist-art" style={p.cover?{backgroundImage:`url("${p.cover}")`}:undefined}>{!p.cover&&<ListMusic/>}</div><span><b>{p.name}</b><small>Playlist · {p.trackIds.length} tracks</small></span><ChevronRight/>
+            </button>)}
+          {(libraryFilter==="all"||libraryFilter==="artists")&&state.savedArtists.filter(item=>!libraryQuery.trim()||item.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(artist=>libraryViewMode==="grid"
+            ?<button className="library-item-card" key={artist.id} onClick={()=>void openArtist(artist.id)}>
+              <div className="library-item-art artist-library-art" style={artist.artwork?{backgroundImage:`url("${artist.artwork}")`}:undefined}>{!artist.artwork&&<UserRound/>}</div><b>{artist.name}</b><small>Artist</small>
+            </button>
+            :<button className="library-row" key={artist.id} onClick={()=>void openArtist(artist.id)}>
+              <div className="library-art artist-library-art" style={artist.artwork?{backgroundImage:`url("${artist.artwork}")`}:undefined}>{!artist.artwork&&<UserRound/>}</div><span><b>{artist.name}</b><small>Artist · Saved on this device</small></span><ChevronRight/>
+            </button>)}
+          {(libraryFilter==="all"||libraryFilter==="playlists"||libraryFilter==="albums")&&state.importedCollections.filter(item=>(libraryFilter==="all"||item.kind===(libraryFilter==="albums"?"album":"playlist"))&&(!libraryQuery.trim()||item.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||item.subtitle.toLowerCase().includes(libraryQuery.trim().toLowerCase()))).map(item=>libraryViewMode==="grid"
+            ?<button className="library-item-card" key={item.provider+item.providerId+item.kind} onClick={()=>{setActiveCollection(item);setModal("collection");}}>
+              <div className="library-item-art" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<ListMusic/>}</div><b>{item.title}</b><small>{item.kind==="album"?"Album":"Playlist"} · {providerName(item.provider)}</small>
+            </button>
+            :<button className="imported-row" key={item.provider+item.providerId+item.kind} onClick={()=>{setActiveCollection(item);setModal("collection");}}>
+              <div className="cover" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<ListMusic/>}</div><span><b>{item.title}</b><small>{item.kind==="album"?"Album":"Playlist"} · {item.subtitle} · {providerName(item.provider)}</small></span><ChevronRight/>
+            </button>)}
+          {libraryFilter==="all"&&state.importedLikes.filter(item=>!libraryQuery.trim()||item.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(item=>libraryViewMode==="grid"
+            ?<button className="library-item-card" key={item.provider+item.providerId} onClick={()=>openImportedPlayback(item)}>
+              <div className="library-item-art" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<Music2/>}</div><b>{item.title}</b><small>{item.subtitle} · {providerName(item.provider)}</small>
+            </button>
+            :<button className="imported-row" key={item.provider+item.providerId} onClick={()=>openImportedPlayback(item)}>
+              <div className="cover" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<Music2/>}</div><span><b>{item.title}</b><small>{item.subtitle} · {providerName(item.provider)}</small></span><Play size={16}/>
+            </button>)}
+        </div>
         {libraryFilter==="all"&&<>
-          <div className="section-heading windows-section-heading"><h2>Liked Tracks</h2><span className="section-note">{likedTracks.length+state.importedLikes.length} SONGS</span></div>
-          {renderRows(likedTracks)}
-          {state.importedLikes.map(item=><button className="imported-row" key={item.provider+item.providerId} onClick={()=>openImportedPlayback(item)}><div className="cover" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<Music2/>}</div><span><b>{item.title}</b><small>{item.subtitle} · {providerName(item.provider)}</small></span><Play size={16}/></button>)}
+          <div className="section-heading library-section-heading"><h2>Liked Tracks</h2><span className="section-note">{likedTracks.length} SONGS</span></div>
+          {libraryQuery.trim()?renderRows(likedTracks.filter(track=>track.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||track.artist.toLowerCase().includes(libraryQuery.trim().toLowerCase()))):renderRows(likedTracks)}
+          <div className="section-heading library-section-heading">
+            <h2>Local Files</h2>
+            <div className="library-local-actions">
+              <button className="subtle-action" onClick={()=>fileRef.current?.click()}><Upload size={14}/> Add files</button>
+              <button className="subtle-action" onClick={()=>{setImportUrl("");setImportPreview(null);setImportError("");setModal("import");}}><Link2 size={14}/> Paste link</button>
+            </div>
+          </div>
+          {libraryQuery.trim()?renderRows(localTracks.filter(track=>track.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||track.artist.toLowerCase().includes(libraryQuery.trim().toLowerCase()))):renderRows(localTracks)}
         </>}
-        {(libraryFilter==="all"||libraryFilter==="playlists"||libraryFilter==="albums")&&<>
-          <div className="section-heading windows-section-heading"><h2>{libraryFilter==="albums"?"Imported Albums":libraryFilter==="playlists"?"Imported Playlists":"Imported Playlists & Albums"}</h2><span className="section-note">{state.importedCollections.filter(item=>libraryFilter==="all"||item.kind===(libraryFilter==="albums"?"album":"playlist")).length} SAVED</span></div>
-          {state.importedCollections.filter(item=>libraryFilter==="all"||item.kind===(libraryFilter==="albums"?"album":"playlist")).map(item=><button className="imported-row" key={item.provider+item.providerId+item.kind} onClick={()=>{setActiveCollection(item);setModal("collection");}}><div className="cover" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<ListMusic/>}</div><span><b>{item.title}</b><small>{item.kind==="album"?"Album":"Playlist"} · {item.subtitle} · {providerName(item.provider)} · {(item.tracks?.length||0)+(item.addedTracks?.length||0)} tracks</small></span><ChevronRight size={16}/></button>)}
-        </>}
-        {libraryFilter==="all"&&<>
-          <div className="section-heading windows-section-heading"><h2>Local Files</h2><button className="subtle-action" onClick={()=>fileRef.current?.click()}>Add files</button></div>
-          {renderRows(localTracks)}
-        </>}
+        {libraryViewMode==="grid"&&libraryFilter!=="all"&&(
+          (libraryFilter==="playlists"&&state.playlists.length===0&&state.importedCollections.filter(item=>item.kind==="playlist").length===0)||
+          (libraryFilter==="albums"&&state.importedCollections.filter(item=>item.kind==="album").length===0)||
+          (libraryFilter==="artists"&&state.savedArtists.length===0)
+        )&&<Empty title={`No ${libraryFilter} yet`} text="Items you add to your LYNE library will appear here."/>}
       </>}
       {tab==="Stats"&&<><div className="hero"><p className="eyebrow">YOUR LISTENING ACTIVITY</p><h1>Your stats</h1><p className="muted">A closer look at what you've been listening to.</p></div><div className="period-pills">{(["day","week","month","year"] as Period[]).map(p=><button className={period===p?"selected":""} onClick={()=>setPeriod(p)} key={p}>{({day:"Day",week:"Week",month:"Month",year:"Year"} as Record<Period,string>)[p]}</button>)}</div><div className="stat-card"><span>TOTAL MINUTES LISTENED</span><strong>{totalMinutes.toLocaleString()}</strong><small>{period==="day"?"Today":period==="week"?"Last 7 days":period==="month"?"This month":"This year"}</small></div><div className="section-heading"><h2>Top 10 songs</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("title")}/><div className="section-heading"><h2>Top 10 artists</h2><span className="section-note">By listening time</span></div><Rankings items={ranking("artist")}/><button className="share-button" onClick={()=>void shareStats()}><Share2/> Share your stats</button>{wrappedStats.length>0&&<><div className="section-heading"><h2>LYNE Wrapped {wrappedYear}</h2><span className="section-note">YOUR YEAR IN MUSIC</span></div><div className="stat-card"><span>MINUTES LISTENED IN {wrappedYear}</span><strong>{wrappedMinutes.toLocaleString()}</strong><small>Your yearly LYNE recap</small><button className="subtle-action" onClick={()=>setWrappedOpen(value=>!value)}>{wrappedOpen?"Hide Wrapped":"View Wrapped"}</button></div>{wrappedOpen&&<><div className="section-heading"><h2>Top songs of {wrappedYear}</h2></div><Rankings items={wrappedRanking("title")}/><div className="section-heading"><h2>Top artists of {wrappedYear}</h2></div><Rankings items={wrappedRanking("artist")}/></>}</>}<p className="footnote">Listening time is recorded on this device. Account sync becomes available through the LYNE API.</p></>}
       {tab==="Profile"&&<><div className="profile-hero"><div className="profile-avatar">{state.profile.avatar?<img src={state.profile.avatar}/>:state.profile.name.slice(0,1).toUpperCase()}</div><p className="eyebrow">YOUR LYNE ACCOUNT</p><h1>{state.profile.name}</h1><p className="muted">{user?(`Signed in as @${user.username}`):"Personalize your listening space."}</p></div><button className="profile-option" onClick={()=>setModal("account")}><UserRound/><span><b>{user?"Account details":"Sign in or create account"}</b><small>Sync your LYNE music and settings</small></span><ChevronRight/></button>{user&&<button className="profile-option" onClick={()=>{setEditUsername(user.username);setModal("profileEdit");}}><Pencil/><span><b>Edit username</b><small>Change how your name appears in LYNE</small></span><ChevronRight/></button>}<label className="profile-option upload-avatar"><ImagePlus/><span><b>Change profile picture</b><small>{user?"Syncs to your LYNE account":"Saved on this device until you sign in"}</small></span><input type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f)void updateProfileAvatar(f);e.currentTarget.value="";}}/></label>{state.profile.avatar&&<button className="provider-open" onClick={()=>void removeProfileAvatar()}>Remove profile picture</button>}<button className="profile-option" onClick={()=>setModal("settings")}><Settings/><span><b>App settings</b><small>Appearance and playback preferences</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>setTab("Stats")}><Clock3/><span><b>Listening stats</b><small>Your minutes, songs and artists</small></span><ChevronRight/></button><button className="profile-option" onClick={()=>{setModal("settings");setSettingsSection("Storage");}}><Download/><span><b>Downloads & offline</b><small>Manage music saved on this device</small></span><ChevronRight/></button>{user&&<button className="signout" onClick={logout}><LogOut/> Sign out</button>}</>}
