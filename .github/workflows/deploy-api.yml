@@ -33,9 +33,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           LYNE_AUTH_SECRET: ${{ secrets.LYNE_AUTH_SECRET }}
           LYNE_ADMIN_API_TOKEN: ${{ secrets.LYNE_ADMIN_API_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -euo pipefail
-          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID LYNE_AUTH_SECRET LYNE_ADMIN_API_TOKEN; do
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID LYNE_AUTH_SECRET LYNE_ADMIN_API_TOKEN SUPABASE_URL SUPABASE_SECRET_KEY; do
             if [[ -z "${!key}" ]]; then
               echo "::error title=Missing secret::$key is not set in Repository Settings → Secrets and variables → Actions."
               exit 1
@@ -101,6 +103,8 @@ jobs:
           SOUNDCLOUD_CLIENT_SECRET: ${{ secrets.SOUNDCLOUD_CLIENT_SECRET }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           APPLE_MUSIC_DEVELOPER_TOKEN: ${{ secrets.APPLE_MUSIC_DEVELOPER_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           set -euo pipefail
           put_secret() {
@@ -112,6 +116,8 @@ jobs:
             fi
           }
           put_secret AUTH_SECRET "$LYNE_AUTH_SECRET"
+          put_secret SUPABASE_URL "$SUPABASE_URL"
+          put_secret SUPABASE_SECRET_KEY "$SUPABASE_SECRET_KEY"
           put_secret ADMIN_API_TOKEN "$LYNE_ADMIN_API_TOKEN"
           put_secret SPOTIFY_CLIENT_ID "$SPOTIFY_CLIENT_ID"
           put_secret SPOTIFY_CLIENT_SECRET "$SPOTIFY_CLIENT_SECRET"
