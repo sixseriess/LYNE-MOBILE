@@ -155,7 +155,7 @@ export default function App() {
     const token=localStorage.getItem("lyne.accessToken");
     if(!token)return;
     let active=true;
-    void Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports()]).then(async ([profile,remote,imports])=>{
+    void Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory()]).then(async ([profile,remote,imports,history])=>{
       if(!active)return;
       const syncedLocal=await syncPendingPlaylists(state.playlists);
       if(!active)return;
@@ -163,7 +163,7 @@ export default function App() {
       const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
       setUser({id:profile.id,username:profile.username});
       setGuestMode(false);
-      setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[]}));
+      setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[],stats:history.stats||[]}));
     }).catch(()=>{
       if(!active)return;
       localStorage.removeItem("lyne.accessToken");
@@ -364,7 +364,7 @@ export default function App() {
       localStorage.setItem("lyne.accessToken",result.accessToken);
       setUser(result.user);setGuestMode(false);
       try{
-        const [profile,remote,imports]=await Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports()]);
+        const [profile,remote,imports,history]=await Promise.all([lyneApi.me(),lyneApi.playlists(),lyneApi.getImports(),lyneApi.listeningHistory()]);
         const syncedLocal=await syncPendingPlaylists(state.playlists);
         const remotePlaylists=remote.playlists.map(item=>({...item,synced:true}));
         const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
