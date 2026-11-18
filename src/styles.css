@@ -1970,3 +1970,13 @@ html,body,#root{background:#0a0a0a;color:#f4f4f5}
 @media(prefers-reduced-motion:reduce){
   .app-dock.windows-sidebar button,.page-home .home-track-play{transition:none}
 }
+
+/* One shared cover-art backdrop powers the whole app, as in LYNE for Windows. */
+.home-art-backdrop{display:none!important}
+:root[data-theme=light] .app-shell{
+  background-image:radial-gradient(ellipse at 50% -16%,rgba(var(--lime-rgb),.045),transparent 52%),#f0f0f3;
+}
+:root[data-theme=light] .app-shell:before{
+  opacity:.22;filter:blur(58px) saturate(.92);
+  background-image:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.72) 62%,#f0f0f3 100%),var(--current-artwork);
+}
