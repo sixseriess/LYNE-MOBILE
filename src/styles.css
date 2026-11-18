@@ -1001,3 +1001,10 @@ body{background:#09090b;color:#f4f4f5}
 .home-filter-pills{gap:6px;margin-bottom:6px}
 .home-filter-pills button{padding:7px 12px;border-radius:8px;font-size:10px;letter-spacing:.05px}
 .home-album-card .home-track-art .cover{width:100%;height:100%;aspect-ratio:1;border-radius:10px;background-size:cover;background-position:center}
+
+.settings-profile-summary{display:flex;align-items:center;gap:12px;padding:12px 0 14px}
+.settings-profile-summary .profile-avatar{width:56px;height:56px;flex:none;margin:0;border-radius:10px}
+.settings-profile-summary>div:last-child{display:flex;flex-direction:column;gap:4px;min-width:0}
+.settings-profile-summary b{font-size:14px;font-weight:650}
+.settings-profile-summary small{font-size:10px;color:var(--dim)}
+.settings-profile-summary img{width:100%;height:100%;object-fit:cover}
