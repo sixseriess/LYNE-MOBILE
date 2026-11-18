@@ -61,6 +61,7 @@ Account:
 - `POST /v1/auth/register`
 - `POST /v1/auth/login`
 - `GET /v1/me`
+- `PUT /v1/me/profile` — update the authenticated account username (3–24 letters, numbers or underscores)
 - `GET|PUT /v1/me/preferences` — sync mobile preferences to the signed-in account
 - `POST|DELETE /v1/me/avatar` — upload or remove the account profile photo in R2
 - `GET|POST /v1/me/playlists`
