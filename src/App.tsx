@@ -97,8 +97,8 @@ function Row({ track, active, liked, onPlay, onLike, onMore }: { track: Track; a
 export default function App() {
   const [tab,setTab]=useState<Tab>("Home");
   const [state,setState]=useState(loadState);
-  const [current,setCurrent]=useState<Track|null>(null);
-  const [queue,setQueue]=useState<Track[]>([]);
+  const [current,setCurrent]=useState<Track|null>(()=>{try{const preferences=JSON.parse(localStorage.getItem(STORE)||"{}").preferences;return preferences?.defaultPlaybackContext==="empty"?null:JSON.parse(localStorage.getItem("lyne.mobile.current")||"null");}catch{return null;}});
+  const [queue,setQueue]=useState<Track[]>(()=>{try{return JSON.parse(localStorage.getItem("lyne.mobile.queue")||"[]") as Track[];}catch{return [];}});
   const [playing,setPlaying]=useState(false);
   const [expanded,setExpanded]=useState(false);
   const [position,setPosition]=useState(0);
@@ -149,7 +149,8 @@ export default function App() {
   const listeningReportedRef=useRef<string|null>(null);
 
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); document.documentElement.dataset.theme=state.theme; },[state]);
-  useEffect(()=>{ currentRef.current=current; },[current]);
+  useEffect(()=>{ currentRef.current=current; if(current&&current.source!=="local")localStorage.setItem("lyne.mobile.current",JSON.stringify(current));else localStorage.removeItem("lyne.mobile.current"); },[current]);
+  useEffect(()=>{try{localStorage.setItem("lyne.mobile.queue",JSON.stringify(queue.filter(track=>track.source!=="local").slice(0,100)));}catch{}},[queue]);
   useEffect(()=>{
     const token=localStorage.getItem("lyne.accessToken");
     if(!token)return;
