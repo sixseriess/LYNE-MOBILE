@@ -1182,14 +1182,25 @@ export default function App() {
         </div>
         <div className={`library-content-grid ${libraryViewMode}`}>
           {libraryFilter==="all"&&<>
-            <div className="library-item-card">
-              <div className="library-item-art liked-art"><Heart fill="currentColor"/></div>
-              <b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small>
-            </div>
-            <div className="library-item-card">
-              <div className="library-item-art local-art"><Headphones/></div>
-              <b>Local Music</b><small>{localTracks.length} tracks</small>
-            </div>
+            {libraryViewMode==="grid"?<>
+              <button type="button" className="library-item-card" onClick={()=>document.getElementById("liked-tracks-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+                <div className="library-item-art liked-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
+                <b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small>
+              </button>
+              <button type="button" className="library-item-card" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+                <div className="library-item-art local-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
+                <b>Local Music</b><small>{localTracks.length} tracks</small>
+              </button>
+            </>:<>
+              <button type="button" className="library-row" onClick={()=>document.getElementById("liked-tracks-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+                <div className="library-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
+                <span><b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small></span><ChevronRight/>
+              </button>
+              <button type="button" className="library-row" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+                <div className="library-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
+                <span><b>Local Music</b><small>{localTracks.length} tracks</small></span><ChevronRight/>
+              </button>
+            </>}
           </>}
           {(libraryFilter==="all"||libraryFilter==="playlists")&&state.playlists.filter(item=>!libraryQuery.trim()||item.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(p=>libraryViewMode==="grid"
             ?<button className="library-item-card" key={p.id} onClick={()=>openPlaylist(p)}>
@@ -1221,9 +1232,9 @@ export default function App() {
             </button>)}
         </div>
         {libraryFilter==="all"&&<>
-          <div className="section-heading library-section-heading"><h2>Liked Tracks</h2><span className="section-note">{likedTracks.length} SONGS</span></div>
+          <div id="liked-tracks-section" className="section-heading library-section-heading"><h2>Liked Tracks</h2><span className="section-note">{likedTracks.length} SONGS</span></div>
           {libraryQuery.trim()?renderRows(likedTracks.filter(track=>track.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||track.artist.toLowerCase().includes(libraryQuery.trim().toLowerCase()))):renderRows(likedTracks)}
-          <div className="section-heading library-section-heading">
+          <div id="local-files-section" className="section-heading library-section-heading">
             <h2>Local Files</h2>
             <div className="library-local-actions">
               <button className="subtle-action" onClick={()=>fileRef.current?.click()}><Upload size={14}/> Add files</button>
