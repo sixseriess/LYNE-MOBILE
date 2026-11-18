@@ -1122,7 +1122,7 @@ export default function App() {
           <button className="library-create-button" onClick={()=>setModal("playlist")}><Plus size={17}/> New playlist</button>
         </div>
         <div className="library-actions">
-          <button onClick={()=>setModal("playlist")}><Plus/> Create playlist</button>
+          
           <button onClick={()=>fileRef.current?.click()}><Upload/> Import files</button>
           <button onClick={()=>{setImportUrl("");setImportPreview(null);setImportError("");setModal("import");}}><Link2/> Paste link</button>
           <input ref={fileRef} hidden type="file" accept="audio/*" multiple onChange={e=>{void importFiles(e.target.files);e.currentTarget.value="";}}/>
