@@ -783,7 +783,7 @@ export default function App() {
       return -1;
     }finally{setOfflineBusy(false);}
   };
-  const downloadMixOffline=async(mix:{id:string;title:string;tracks:Track[]})=>{
+  const downloadMixOffline=async(mix:{id:string;title:string;artwork?:string;tracks:Track[]})=>{
     if(offlineMixId)return;
     setOfflineMixId(mix.id);
     const unique=[...new Map(mix.tracks.map(track=>[track.id,track])).values()];
