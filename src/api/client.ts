@@ -82,6 +82,7 @@ export const lyneApi = {
   createPlaylist: (name: string, description = "") => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify({ name, description }) }),
   updatePlaylist: (playlist: Playlist) => api<Playlist>(`/v1/me/playlists/${encodeURIComponent(playlist.id)}`, { method: "PUT", body: JSON.stringify({ name: playlist.name, description: playlist.description || "", trackIds: playlist.trackIds }) }),
   deletePlaylist: (id: string) => api<void>(`/v1/me/playlists/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  listeningHistory: () => api<{ stats: { id:string; title:string; artist:string; ms:number; day:string }[] }>("/v1/me/listening"),
   listening: (event: { trackId: string; listenedMs: number; playedAt: string }) => api<void>("/v1/me/listening", { method: "POST", body: JSON.stringify(event) }),
   resolveImport: (url: string) => api<ResolvedImport>(`/v1/import/resolve?url=${encodeURIComponent(url)}`),
   saveImport: (item: ResolvedImport) => api<{ saved:boolean; kind:string; id:string }>("/v1/me/imports", { method:"POST", body:JSON.stringify(item) }),
