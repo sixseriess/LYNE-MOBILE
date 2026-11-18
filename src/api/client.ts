@@ -58,7 +58,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     response = await fetch(API_URL + path, {
       ...init, credentials: "omit",
-      headers: { Accept: "application/json", ...(init.body ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
+      headers: { Accept: "application/json", ...(init.body && !(typeof FormData!=="undefined" && init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
     });
   } catch { throw new ApiError("Can't reach the LYNE API. Check your connection."); }
   if (!response.ok) {
@@ -81,6 +81,8 @@ export const lyneApi = {
   playlists: () => api<{ playlists: Playlist[] }>("/v1/me/playlists"),
   createPlaylist: (name: string, description = "") => api<Playlist>("/v1/me/playlists", { method: "POST", body: JSON.stringify({ name, description }) }),
   updatePlaylist: (playlist: Playlist) => api<Playlist>(`/v1/me/playlists/${encodeURIComponent(playlist.id)}`, { method: "PUT", body: JSON.stringify({ name: playlist.name, description: playlist.description || "", trackIds: playlist.trackIds }) }),
+  uploadPlaylistCover: (id: string, file: File) => { const form=new FormData(); form.append("artwork",file); return api<{cover:string}>(`/v1/me/playlists/${encodeURIComponent(id)}/cover`, { method:"POST", body:form }); },
+  removePlaylistCover: (id: string) => api<{cover:string}>(`/v1/me/playlists/${encodeURIComponent(id)}/cover`, { method:"DELETE" }),
   deletePlaylist: (id: string) => api<void>(`/v1/me/playlists/${encodeURIComponent(id)}`, { method: "DELETE" }),
   listeningHistory: () => api<{ stats: { id:string; title:string; artist:string; ms:number; day:string }[] }>("/v1/me/listening"),
   listening: (event: { trackId: string; listenedMs: number; playedAt: string }) => api<void>("/v1/me/listening", { method: "POST", body: JSON.stringify(event) }),
