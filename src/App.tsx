@@ -53,7 +53,7 @@ async function removeAudioFile(id:string):Promise<void>{
     tx.onerror=()=>reject(tx.error||new Error("Could not remove this audio file."));
   }).finally(()=>db.close());
 }
-const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500, audioQuality: "auto" as "auto"|"lossless" } };
+const blankState = { likes: [] as string[], playlists: [] as Playlist[], stats: [] as PlayRecord[], history: [] as Track[], importedLikes: [] as SavedImport[], importedCollections: [] as SavedImport[], profile: { name: "Listener", avatar: "" }, theme: "dark", repeat: "off" as "off"|"all"|"one", preferences: { autoplaySimilar: true, trackTapBehavior: "play" as "play"|"queue", defaultPlaybackContext: "resume" as "resume"|"empty", pauseOnInterruption: true, touchGestures: true, haptics: true, miniPlayer: true, discordPresence: false, youtubeAccountPlayback: false, youtubePromptSignIn: true, youtubeSyncLibrary: false, language: "en" as "en"|"system", reduceMotion: false, cacheLimitMb: 500, audioQuality: "auto" as "auto"|"lossless", lyricsOffsetMs: 0 } };
 const providerName = (provider: string) => ({spotify:"Spotify",soundcloud:"SoundCloud",youtube:"YouTube",apple_music:"Apple Music"} as Record<string,string>)[provider] || provider;
 const artwork = (track: Track) => track.artwork || "";
 function getAudioSourceQuality(track:Track):{label:string;lossless:boolean;format:string}{
@@ -289,6 +289,18 @@ export default function App() {
     if(state.repeat==="all"&&queue.length){play(queue[queue.length-1],queue);return;}
     if(current&&audioRef.current){audioRef.current.currentTime=0;setPosition(0);}
   };
+  const moveQueueTrack=(trackId:string,direction:-1|1)=>{
+    setQueue(items=>{
+      const from=items.findIndex(item=>item.id===trackId),to=from+direction;
+      if(from<0||to<0||to>=items.length)return items;
+      const reordered=[...items];[reordered[from],reordered[to]]=[reordered[to],reordered[from]];
+      return reordered;
+    });
+  };
+  const removeQueueTrack=(trackId:string)=>{
+    if(current?.id===trackId){setNotice("The currently playing song stays in your queue.");return;}
+    setQueue(items=>items.filter(item=>item.id!==trackId));
+  };
   const handlePlayerTouchStart=(event:ReactTouchEvent<HTMLDivElement>)=>{
     if(!state.preferences.touchGestures)return;
     const touch=event.changedTouches[0];
@@ -338,7 +350,7 @@ export default function App() {
   const selectedPlaylistTracks=selectedPlaylist?selectedPlaylist.trackIds.map(id=>allTracks.find(track=>track.id===id)).filter(Boolean) as Track[]:[];
   const likedTracks=useMemo(()=>state.likes.map(id=>allTracks.find(t=>t.id===id)).filter(Boolean) as Track[],[state.likes,allTracks]);
   const syncedLyrics=useMemo(()=>parseSyncedLyrics(current?.lyrics||""),[current?.lyrics]);
-  const activeLyricIndex=syncedLyrics.reduce((active,line,index)=>line.timeMs<=position?index:active,-1);
+  const activeLyricIndex=syncedLyrics.reduce((active,line,index)=>line.timeMs+state.preferences.lyricsOffsetMs<=position?index:active,-1);
   const search=async(value:string,kind:SearchKind)=>{setQuery(value);setFilter(kind);setSearchError("");if(value.trim().length<2){setResults([]);setArtistResults([]);setAlbumResults([]);setPlaylistResults([]);return;}setLoadingSearch(true);try{const data=await lyneApi.search(value,kind);setResults(data.tracks||[]);setArtistResults(data.artists||[]);setAlbumResults(data.albums||[]);setPlaylistResults(data.playlists||[]);}catch(error){setResults([]);setArtistResults([]);setAlbumResults([]);setPlaylistResults([]);setSearchError(error instanceof Error?error.message:"Search is unavailable right now.");}finally{setLoadingSearch(false);}};
   const openArtist=async(id:string)=>{
     setDetailBusy(true);setArtistDetail(null);setModal("artistDetail");
@@ -654,8 +666,8 @@ export default function App() {
           {settingsSection==="About"&&<><div className="settings-section-title">About LYNE</div><div className="about-card"><div className="brand">LYNE<span>.</span></div><b>LYNE Mobile</b><small>Version 0.1.0 · Progressive Web App</small><p>Your music, your space.</p></div><div className="api-setup-panel"><b>First-party LYNE API</b><p>{apiStatus==="online"?"Connected. Catalogue, account and library endpoints are responding.":isApiConfigured()?"A Worker URL is saved, but the health check is failing. Check that the Cloudflare Worker is deployed and its CORS origin includes https://sixseriess.github.io.":"The API has not been connected yet. Deploy the LYNE Worker in Cloudflare first, then paste the workers.dev URL here. This URL is saved on this device."}</p><label className="field-label">Cloudflare Worker URL<input value={apiUrlInput} onChange={e=>setApiUrlInput(e.target.value)} placeholder="https://lyne-api.your-subdomain.workers.dev" inputMode="url" autoComplete="url"/></label><button className="primary-button" onClick={()=>void connectApi()} disabled={apiTesting}>{apiTesting?<LoaderCircle size={15} className="spin"/>:null}{apiTesting?"Testing connection":"Save URL & test connection"}</button><div className="api-setup-status">{apiMessage||"For all devices, also set the GitHub Actions variable VITE_API_URL to this same URL and rebuild the PWA."}</div><button className="provider-open" onClick={()=>window.open("https://github.com/sixseriess/LYNE-MOBILE/blob/main/backend/README.md","_blank","noopener,noreferrer")}>Open API deployment instructions <ExternalLink size={14}/></button></div><div className="setting-line"><span><b>Connection status</b><small>{apiStatus==="online"?"Connected to LYNE":apiMessage||"Not connected"}</small></span><span className={"status-pill "+apiStatus}>{apiStatus==="online"?"online":isApiConfigured()?"offline":"not set"}</span></div><button className="provider-open" onClick={()=>window.open("https://github.com/sixseriess/LYNE-MOBILE","_blank","noopener,noreferrer")}>LYNE Mobile on GitHub <ExternalLink size={14}/></button><button className="provider-open" onClick={()=>window.open("https://discord.gg/WtzrU9ERbN","_blank","noopener,noreferrer")}>Support <ExternalLink size={14}/></button></>}
         </div>
       </div>}
-      {modal==="queue"&&<div className="track-list">{queue.length?queue.map(t=><button className="queue-row" key={t.id} onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current?.id===t.id&&<span className="queue-playing">PLAYING</span>}</button>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
-      {modal==="lyrics"&&<div className="lyrics-body">{syncedLyrics.length?syncedLyrics.map((line,index)=><p key={index} className={index===activeLyricIndex?"lyric-line active":"lyric-line"}>{line.text}</p>):<p>{current?.lyrics||"Synced lyrics aren't available for this track yet."}</p>}</div>}
+      {modal==="queue"&&<div className="track-list">{queue.length?queue.map((t,index)=><div className="queue-manage-row" key={t.id}><button className="queue-row-main" onClick={()=>play(t,queue)}><Cover track={t}/><span><b>{t.title}</b><small>{t.artist}</small></span>{current?.id===t.id&&<span className="queue-playing">PLAYING</span>}</button><div className="queue-actions"><button className="plain-icon" aria-label={"Move "+t.title+" up"} disabled={index===0} onClick={()=>moveQueueTrack(t.id,-1)}><ChevronUp size={15}/></button><button className="plain-icon" aria-label={"Move "+t.title+" down"} disabled={index===queue.length-1} onClick={()=>moveQueueTrack(t.id,1)}><ChevronDown size={15}/></button><button className="plain-icon" aria-label={"Remove "+t.title+" from queue"} disabled={current?.id===t.id} onClick={()=>removeQueueTrack(t.id)}><X size={15}/></button></div></div>):<Empty title="Queue is empty" text="Play something to start a queue."/ >}</div>}
+      {modal==="lyrics"&&<div className="lyrics-body"><div className="lyrics-offset"><label>Lyrics timing <input aria-label="Lyrics timing offset" type="range" min="-5000" max="5000" step="250" value={state.preferences.lyricsOffsetMs} onChange={e=>setState(s=>({...s,preferences:{...s.preferences,lyricsOffsetMs:Number(e.target.value)}}))}/></label><small>{state.preferences.lyricsOffsetMs>0?"+":""}{(state.preferences.lyricsOffsetMs/1000).toFixed(2)}s · positive delays the highlight</small></div>{syncedLyrics.length?syncedLyrics.map((line,index)=><p key={index} className={index===activeLyricIndex?"lyric-line active":"lyric-line"}>{line.text}</p>):<p>{current?.lyrics||"Synced lyrics aren't available for this track yet."}</p>}</div>}
     </div></div>}
     {notice&&<button className="notice" onClick={()=>setNotice("")}>{notice}<X size={15}/></button>}
   </main>;
