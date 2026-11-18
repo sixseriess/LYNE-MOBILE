@@ -51,7 +51,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [ ] Full statistics experience, including day / week / month / year filters and top songs / artists.
 - [x] Authenticated listening history can be retrieved from the LYNE API and restored across signed-in sessions.
 - [x] Export and share branded LYNE listening-stat images (native file share where supported, image-save fallback elsewhere).
-- [ ] Yearly Wrapped and historical listening summaries, if present in the Windows app.
+- [x] Previous-year LYNE Wrapped recap with total minutes and top-10 songs / artists, shown once prior-year listening history exists.
 
 ### Settings — map every Windows tab to mobile
 - [ ] **Playback:** pause on audio-device / route changes and remaining Windows-specific playback preferences.
