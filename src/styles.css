@@ -700,3 +700,7 @@ body{font-feature-settings:"ss01" on,"cv11" on}
 .external-player-heading small{font-size:10px;color:var(--muted)}
 .provider-embed{display:block;width:100%;height:430px;min-height:180px;border:0;border-radius:12px;background:#111}
 @media(max-width:480px){.provider-embed{height:380px}}
+
+.player-overlay.ambient-soft .player-art-backdrop{opacity:.42;filter:blur(48px) saturate(.9)}
+.player-overlay.ambient-glow .player-art-backdrop{opacity:.76;filter:blur(62px) saturate(1.5)}
+.player-overlay.ambient-off .player-art-backdrop{opacity:0}
