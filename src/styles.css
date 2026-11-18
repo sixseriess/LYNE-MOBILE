@@ -1482,3 +1482,39 @@ html,body,#root{background:#050d18;color:#f4f8ff}
 @media(min-width:431px){
   .app-shell{max-width:430px}
 }
+
+/* Restore the LYNE Windows desktop visual language on the phone layout. */
+:root{--bg:#0a0a0a;--surface:#111113;--elevated:#19191c;--panel:#202024;--border:rgba(255,255,255,.075);--muted:rgba(237,237,242,.58);--dim:rgba(237,237,242,.36)}
+html,body,#root{background:#0a0a0a;color:#f4f4f5}
+.app-shell{background:#0a0a0a;isolation:isolate}
+.app-shell:before{background-image:linear-gradient(180deg,rgba(0,0,0,.28),rgba(0,0,0,.56) 52%,#0a0a0a 100%),var(--current-artwork);filter:blur(42px) saturate(1.18);opacity:.76;inset:-12% -25% 16%;mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.9) 58%,transparent 100%)}
+.topbar{height:50px;min-height:50px;padding:0 12px 0 58px;background:rgba(10,10,10,.66);border-bottom:1px solid rgba(255,255,255,.055);backdrop-filter:blur(22px)}
+.page{height:calc(100% - 50px);margin:0 0 0 58px;padding:16px 13px 90px 12px;background:transparent}
+.app-dock.windows-sidebar{left:0;right:auto;top:50px;bottom:0;transform:none;width:52px;height:auto;min-height:0;flex-direction:column;align-items:center;justify-content:flex-start;gap:19px;padding:18px 0 76px;border:0;border-right:1px solid rgba(255,255,255,.045);border-radius:0;background:rgba(10,10,10,.28);backdrop-filter:blur(22px);box-shadow:none}
+.app-dock.windows-sidebar button{position:relative;flex:none;width:100%;height:31px;min-height:31px;padding:0;border:0;border-radius:0;background:transparent;color:rgba(240,240,245,.48);display:grid;place-items:center}
+.app-dock.windows-sidebar button.active{color:#f5f5f5;background:transparent}
+.app-dock.windows-sidebar button.active:after{content:"";position:absolute;left:0;right:auto;top:5px;bottom:auto;transform:none;width:2px;height:21px;border-radius:0 2px 2px 0;background:var(--lime);box-shadow:0 0 9px rgba(var(--lime-rgb),.4)}
+.app-dock.windows-sidebar button svg{width:23px;height:23px}
+.app-dock.windows-sidebar .sidebar-spacer{flex:1;display:block}
+.app-dock.windows-sidebar .sidebar-settings{margin:0}
+.mini-player{position:absolute;z-index:22;left:52px;right:0;bottom:0;height:66px;padding:7px 9px;gap:8px;border:0;border-top:1px solid rgba(255,255,255,.075);border-radius:0;background:rgba(15,15,17,.88);backdrop-filter:blur(25px);box-shadow:0 -8px 25px rgba(0,0,0,.22);display:flex;align-items:center}
+.mini-player:before{display:none}
+.mini-player .cover{width:43px;height:43px;border-radius:5px}
+.mini-copy{flex:1;min-width:0;gap:3px}
+.mini-copy b{font-size:11px;color:#f4f4f5;font-weight:600}
+.mini-copy small{font-size:9px;color:var(--muted)}
+.mini-player .plain-icon{padding:6px;color:rgba(245,245,245,.78)}
+.mini-player .mini-play{color:#fff;background:rgba(255,255,255,.1);border-radius:50%;width:32px;height:32px;display:grid;place-items:center}
+.mini-player .mini-extra{color:rgba(240,240,245,.5)}
+.mini-progress{position:absolute;left:0;right:0;bottom:0;height:2px;background:rgba(255,255,255,.09)}
+.mini-progress span{display:block;height:100%;background:var(--lime);box-shadow:0 0 8px rgba(var(--lime-rgb),.4)}
+.windows-home-heading .eyebrow,.eyebrow{color:var(--lime)}
+.section-heading h2,.mix-section-heading .mix-section-copy h2,.windows-home-heading h1{color:#f4f4f5}
+.mix-tile,.home-track-card,.searchbox,.filter-pills button,.period-pills button,.library-actions button,.share-button,.profile-option,.secondary-action{background:rgba(19,19,22,.72);border-color:var(--border);color:#f4f4f5}
+.track-copy b,.mix-tile b,.home-track-card>b,.library-row b,.playlist-row b{color:#f4f4f5}
+.track-copy small,.mix-tile small,.home-track-card small,.library-row small,.playlist-row small{color:var(--muted)}
+.is-active .track-copy b{color:var(--lime)}
+.modal-backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(10px)}
+.modal{background:#17171b;border-color:var(--border)}
+.artist-page-modal,.artist-page-backdrop .artist-page-modal{background:#101012}
+@media(max-width:360px){.topbar{padding-left:51px}.page{margin-left:49px;padding-left:9px;padding-right:9px}.app-dock.windows-sidebar{width:45px}.mini-player{left:45px;padding-left:6px}.mini-player .cover{width:37px;height:37px}.mini-player .mini-extra{display:none}}
