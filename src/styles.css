@@ -2644,3 +2644,9 @@ html,body,#root{background:#09090b;color:#f4f4f5}
 :root[data-theme=light] .liner-collection-modal .modal-head{background:rgba(250,250,252,.9);border-bottom-color:rgba(0,0,0,.08)}
 :root[data-theme=light] .liner-collection-modal .music-detail-hero h3,:root[data-theme=light] .liner-collection-modal .track-copy b{color:#18181b}
 :root[data-theme=light] .liner-collection-modal .music-detail-hero small,:root[data-theme=light] .liner-collection-modal .detail-description,:root[data-theme=light] .liner-collection-modal .track-copy small{color:rgba(0,0,0,.52)}
+
+
+/* Clear the old desktop-frame offsets left behind by the earlier sidebar layout. */
+.app-shell{padding:0;gap:0}
+.topbar{top:auto;left:auto;right:auto;bottom:auto;width:auto}
+.page{top:auto;right:auto;bottom:auto;left:auto;height:auto;margin:0 6px}
