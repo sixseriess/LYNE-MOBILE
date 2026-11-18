@@ -62,6 +62,8 @@ Account:
 - `POST /v1/auth/login`
 - `GET /v1/me`
 - `GET|POST /v1/me/playlists`
+- `PUT|DELETE /v1/me/playlists/:id`
+- `POST|DELETE /v1/me/playlists/:id/cover` — upload or remove account-synced playlist artwork
 - `GET|POST /v1/me/listening` — retrieve and record per-track daily listening totals.
 
 Admin:
