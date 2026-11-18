@@ -5,6 +5,9 @@ interface Env {
   SOUNDCLOUD_CLIENT_ID?: string; SOUNDCLOUD_CLIENT_SECRET?: string;
   YOUTUBE_API_KEY?: string; APPLE_MUSIC_DEVELOPER_TOKEN?: string;
   DB: D1Database;
+  SUPABASE_URL?: string;
+  SUPABASE_SECRET_KEY?: string;
+  SUPABASE_BUCKET?: string;
   ADMIN_API_TOKEN: string;
   AUTH_SECRET: string;
   CORS_ORIGIN?: string;
@@ -92,13 +95,43 @@ async function verifyPassword(password: string, stored: string) {
   return actual.length === expected.length && [...actual].every((c, i) => c === expected[i]);
 }
 function mediaUrl(key: string | null | undefined) {
-  return key?.startsWith("data:image/") ? key : "";
+  if (!key) return "";
+  if (key.startsWith("data:image/")) return key;
+  return "/v1/media/" + key.split("/").map(encodeURIComponent).join("/");
 }
-async function imageDataUrl(file: File) {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return `data:${file.type};base64,${btoa(binary)}`;
+function storageReady(env: Env) {
+  return !!env.SUPABASE_URL?.trim() && !!env.SUPABASE_SECRET_KEY?.trim();
+}
+function storageObjectUrl(env: Env, key: string, isPublic = false) {
+  const base = env.SUPABASE_URL!.replace(/\/+$/, "");
+  const bucket = encodeURIComponent(env.SUPABASE_BUCKET || "lyne-media");
+  const object = key.split("/").map(encodeURIComponent).join("/");
+  return `${base}/storage/v1/object/${isPublic ? "public/" : ""}${bucket}/${object}`;
+}
+function storageHeaders(env: Env) {
+  return { apikey: env.SUPABASE_SECRET_KEY! };
+}
+async function storageUpload(env: Env, key: string, file: File) {
+  if (!storageReady(env)) throw new Error("Supabase media storage is not configured.");
+  const response = await fetch(storageObjectUrl(env, key), {
+    method: "POST",
+    headers: { ...storageHeaders(env), "content-type": file.type, "x-upsert": "false" },
+    body: await file.arrayBuffer(),
+  });
+  if (!response.ok) {
+    const message = await response.text().catch(() => "");
+    throw new Error(`Supabase upload failed (${response.status})${message ? `: ${message.slice(0, 240)}` : ""}`);
+  }
+}
+async function storageDelete(env: Env, key: string | null | undefined) {
+  if (!key || key.startsWith("data:image/") || !storageReady(env)) return;
+  const response = await fetch(storageObjectUrl(env, key), {
+    method: "DELETE",
+    headers: storageHeaders(env),
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Supabase delete failed (${response.status}).`);
+  }
 }
 function publicTrack(row: TrackRow) {
   return {
@@ -144,8 +177,28 @@ async function requireAdmin(request: Request, env: Env) {
   if (diff !== 0) throw new Response(JSON.stringify({ error: "Admin access is not configured or authorized." }), { status: 401, headers: JSON_HEADERS });
 }
 
-async function media(_request: Request, _env: Env, _key: string) {
-  return fail("Hosted media storage is not enabled in this free configuration.", 404);
+async function media(request: Request, env: Env, key: string) {
+  if (!/^(audio|artwork|avatars|playlists)\/[a-zA-Z0-9._/-]+$/.test(key) || key.includes("..")) return fail("Media not found.", 404);
+  if (!storageReady(env)) return fail("Media storage is not configured.", 503);
+  const headers = new Headers();
+  const range = request.headers.get("range");
+  if (range) headers.set("range", range);
+  const upstream = await fetch(storageObjectUrl(env, key, true), {
+    method: request.method,
+    headers,
+  });
+  if (!upstream.ok) return fail("Media not found.", upstream.status === 404 ? 404 : 502);
+  const responseHeaders = new Headers();
+  for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    const value = upstream.headers.get(name);
+    if (value) responseHeaders.set(name, value);
+  }
+  responseHeaders.set("cache-control", "public, max-age=3600");
+  responseHeaders.set("x-content-type-options", "nosniff");
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status,
+    headers: responseHeaders,
+  });
 }
 
 async function handle(request: Request, env: Env): Promise<Response> {
@@ -163,10 +216,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
     } catch {
       // Keep the health response useful without exposing internal database errors.
     }
-    const storage = "not-required";
+    const storage = storageReady(env) ? "configured" : "missing";
     const auth = env.AUTH_SECRET ? "configured" : "missing";
     const admin = env.ADMIN_API_TOKEN ? "configured" : "missing";
-    const ok = database === "connected" && schema === "ready" && auth === "configured" && admin === "configured";
+    const ok = database === "connected" && schema === "ready" && storage === "configured" && auth === "configured" && admin === "configured";
     return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
   }
 
@@ -241,14 +294,24 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if(!previous)return fail("Account not found.",404);
     if(request.method==="DELETE"){
       await env.DB.prepare("UPDATE users SET avatar_key=NULL WHERE id=?").bind(userId).run();
+      await storageDelete(env, previous.avatarKey);
       return json({avatar:""});
     }
     const form=await request.formData();
     const image=form.get("avatar");
-    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>300*1024)return fail("Profile photo must be JPG, PNG, WebP or AVIF and no larger than 300 KB.");
-    const dataUrl=await imageDataUrl(image);
-    await env.DB.prepare("UPDATE users SET avatar_key=? WHERE id=?").bind(dataUrl,userId).run();
-    return json({avatar:dataUrl});
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>5*1024*1024)return fail("Profile photo must be JPG, PNG, WebP or AVIF and no larger than 5 MB.");
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="avatars/"+userId+"/"+id()+"."+extension;
+    try{
+      await storageUpload(env,key,image);
+      await env.DB.prepare("UPDATE users SET avatar_key=? WHERE id=?").bind(key,userId).run();
+      await storageDelete(env,previous.avatarKey);
+      return json({avatar:mediaUrl(key)});
+    }catch(error){
+      await storageDelete(env,key).catch(()=>{});
+      return fail(error instanceof Error?error.message:"Could not save profile photo.",500);
+    }
   }
 
   if(path==="/v1/import/resolve" && request.method==="GET"){
@@ -398,14 +461,19 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if(!playlist)return fail("Playlist not found.",404);
     if(request.method==="DELETE"){
       await env.DB.prepare("UPDATE playlists SET cover_key=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(playlistId,userId).run();
+      await storageDelete(env,playlist.coverKey);
       return json({cover:""});
     }
     const form=await request.formData();
     const image=form.get("artwork");
-    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>300*1024)return fail("Playlist artwork must be JPG, PNG, WebP or AVIF and no larger than 300 KB.");
-    const dataUrl=await imageDataUrl(image);
-    await env.DB.prepare("UPDATE playlists SET cover_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(dataUrl,playlistId,userId).run();
-    return json({cover:dataUrl});
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>7*1024*1024)return fail("Playlist artwork must be JPG, PNG, WebP or AVIF and no larger than 7 MB.");
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="playlists/"+playlistId+"/"+id()+"."+extension;
+    await storageUpload(env,key,image);
+    await env.DB.prepare("UPDATE playlists SET cover_key=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND user_id=?").bind(key,playlistId,userId).run();
+    await storageDelete(env,playlist.coverKey);
+    return json({cover:mediaUrl(key)});
   }
 
   const playlistMatch=path.match(/^\/v1\/me\/playlists\/([a-f0-9-]+)$/i);
@@ -463,7 +531,39 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   if(path==="/v1/admin/tracks" && request.method==="POST"){
     await requireAdmin(request,env);
-    return fail("Hosted track uploads require an object-storage service, which is intentionally disabled in this free deployment.", 503);
+    if(!storageReady(env))return fail("Media storage is not configured.",503);
+    const form=await request.formData();
+    const title=String(form.get("title")||"").trim(); const artistName=String(form.get("artist")||"").trim();
+    const albumTitle=String(form.get("album")||"").trim(); const lyrics=String(form.get("lyrics")||"").trim().slice(0,50000); const rights=String(form.get("rightsStatus")||"");
+    const rightsReference=String(form.get("rightsReference")||"").trim();
+    const rightsConfirmed=String(form.get("rightsConfirmed")||"")==="true";
+    const audio=form.get("audio"); const image=form.get("artwork");
+    if(!title||title.length>180||!artistName||artistName.length>140)return fail("Track title and artist are required.");
+    if(!(audio instanceof File)||audio.size<1||audio.size>45*1024*1024)return fail("Audio file is required and must be 45 MB or smaller.");
+    if(!AUDIO_TYPES.has(audio.type))return fail("Unsupported audio format. Use MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM.");
+    if(image && (!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size>7*1024*1024))return fail("Artwork must be JPG, PNG, WebP or AVIF and no larger than 7 MB.");
+    if(!rightsConfirmed||!["owned","licensed","public_domain"].includes(rights)||!rightsReference)return fail("Confirm your rights to distribute this recording and provide a rights reference.");
+    const trackId=id(); const audioExtension=safeName(audio.name).split(".").pop()!.toLowerCase();
+    const audioKey="audio/"+trackId+"."+audioExtension;
+    const imageKey=image instanceof File?"artwork/"+trackId+"."+image.type.split("/")[1].replace("jpeg","jpg"):null;
+    let artistId=""; let albumId:string|null=null;
+    try{
+      const artistRow=await env.DB.prepare("INSERT INTO artists (id,name,name_norm) VALUES (?,?,?) ON CONFLICT(name_norm) DO UPDATE SET name=excluded.name RETURNING id").bind(id(),artistName,normalized(artistName)).first<{id:string}>();
+      if(!artistRow)throw new Error("Artist creation failed."); artistId=artistRow.id;
+      if(albumTitle){
+        const found=await env.DB.prepare("SELECT id FROM albums WHERE title=? AND artist_id=? LIMIT 1").bind(albumTitle,artistId).first<{id:string}>();
+        albumId=found?.id||id();
+        if(!found)await env.DB.prepare("INSERT INTO albums (id,title,artist_id) VALUES (?,?,?)").bind(albumId,albumTitle,artistId).run();
+      }
+      await storageUpload(env,audioKey,audio);
+      if(image instanceof File)await storageUpload(env,imageKey!,image);
+      await env.DB.prepare("INSERT INTO tracks (id,title,artist_id,album_id,duration_ms,genre,explicit,audio_key,audio_mime,audio_size,artwork_key,rights_status,rights_reference,lyrics,published) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)")
+        .bind(trackId,title,artistId,albumId,Math.max(0,Number(form.get("durationMs")||0)),String(form.get("genre")||"").slice(0,80)||null,String(form.get("explicit")||"")==="true"?1:0,audioKey,audio.type,audio.size,imageKey,rights,rightsReference.slice(0,500),lyrics||null).run();
+    }catch(error){
+      await Promise.all([storageDelete(env,audioKey),storageDelete(env,imageKey)].map(p=>p.catch(()=>{})));
+      return fail(error instanceof Error?error.message:"Unable to save track.",500);
+    }
+    return json({id:trackId,title,artist:artistName,album:albumTitle||undefined,durationMs:Number(form.get("durationMs")||0),artwork:mediaUrl(imageKey),audioUrl:mediaUrl(audioKey),published:true},201);
   }
 
   return fail("Route not found.",404);
