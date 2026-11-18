@@ -438,6 +438,12 @@ export default function App() {
     return ()=>{active=false;image.onload=null;image.onerror=null;};
   },[current?.artwork,state.preferences.ambientVisualMode]);
   useEffect(()=>{
+    const root=document.documentElement;
+    if(current?.artwork)root.style.setProperty("--current-artwork",`url("${current.artwork}")`);
+    else root.style.removeProperty("--current-artwork");
+    return ()=>root.style.removeProperty("--current-artwork");
+  },[current?.artwork]);
+  useEffect(()=>{
     const [red,green,blue]=ambientColor.split(",").map(value=>Math.max(0,Math.min(255,Number(value)||0)));
     const root=document.documentElement;
     root.style.setProperty("--lime-rgb",`${red},${green},${blue}`);
