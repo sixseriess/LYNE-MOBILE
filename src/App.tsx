@@ -163,7 +163,7 @@ export default function App() {
       const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
       setUser({id:profile.id,username:profile.username});
       setGuestMode(false);
-      setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[],stats:history.stats||[]}));
+      setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[]}));
     }).catch(()=>{
       if(!active)return;
       localStorage.removeItem("lyne.accessToken");
@@ -369,7 +369,7 @@ export default function App() {
         const remotePlaylists=remote.playlists.map(item=>({...item,synced:true}));
         const merged=[...remotePlaylists,...syncedLocal.filter(item=>!remotePlaylists.some(remoteItem=>remoteItem.id===item.id))];
         setUser({id:profile.id,username:profile.username});
-        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[]}));
+        setState(old=>({...old,profile:{...old.profile,name:profile.username,avatar:profile.avatar||old.profile.avatar},playlists:merged,importedLikes:imports.likes||[],importedCollections:imports.collections||[],stats:history.stats||[]}));
       }catch{setNotice("Signed in. Some account library data could not be loaded yet.");}
       setAccountMessage("You're signed in.");setModal(null);setNotice("Signed in to LYNE.");
     }catch(e){localStorage.removeItem("lyne.accessToken");setAccountMessage(e instanceof Error?e.message:"Couldn't connect to LYNE.");}
