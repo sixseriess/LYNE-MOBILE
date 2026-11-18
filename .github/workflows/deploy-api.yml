@@ -54,7 +54,7 @@ jobs:
             exit 1
           fi
 
-      - name: Create or reuse Cloudflare resources
+      - name: Create or reuse Cloudflare D1 database
         id: resources
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
