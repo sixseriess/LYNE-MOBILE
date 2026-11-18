@@ -220,6 +220,49 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({ id:row.id, username:row.username, avatar:mediaUrl(row.avatarKey) });
   }
 
+
+  if(path==="/v1/me/preferences" && request.method==="GET"){
+    const userId=await requireUser(request,env);
+    const row=await env.DB.prepare("SELECT preferences_json AS preferencesJson FROM users WHERE id=?").bind(userId).first<{preferencesJson:string|null}>();
+    if(!row)return fail("Account not found.",404);
+    let preferences:Record<string,unknown>={};
+    try{const value=JSON.parse(row.preferencesJson||"{}");if(value&&typeof value==="object"&&!Array.isArray(value))preferences=value;}catch{}
+    return json({preferences});
+  }
+  if(path==="/v1/me/preferences" && request.method==="PUT"){
+    const userId=await requireUser(request,env);
+    const body=await request.json() as {preferences?:unknown};
+    if(!body.preferences||typeof body.preferences!=="object"||Array.isArray(body.preferences))return fail("Preferences must be an object.");
+    const serialized=JSON.stringify(body.preferences);
+    if(serialized.length>12000)return fail("Preferences are too large.");
+    await env.DB.prepare("UPDATE users SET preferences_json=? WHERE id=?").bind(serialized,userId).run();
+    return json({saved:true});
+  }
+  if(path==="/v1/me/avatar" && (request.method==="POST"||request.method==="DELETE")){
+    const userId=await requireUser(request,env);
+    const previous=await env.DB.prepare("SELECT avatar_key AS avatarKey FROM users WHERE id=?").bind(userId).first<{avatarKey:string|null}>();
+    if(!previous)return fail("Account not found.",404);
+    if(request.method==="DELETE"){
+      await env.DB.prepare("UPDATE users SET avatar_key=NULL WHERE id=?").bind(userId).run();
+      if(previous.avatarKey)await env.MEDIA.delete(previous.avatarKey);
+      return json({avatar:""});
+    }
+    const form=await request.formData();
+    const image=form.get("avatar");
+    if(!(image instanceof File)||!IMAGE_TYPES.has(image.type)||image.size<1||image.size>5*1024*1024)return fail("Profile photo must be JPG, PNG, WebP or AVIF and no larger than 5 MB.");
+    const extension=image.type.split("/")[1].replace("jpeg","jpg");
+    const key="avatars/"+userId+"/"+id()+"."+extension;
+    try{
+      await env.MEDIA.put(key,image.stream(),{httpMetadata:{contentType:image.type,cacheControl:"public, max-age=31536000, immutable"}});
+      await env.DB.prepare("UPDATE users SET avatar_key=? WHERE id=?").bind(key,userId).run();
+      if(previous.avatarKey)await env.MEDIA.delete(previous.avatarKey);
+      return json({avatar:mediaUrl(key)});
+    }catch(error){
+      await env.MEDIA.delete(key);
+      return fail(error instanceof Error?error.message:"Could not save profile photo.",500);
+    }
+  }
+
   if(path==="/v1/import/resolve" && request.method==="GET"){
     const raw=url.searchParams.get("url")||"";
     if(raw.length>2048)return fail("Music link is too long.");
