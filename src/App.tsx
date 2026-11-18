@@ -195,7 +195,7 @@ function extractCoverFluidColors(image:HTMLImageElement):CoverFluidColors{
 }
 
 function extractCoverAccent(image:HTMLImageElement):string{
-  const match=extractCoverFluidColors(image).color2.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/);
+  const match=extractCoverFluidColors(image).color2.match(/\d+\s*,\s*\d+\s*,\s*\d+/);
   return match?.[0]||"200,245,106";
 }
 
