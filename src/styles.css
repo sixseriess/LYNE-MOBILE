@@ -1066,3 +1066,32 @@ body{background:#09090b;color:#f4f4f5}
 .mix-download-action{min-height:32px;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--muted);font-size:10px;font-weight:650}
 .mix-download-action:disabled{opacity:.45}
 .mix-download-action:not(:disabled):active{background:var(--lime-soft);color:var(--text)}
+
+
+/* Windows Daily Mix row adapted to mobile touch scrolling */
+.mix-grid{
+  display:flex;
+  flex-wrap:nowrap;
+  gap:18px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  padding:0 2px 9px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:none;
+  -webkit-overflow-scrolling:touch;
+}
+.mix-grid::-webkit-scrollbar{display:none}
+.mix-card{
+  flex:0 0 136px;
+  width:136px;
+  scroll-snap-align:start;
+}
+.mix-card .mix-tile{
+  width:100%;
+  min-width:0;
+  flex:1 1 auto;
+}
+.mix-card .mix-art{width:100%;min-width:0;height:auto}
+@media(min-width:420px){
+  .mix-card{flex-basis:150px;width:150px}
+}
