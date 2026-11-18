@@ -1638,3 +1638,26 @@ html,body,#root{background:#0a0a0a;color:#f4f4f5}
 .home-track-card>b{font-size:12px;font-weight:550;margin-top:8px}
 .home-track-card>small{font-size:10px;margin-top:3px}
 .home-art-backdrop{display:none!important}
+
+
+/* Desktop LYNE visual measurements carried over without substituting a new theme. */
+.brand{left:11px;top:50%;width:54px;height:27px;padding:0;background:transparent}
+.brand:before{display:none!important}
+.brand img{display:block;width:54px;height:27px;object-fit:contain}
+.top-actions{display:none!important}
+.topbar{padding-left:76px;padding-right:6px}
+.mix-section-heading{margin:0 0 12px;padding:0 12px}
+.mix-section-heading .mix-section-copy h2{font-size:36px;line-height:1;letter-spacing:-1.2px;font-weight:564}
+.mix-section-heading .mix-section-icon{width:28px;height:28px}
+.mix-grid{gap:28px;padding-left:12px;padding-right:12px}
+.mix-card{width:175px;min-width:175px;flex:0 0 175px}
+.mix-art{width:175px;height:175px;border-radius:6px}
+.mix-tile>b{font-size:14px;font-weight:500;margin-top:8px}
+.mix-tile>small{font-size:13px;margin-top:4px}
+.section-heading:not(.mix-section-heading){margin:22px 12px 12px}
+.section-heading:not(.mix-section-heading) h2{font-size:22px;font-weight:500;letter-spacing:-.4px}
+.home-card-rail{gap:16px;padding-left:12px;padding-right:12px}
+.home-track-card{width:160px;min-width:160px;flex:0 0 160px}
+.home-track-art{width:160px;height:160px;border-radius:6px}
+.home-track-card>b{font-size:14px;font-weight:500;margin-top:8px}
+.home-track-card>small{font-size:12px;margin-top:4px}
