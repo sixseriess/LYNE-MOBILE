@@ -12,9 +12,5 @@ database_name = "lyne-catalog"
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 migrations_dir = "migrations"
 
-[[r2_buckets]]
-binding = "MEDIA"
-bucket_name = "lyne-media"
-
 [observability]
 enabled = true
