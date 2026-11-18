@@ -1017,15 +1017,15 @@ export default function App() {
     try{
       const canvas=document.createElement("canvas");canvas.width=1080;canvas.height=1350;
       const ctx=canvas.getContext("2d");if(!ctx)throw new Error("Image export is not supported in this browser.");
-      const gradient=ctx.createLinearGradient(0,0,1080,1350);gradient.addColorStop(0,"#171b12");gradient.addColorStop(.55,"#09090b");gradient.addColorStop(1,"#050505");ctx.fillStyle=gradient;ctx.fillRect(0,0,1080,1350);
-      ctx.fillStyle="#c8f56a";ctx.font="800 68px Inter,Arial";ctx.fillText("LYNE",76,120);
+      const accentColor=`rgb(${ambientColor.split(",").join(" ")})`;const accentSoft=`rgba(${ambientColor},.2)`;const gradient=ctx.createLinearGradient(0,0,1080,1350);gradient.addColorStop(0,accentSoft);gradient.addColorStop(.55,"#09090b");gradient.addColorStop(1,"#050505");ctx.fillStyle=gradient;ctx.fillRect(0,0,1080,1350);
+      ctx.fillStyle=accentColor;ctx.font="800 68px Inter,Arial";ctx.fillText("LYNE",76,120);
       ctx.fillStyle="#f4f4f5";ctx.font="700 54px Inter,Arial";ctx.fillText("YOUR LISTENING STATS",76,245);
-      ctx.fillStyle="#c8f56a";ctx.font="800 150px Inter,Arial";ctx.fillText(totalMinutes.toLocaleString(),76,445);
+      ctx.fillStyle=accentColor;ctx.font="800 150px Inter,Arial";ctx.fillText(totalMinutes.toLocaleString(),76,445);
       ctx.fillStyle="rgba(244,244,245,.68)";ctx.font="500 34px Inter,Arial";ctx.fillText("MINUTES LISTENED · "+period.toUpperCase(),80,510);
       ctx.fillStyle="#f4f4f5";ctx.font="700 40px Inter,Arial";ctx.fillText("TOP SONGS",76,650);
-      songs.forEach(([name],i)=>{ctx.fillStyle="#c8f56a";ctx.font="700 30px Inter,Arial";ctx.fillText(String(i+1).padStart(2,"0"),80,720+i*72);ctx.fillStyle="#f4f4f5";ctx.font="500 30px Inter,Arial";ctx.fillText(name.slice(0,42),155,720+i*72);});
+      songs.forEach(([name],i)=>{ctx.fillStyle=accentColor;ctx.font="700 30px Inter,Arial";ctx.fillText(String(i+1).padStart(2,"0"),80,720+i*72);ctx.fillStyle="#f4f4f5";ctx.font="500 30px Inter,Arial";ctx.fillText(name.slice(0,42),155,720+i*72);});
       ctx.fillStyle="#f4f4f5";ctx.font="700 40px Inter,Arial";ctx.fillText("TOP ARTISTS",76,1110);
-      artists.slice(0,3).forEach(([name],i)=>{ctx.fillStyle="#c8f56a";ctx.font="600 26px Inter,Arial";ctx.fillText(name.slice(0,30),80,1170+i*48);});
+      artists.slice(0,3).forEach(([name],i)=>{ctx.fillStyle=accentColor;ctx.font="600 26px Inter,Arial";ctx.fillText(name.slice(0,30),80,1170+i*48);});
       ctx.fillStyle="rgba(244,244,245,.45)";ctx.font="500 22px Inter,Arial";ctx.fillText("YOUR MUSIC. YOUR SPACE.",76,1300);
       const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(value=>value?resolve(value):reject(new Error("Could not create the stats image.")),"image/png"));
       const imageFile=new File([blob],"lyne-listening-stats.png",{type:"image/png"});
