@@ -1,4 +1,4 @@
-const CACHE_NAME = "lyne-mobile-shell-v1";
+const CACHE_NAME = "lyne-mobile-shell-v2";
 const SHELL_FILES = [
   "./",
   "./index.html",
