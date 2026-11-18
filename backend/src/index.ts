@@ -309,7 +309,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const tracks = type==="all"||type==="tracks" ? await env.DB.prepare(TRACK_SELECT+" WHERE t.published=1 AND (t.title LIKE ? OR a.name LIKE ? OR al.title LIKE ?) ORDER BY t.plays_count DESC LIMIT 30").bind(like,like,like).all<TrackRow>() : {results:[] as TrackRow[]};
     const artists = type==="all"||type==="artists" ? await env.DB.prepare("SELECT id,name,bio,CASE WHEN image_key IS NULL THEN '' ELSE '/v1/media/' || image_key END AS artwork FROM artists WHERE name LIKE ? ORDER BY name COLLATE NOCASE LIMIT 20").bind(like).all() : {results:[]};
     const albums = type==="all"||type==="albums" ? await env.DB.prepare("SELECT al.id,al.title,a.name AS artist,a.id AS artistId,CASE WHEN al.artwork_key IS NULL THEN '' ELSE '/v1/media/' || al.artwork_key END AS artwork FROM albums al JOIN artists a ON a.id=al.artist_id WHERE al.title LIKE ? OR a.name LIKE ? ORDER BY al.title LIMIT 20").bind(like,like).all() : {results:[]};
-    const playlists = type==="all"||type==="playlists" ? await env.DB.prepare("SELECT p.id,p.name,p.description,u.username AS owner FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.name LIKE ? LIMIT 20").bind(like).all() : {results:[]};
+    const playlists = type==="all"||type==="playlists" ? await env.DB.prepare("SELECT p.id,p.name,p.description,u.username AS owner,CASE WHEN p.cover_key IS NULL THEN '' ELSE '/v1/media/' || p.cover_key END AS cover FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.name LIKE ? ORDER BY p.updated_at DESC LIMIT 20").bind(like).all() : {results:[]};
     return json({ tracks:tracks.results.map(publicTrack), artists:artists.results, albums:albums.results, playlists:playlists.results });
   }
 
@@ -331,6 +331,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
   }
 
   if(path==="/v1/me/playlists" && request.method==="GET"){
+  const publicPlaylistMatch=path.match(/^\/v1\/playlists\/([a-f0-9-]+)$/i);
+  if(publicPlaylistMatch && request.method==="GET"){
+    const playlist=await env.DB.prepare("SELECT p.id,p.name,p.description,p.cover_key AS coverKey,u.username AS owner FROM playlists p JOIN users u ON u.id=p.user_id WHERE p.id=?").bind(publicPlaylistMatch[1]).first<{id:string;name:string;description:string|null;coverKey:string|null;owner:string}>();
+    if(!playlist)return fail("Playlist not found.",404);
+    const items=await env.DB.prepare("SELECT track_id AS id FROM playlist_tracks WHERE playlist_id=? ORDER BY position ASC,added_at ASC").bind(publicPlaylistMatch[1]).all<{id:string}>();
+    const ids=items.results.map(item=>item.id);
+    const found=ids.length?await env.DB.prepare(TRACK_SELECT+` WHERE t.published=1 AND t.id IN (${ids.map(()=>"?").join(",")})`).bind(...ids).all<TrackRow>():{results:[] as TrackRow[]};
+    const byId=new Map(found.results.map(track=>[track.id,publicTrack(track)]));
+    return json({playlist:{id:playlist.id,name:playlist.name,description:playlist.description||"",owner:playlist.owner,cover:mediaUrl(playlist.coverKey),trackIds:ids},tracks:ids.map(id=>byId.get(id)).filter(Boolean)});
+  }
+
+
     const userId=await requireUser(request,env);
     const playlists=await env.DB.prepare("SELECT id,name,description,cover_key AS coverKey,updated_at AS updatedAt FROM playlists WHERE user_id=? ORDER BY updated_at DESC").bind(userId).all();
     const hydrated=await Promise.all(playlists.results.map(async (p:any)=>{

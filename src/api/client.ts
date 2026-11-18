@@ -4,6 +4,7 @@ export type Track = {
   lyrics?: string;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
+export type SearchPlaylist = { id: string; name: string; description?: string; owner: string; cover?: string };
 export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
 export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
 export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
@@ -71,7 +72,8 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),
   home: () => api<{ recentlyPlayed: Track[]; popular: Track[]; mixes: { id: string; title: string; artwork?: string; tracks: Track[] }[] }>("/v1/home"),
-  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: Playlist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  search: (q: string, type: SearchKind = "all") => api<{ tracks: Track[]; artists: {id:string;name:string;bio?:string;artwork?:string}[]; albums: {id:string;title:string;artist:string;artistId:string;artwork?:string}[]; playlists: SearchPlaylist[] }>(`/v1/search?q=${encodeURIComponent(q)}&type=${type}`),
+  publicPlaylist: (id: string) => api<{ playlist: SearchPlaylist & { trackIds: string[] }; tracks: Track[] }>(`/v1/playlists/${encodeURIComponent(id)}`),
   tracks: (limit = 30, offset = 0) => api<{ tracks: Track[]; total: number }>(`/v1/tracks?limit=${limit}&offset=${offset}`),
   artist: (id: string) => api<{ artist: {id:string;name:string;bio?:string;artwork?:string}; tracks: Track[]; albums: {id:string;title:string;releaseDate?:string;artwork?:string}[] }>(`/v1/artists/${encodeURIComponent(id)}`),
   album: (id: string) => api<{ album: {id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string}; tracks: Track[] }>(`/v1/albums/${encodeURIComponent(id)}`),
