@@ -20,7 +20,7 @@ Set `VITE_API_URL` to the deployed first-party LYNE API origin. Until that backe
 GitHub Actions builds and deploys `dist` to GitHub Pages on pushes to `main`. In repository **Settings → Pages**, set the source to **GitHub Actions**. The first deployment will fail until Pages is enabled.
 
 ## LYNE's own catalogue backend
-The `backend/` folder contains LYNE's own Cloudflare Worker API, D1 migration and R2 media-storage integration. See [backend/README.md](backend/README.md) for deployment and catalogue upload instructions. This is a new backend, not a proxy to another music service.
+The `backend/` folder contains LYNE's own Cloudflare Worker API and D1 migration, with Supabase Storage for hosted audio and artwork. See [backend/README.md](backend/README.md) for deployment and catalogue upload instructions. This is a new backend, not a proxy to another music service.
 
 ## Project boundaries
 - This repository is independent from the LYNE Windows application repository.
