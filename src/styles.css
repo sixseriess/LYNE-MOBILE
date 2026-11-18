@@ -1594,3 +1594,47 @@ html,body,#root{background:#0a0a0a;color:#f4f4f5}
  .mini-player{left:64px}
  .topbar{padding-left:70px}
 }
+
+/* Home feed: mirror the Windows Your Mixes-first page, not a generic dashboard. */
+.windows-home-heading,.home-filter-pills{display:none!important}
+.mix-section-heading{
+  display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:0 12px;
+  justify-content:flex-start
+}
+.mix-section-heading .mix-section-icon{
+  width:28px;height:28px;flex:none;border-radius:7px;
+  display:grid;place-items:center;background:rgba(255,255,255,.1);color:#f5f5f5
+}
+.mix-section-heading .mix-section-copy{display:flex;flex-direction:column;gap:2px}
+.mix-section-heading .mix-section-copy h2{
+  font-size:28px;line-height:1;letter-spacing:-1.1px;font-weight:650
+}
+.mix-section-heading .mix-section-copy small{display:none}
+.mix-section-heading .section-note{margin-left:auto;font-size:9px;letter-spacing:1px}
+.mix-grid{
+  display:flex;flex-direction:row;align-items:flex-start;gap:18px;
+  overflow-x:auto;overflow-y:hidden;padding:0 12px 5px;
+  margin:0 -0px;scrollbar-width:none;scroll-snap-type:x proximity
+}
+.mix-grid::-webkit-scrollbar,.home-card-rail::-webkit-scrollbar{display:none}
+.mix-card{width:155px;min-width:155px;flex:0 0 155px;scroll-snap-align:start}
+.mix-tile{width:100%;padding:0;border:0;background:transparent;border-radius:0;display:flex;flex-direction:column;align-items:stretch;text-align:left;gap:0}
+.mix-art{
+  width:155px;height:155px;aspect-ratio:1;border-radius:7px;
+  overflow:hidden;position:relative;background-size:cover;background-position:center;
+  box-shadow:none
+}
+.mix-art strong,.mix-brand-label{display:none}
+.mix-cover-play{position:absolute;right:8px;bottom:8px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:rgba(15,15,16,.8);color:white;opacity:0;transition:opacity .15s}
+.mix-tile:active .mix-cover-play{opacity:1}
+.mix-tile>b{font-size:13px;font-weight:550;margin-top:8px;color:#f5f5f5}
+.mix-tile>small{font-size:11px;margin-top:3px;color:rgba(245,245,248,.56)}
+.mix-download-action{margin-top:6px;font-size:10px}
+.section-heading:not(.mix-section-heading){margin:22px 12px 10px}
+.section-heading:not(.mix-section-heading) h2{font-size:19px;font-weight:600;letter-spacing:-.4px}
+.home-card-rail{display:flex;gap:14px;overflow-x:auto;overflow-y:hidden;padding:0 12px 5px;scrollbar-width:none}
+.home-track-card{width:132px;min-width:132px;flex:0 0 132px;background:transparent;border:0;border-radius:0;padding:0;gap:0;text-align:left}
+.home-track-art{width:132px;height:132px;border-radius:7px;overflow:hidden}
+.home-track-card>b{font-size:12px;font-weight:550;margin-top:8px}
+.home-track-card>small{font-size:10px;margin-top:3px}
+.home-art-backdrop{display:none!important}
