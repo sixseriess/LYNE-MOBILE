@@ -219,6 +219,20 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (!row) return fail("Account not found.",404);
     return json({ id:row.id, username:row.username, avatar:mediaUrl(row.avatarKey) });
   }
+  
+  if (path === "/v1/me/profile" && request.method === "PUT") {
+    const userId = await requireUser(request,env);
+    const body = await request.json() as { username?: string };
+    const username = body.username?.trim() || "";
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) return fail("Username must be 3–24 characters using letters, numbers, and underscores.");
+    const usernameNorm = normalized(username);
+    const duplicate = await env.DB.prepare("SELECT id FROM users WHERE username_norm=? AND id<>?").bind(usernameNorm,userId).first<{id:string}>();
+    if (duplicate) return fail("That username is already in use.",409);
+    const updated = await env.DB.prepare("UPDATE users SET username=?,username_norm=? WHERE id=?").bind(username,usernameNorm,userId).run();
+    if (!updated.meta.changes) return fail("Account not found.",404);
+    return json({ username });
+  }
+
 
 
   if(path==="/v1/me/preferences" && request.method==="GET"){

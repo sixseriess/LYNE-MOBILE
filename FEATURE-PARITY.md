@@ -46,7 +46,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ### Account, profile, and personalization
 - [x] Basic LYNE account sign-in / registration UI, local profile image selection, R2-backed avatar upload/removal, and signed-in preference sync.
 - [x] Best-effort account restore: temporary API failures retain the saved session, while explicit 401/403 responses clear rejected credentials; library, imports, listening history, preferences, and profile photos sync independently.
-- [ ] Username/email profile editing; signed-in avatar upload/removal and settings sync are already implemented.
+- [x] Signed-in username editing, avatar upload/removal, and preference sync; changing an account email remains unavailable without an email verification flow.
 - [x] Profile picture is optimized and persists locally on the device.
 - [x] Listening statistics for day / week / month / year with top-10 songs and artists; data availability depends on listening history.
 - [x] Authenticated listening history can be retrieved from the LYNE API and restored across signed-in sessions.

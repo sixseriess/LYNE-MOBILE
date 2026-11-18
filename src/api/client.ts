@@ -78,6 +78,7 @@ export const lyneApi = {
   artist: (id: string) => api<{ artist: {id:string;name:string;bio?:string;artwork?:string}; tracks: Track[]; albums: {id:string;title:string;releaseDate?:string;artwork?:string}[] }>(`/v1/artists/${encodeURIComponent(id)}`),
   album: (id: string) => api<{ album: {id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string}; tracks: Track[] }>(`/v1/albums/${encodeURIComponent(id)}`),
   me: () => api<{ id: string; username: string; avatar?: string }>("/v1/me"),
+  updateProfile: (username:string) => api<{username:string}>("/v1/me/profile",{method:"PUT",body:JSON.stringify({username})}),
   preferences: () => api<{preferences:Record<string,unknown>}>("/v1/me/preferences"),
   savePreferences: (preferences:Record<string,unknown>) => api<{saved:boolean}>("/v1/me/preferences",{method:"PUT",body:JSON.stringify({preferences})}),
   uploadAvatar: (file:File) => { const form=new FormData(); form.append("avatar",file); return api<{avatar:string}>("/v1/me/avatar",{method:"POST",body:form}); },
