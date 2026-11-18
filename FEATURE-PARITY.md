@@ -24,7 +24,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ### Library and imports
 - [x] Liked songs and locally imported audio files.
 - [x] Create playlists and save external song / playlist / album links.
-- [ ] Full playlist editing: rename, description, custom artwork, reorder, remove tracks, delete.
+- [x] Full playlist editing: rename, description, account-synced custom artwork, reorder, remove tracks, and delete.
 - [ ] Full local library management, metadata, artwork, and persistent file access where browser permissions allow.
 - [ ] Cached / saved tracks and offline mixes with storage limits and clear-cache controls.
 - [ ] Import review, duplicate handling, progress, retries, and source attribution.
@@ -75,6 +75,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and editing, local persistent local profile images, custom backgrounds, master volume and playback-speed controls, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation, including authenticated listening-history retrieval and sync. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
+The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and full editing with account-synced artwork, local persistent profile images, custom backgrounds, master volume and playback-speed controls, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation, including authenticated listening-history retrieval and sync. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
