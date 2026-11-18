@@ -18,7 +18,7 @@ You need the Cloudflare account credentials, two LYNE authentication secrets, an
 
 1. Open [LYNE-MOBILE repository secrets](https://github.com/sixseriess/LYNE-MOBILE/settings/secrets/actions).
 2. Add these six **repository secrets**:
-   - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with **D1:Edit**, **Workers Scripts:Edit**, and **R2 Storage:Edit** permissions for your account.
+   - `CLOUDFLARE_API_TOKEN` — Cloudflare API token with **D1:Edit** and **Workers Scripts:Edit** permissions for your account.
    - `CLOUDFLARE_ACCOUNT_ID` — your 32-character Cloudflare account ID.
    - `LYNE_AUTH_SECRET` — a long random secret (at least 32 characters). Keep it stable between deployments; changing it signs every existing user out.
    - `LYNE_ADMIN_API_TOKEN` — a separate random admin token (at least 24 characters).
