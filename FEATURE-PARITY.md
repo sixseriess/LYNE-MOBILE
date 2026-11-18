@@ -45,19 +45,22 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ### Account, profile, and personalization
 - [x] Basic LYNE account sign-in / registration UI and local profile image selection.
 - [ ] Reliable account restore, secure token lifecycle, sign-out cleanup, and sync for library, playlists, preferences, and stats.
-- [ ] Profile editing and persistent avatar upload / sync.
+- [ ] Account profile editing and server-side avatar sync.
+- [x] Profile picture is optimized and persists locally on the device.
 - [ ] Full statistics experience, including day / week / month / year filters and top songs / artists.
 - [x] Authenticated listening history can be retrieved from the LYNE API and restored across signed-in sessions.
 - [x] Export and share branded LYNE listening-stat images (native file share where supported, image-save fallback elsewhere).
 - [ ] Yearly Wrapped and historical listening summaries, if present in the Windows app.
 
 ### Settings — map every Windows tab to mobile
-- [ ] **Playback:** autoplay similar, track activation behavior adapted to touch, default playback context, pause on audio-device / route changes, plus all other player preferences.
+- [ ] **Playback:** pause on audio-device / route changes and remaining Windows-specific playback preferences.
+- [x] Master volume, playback speed, autoplay-similar, track tap behavior, default playback context, repeat, shuffle, and lossless-only source preference.
 - [ ] **Shortcuts:** replace keyboard/global hotkeys with touch gestures, headset/media buttons, and accessibility actions where supported; explain unavailable OS-wide bindings.
 - [ ] **Overlay:** replace floating desktop overlay with a persistent mini-player, picture-in-picture where supported, and notification / lock-screen controls where supported.
 - [ ] **Discord:** provide mobile-compatible Rich Presence/status behavior only where the platform and Discord integration permit it; otherwise explain the limitation and retain configurable preferences only if useful.
 - [ ] **YouTube:** mobile-safe sign-in and account playback / library sync only through supported official authorization flows; never embed desktop auth mechanisms.
-- [ ] **Appearance:** system / light / dark theme, language selection, and all supported visual customization.
+- [ ] **Appearance:** system theme detection and full Windows language parity.
+- [x] Dark / light theme, language preference, reduce-motion preference, and persistent custom background images.
 - [ ] **Storage:** usage overview, cache limits, clear cache, local music management, saved downloads, and offline availability.
 - [ ] **About:** app version, build information, and update information appropriate to a PWA.
 - [x] Support link points to the LYNE Discord invite; API deployment documentation and repository links are available.
@@ -71,6 +74,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and editing, local profile image selection, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation, including authenticated listening-history retrieval and sync. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
+The current mobile client already contains a PWA shell, local audio import, basic playback controls, queue persistence and progression, likes, playlist creation and editing, local persistent local profile images, custom backgrounds, master volume and playback-speed controls, mobile equivalents for the Windows settings categories, local listening stats, top-10 song / artist lists, branded shareable stats images, and a first-party API client / Worker backend foundation, including authenticated listening-history retrieval and sync. The mobile accent and SVG install icon now use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
