@@ -28,7 +28,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Local audio track title, artist, album and artwork editing is saved in IndexedDB alongside the audio; system-level file/folder access and cross-device local-file sync remain browser-limited.
 - [x] Save individual first-party LYNE catalogue tracks to device storage for offline playback, with a configurable download limit and remove controls. Offline mixes remain a future enhancement.
 - [x] Import preview, provider/source attribution, local duplicate detection, progress states, and retry of failed account sync from the still-open preview; bulk import reports partial sync failures.
-- [ ] Spotify, SoundCloud, YouTube, and Apple Music imports must follow each provider's official terms and approved playback/embed path. Imports do not imply permission to copy or rehost audio.
+- [x] Spotify, SoundCloud, YouTube, and Apple Music imports use provider metadata APIs and allowlisted official embed players where available, with HTTPS original-link fallback. Imports do not copy or rehost provider audio; backend credentials remain required.
 
 ### Player and audio
 - [x] Basic playback UI, mini-player, expanded player, seek, volume, queue, shuffle, repeat, and likes.
@@ -75,7 +75,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] API health/status indicator, online/offline detection, global offline notice, and offline catalogue-track playback; not all remote pages can be retried offline.
 - [ ] App-shell assets are cached by the service worker and first-party media responses use immutable cache headers; a separate controlled cover cache for cross-origin provider artwork remains outstanding.
 - [x] Desktop window controls, native overlay windows, system tray, global hotkeys and filesystem folder pickers are replaced with mobile PWA equivalents or explained limitations.
-- [ ] Common controls have accessible labels and keyboard focus styles; non-English translations and a full accessibility audit remain outstanding.
+- [ ] Common controls have accessible labels, modal semantics, Escape dismissal, focus containment and return, and live status announcements; non-English translations and a full accessibility audit remain outstanding.
 
 ## Current implementation snapshot
 
