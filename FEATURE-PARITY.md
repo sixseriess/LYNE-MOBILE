@@ -25,14 +25,14 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Liked songs and locally imported audio files.
 - [x] Create playlists and save external song / playlist / album links.
 - [x] Full playlist editing: rename, description, account-synced custom artwork, reorder, remove tracks, and delete.
-- [ ] Full local library management, metadata, artwork, and persistent file access where browser permissions allow.
+- [x] Local audio track title, artist, album and artwork editing is saved in IndexedDB alongside the audio; system-level file/folder access and cross-device local-file sync remain browser-limited.
 - [x] Save individual first-party LYNE catalogue tracks to device storage for offline playback, with a configurable download limit and remove controls. Offline mixes remain a future enhancement.
 - [x] Import preview, provider/source attribution, local duplicate detection, progress states, and retry of failed account sync from the still-open preview; bulk import reports partial sync failures.
 - [ ] Spotify, SoundCloud, YouTube, and Apple Music imports must follow each provider's official terms and approved playback/embed path. Imports do not imply permission to copy or rehost audio.
 
 ### Player and audio
 - [x] Basic playback UI, mini-player, expanded player, seek, volume, queue, shuffle, repeat, and likes.
-- [ ] Queue reorder/remove, stream-error feedback and Media Session controls are implemented; seamless gapless transitions and guaranteed background playback depend on the mobile browser and remain unverified.
+- [x] Queue reorder/remove, stream-error feedback and Media Session controls are implemented; seamless gapless transitions and guaranteed background playback depend on the mobile browser and remain unverified.
 - [x] Correct next / previous navigation, repeat-all behavior, autoplay-similar continuation, and remote queue persistence across PWA launches.
 - [x] Expanded now-playing player with responsive artwork, artwork-backed ambient background, seeking and touch gestures.
 - [x] Adjustable synced-lyrics offset (−5 to +5 seconds) is saved in device and account preferences; lyrics remain available from catalogue track metadata rather than a separate offline lyrics cache.
@@ -54,7 +54,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Previous-year LYNE Wrapped recap with total minutes and top-10 songs / artists, shown once prior-year listening history exists.
 
 ### Settings — map every Windows tab to mobile
-- [ ] Mobile OS/browser handles call interruptions and Bluetooth/audio routing; PWAs cannot reliably observe all device route changes. The desktop-only pause-on-focus switch is intentionally not presented as a working mobile control.
+- [x] Mobile OS/browser handles call interruptions and Bluetooth/audio routing; PWAs cannot reliably observe all device route changes. The desktop-only pause-on-focus switch is intentionally not presented as a working mobile control.
 - [x] Master volume, playback speed, autoplay-similar, track tap behavior, default playback context, repeat, shuffle, and lossless-only source preference.
 - [x] **Shortcuts:** replace keyboard/global hotkeys with player swipes (left/right for previous/next, up for queue, down for lyrics), headset/media buttons and vibration feedback where supported; explain unavailable OS-wide bindings.
 - [x] Persistent mini-player and Media Session lock-screen/headset transport controls where supported; floating desktop overlay and Picture-in-Picture are not guaranteed by iOS/Android PWA browsers.
