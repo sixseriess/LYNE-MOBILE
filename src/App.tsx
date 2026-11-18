@@ -799,7 +799,7 @@ export default function App() {
     <audio ref={audioRef} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={()=>{setPlaying(false);setNotice("Playback failed or the audio stream was interrupted. Check your connection, then tap Play to retry or choose another track.");}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>setDuration(e.currentTarget.duration*1000)} />
     <header className="topbar">
       <button className="brand" type="button" aria-label="LYNE Home" onClick={()=>setTab("Home")}>
-        <img src="/LYNE-MOBILE/lyne-wordmark.svg" alt="LYNE" width="54" height="27"/>
+        <img src="/LYNE-MOBILE/lyne-wordmark.png" alt="LYNE" width="54" height="27"/>
       </button>
       <div className="top-actions">
         <button className="api-status-trigger" title="Configure LYNE API" aria-label="Configure LYNE API" onClick={()=>{setSettingsSection("About");setApiUrlInput(getApiUrl());setModal("settings");}}>
