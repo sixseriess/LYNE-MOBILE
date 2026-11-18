@@ -239,6 +239,7 @@ export default function App() {
   const [playlistResults,setPlaylistResults]=useState<SearchPlaylist[]>([]);
   const [publicPlaylistDetail,setPublicPlaylistDetail]=useState<{playlist:SearchPlaylist&{trackIds:string[]};tracks:Track[]}|null>(null);
   const [offlineBusy,setOfflineBusy]=useState(false);
+  const [offlineMixId,setOfflineMixId]=useState<string|null>(null);
   const [searchError,setSearchError]=useState("");
   const [artistResults,setArtistResults]=useState<{id:string;name:string;bio?:string;artwork?:string}[]>([]);
   const [albumResults,setAlbumResults]=useState<{id:string;title:string;artist:string;artistId:string;artwork?:string}[]>([]);
@@ -749,30 +750,44 @@ export default function App() {
     }catch(error){setNotice(error instanceof Error?error.message:"Could not save local track details.");}
   };
 
-  const downloadTrackOffline=async(track:Track)=>{
-    if(!track.audioUrl||track.source==="local")return;
+  const downloadTrackOffline=async(track:Track,notify=true,additionalBytes=0):Promise<number>=>{
+    if(!track.audioUrl||track.source==="local")return -1;
+    if(localTracks.some(item=>item.id===track.id&&item.offline))return 0;
     setOfflineBusy(true);
     try{
       const response=await fetch(track.audioUrl,{credentials:"omit"});
       if(!response.ok)throw new Error("The track could not be downloaded from LYNE.");
       const blob=await response.blob();
       if(!blob.size)throw new Error("LYNE returned an empty audio file.");
-      const alreadySaved=localTracks.find(item=>item.id===track.id&&item.offline);
       const used=localTracks.filter(item=>item.offline&&item.id!==track.id).reduce((sum,item)=>sum+(item.audioSize||0),0);
       const limit=state.preferences.cacheLimitMb*1024*1024;
-      if(used+blob.size>limit)throw new Error("This download exceeds your "+state.preferences.cacheLimitMb+" MB offline storage limit. Increase the limit or remove saved tracks.");
+      if(used+additionalBytes+blob.size>limit)throw new Error("This download exceeds your "+state.preferences.cacheLimitMb+" MB offline storage limit. Increase the limit or remove saved tracks.");
       const safeName=track.title.replace(/[\\/:*?"<>|]/g,"_");
       const file=new File([blob],safeName+".audio",{type:blob.type||track.audioMime||"audio/mpeg"});
       await saveAudioFile(track.id,file,{...track,offline:true});
       const audioUrl=URL.createObjectURL(blob);
-      if(alreadySaved?.audioUrl)URL.revokeObjectURL(alreadySaved.audioUrl);
       const saved={...track,audioUrl,audioMime:file.type,audioSize:file.size,offline:true};
       setLocalTracks(items=>[...items.filter(item=>item.id!==track.id),saved]);
       try{await navigator.storage?.persist?.();}catch{}
       void refreshStorage();
-      setNotice(track.title+" is saved for offline playback on this device.");
-    }catch(error){setNotice(error instanceof Error?error.message:"Could not save this track offline.");}
-    finally{setOfflineBusy(false);}
+      if(notify)setNotice(track.title+" is saved for offline playback on this device.");
+      return file.size;
+    }catch(error){
+      if(notify)setNotice(error instanceof Error?error.message:"Could not save this track offline.");
+      return -1;
+    }finally{setOfflineBusy(false);}
+  };
+  const downloadMixOffline=async(mix:{id:string;title:string;tracks:Track[]})=>{
+    if(offlineMixId)return;
+    setOfflineMixId(mix.id);
+    const unique=[...new Map(mix.tracks.map(track=>[track.id,track])).values()];
+    let additionalBytes=0,saved=0,failed=0;
+    for(const track of unique){
+      const bytes=await downloadTrackOffline(track,false,additionalBytes);
+      if(bytes>=0){saved++;additionalBytes+=bytes;}else failed++;
+    }
+    setOfflineMixId(null);
+    setNotice(failed?("Saved "+saved+" of "+unique.length+" tracks from "+mix.title+". "+failed+" could not be saved."):(saved+" tracks from "+mix.title+" are ready offline."));
   };
 
   const resolveImportLink=async()=>{if(!importUrl.trim())return;setImportBusy(true);setImportError("");setImportPreview(null);try{const item=await lyneApi.resolveImport(importUrl.trim());setImportPreview(item);}catch(e){setImportError(e instanceof Error?e.message:"LYNE couldn't read that link.");}finally{setImportBusy(false);}};
@@ -1060,7 +1075,7 @@ export default function App() {
       {tab==="Home"&&<><div className="home-art-backdrop" style={(current?.artwork||homeTracks[0]?.artwork)?{backgroundImage:`url("${current?.artwork||homeTracks[0]?.artwork}")`}:undefined}/>
         <div className="home-heading"><div className="home-avatar">{state.profile.avatar?<img src={state.profile.avatar} alt=""/>:state.profile.name.slice(0,1).toUpperCase()}</div><div className="home-heading-copy"><h1>{greeting}{state.profile.name&&state.profile.name!=="Listener"?<span>, {state.profile.name}</span>:""}</h1><p><i/> {dateLabel}</p></div><button className="home-quick-play" onClick={()=>{const track=state.history[0]||homeTracks[0];if(track)play(track,[...state.history,...homeTracks]);else setTab("Search");}}><Play size={14} fill="currentColor"/> Play</button></div>
         <div className="home-filter-pills">{([{id:"all",label:"All"},{id:"speedDial",label:"Speed dial"},{id:"mixes",label:"Mixes"},{id:"charts",label:"Charts"},{id:"albums",label:"Albums"}] as const).map(item=><button key={item.id} className={homeFilter===item.id?"selected":""} onClick={()=>setHomeFilter(item.id)}>{item.label}</button>)}</div>
-        {(homeFilter==="all"||homeFilter==="mixes")&&<><div className="section-heading mix-section-heading"><div className="mix-section-icon"><Sparkles size={17}/></div><div className="mix-section-copy"><h2>Your Mixes</h2><small>BASED ON YOUR LISTENING</small></div><span className="section-note">FOR YOU</span></div>{homeMixes.length>0?<div className="mix-grid">{homeMixes.map((mix,i)=><button className="mix-tile" key={mix.id} onClick={()=>{if(mix.tracks[0])play(mix.tracks[0],mix.tracks);}}><div className={`mix-art mix-${i%3}`} style={mix.artwork?{backgroundImage:`url("${mix.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{mix.title}</b><small>{mix.tracks.length} tracks</small></button>)}</div>:homeMixSeeds.length?<div className="mix-grid">{homeMixSeeds.map((track,i)=><button className="mix-tile" key={track.id} onClick={()=>play(track,homeMixSeeds)}><div className={`mix-art mix-${i%3}`} style={track.artwork?{backgroundImage:`url("${track.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{i===0?"Daily Mix":i===1?"On Repeat":i===2?"Discovery":`Your Mix ${i+1}`}</b><small>{track.artist}</small></button>)}</div>:<Empty title="Your mixes will show up here" text="Connect the LYNE catalogue to start building artwork-led mixes."/ >}
+        {(homeFilter==="all"||homeFilter==="mixes")&&<><div className="section-heading mix-section-heading"><div className="mix-section-icon"><Sparkles size={17}/></div><div className="mix-section-copy"><h2>Your Mixes</h2><small>BASED ON YOUR LISTENING</small></div><span className="section-note">FOR YOU</span></div>{homeMixes.length>0?<div className="mix-grid">{homeMixes.map((mix,i)=><div className="mix-card" key={mix.id}><button className="mix-tile" onClick={()=>{if(mix.tracks[0])play(mix.tracks[0],mix.tracks);}}><div className={`mix-art mix-${i%3}`} style={mix.artwork?{backgroundImage:`url("${mix.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{mix.title}</b><small>{mix.tracks.length} tracks</small></button><button type="button" className="mix-download-action" disabled={offlineMixId!==null||!mix.tracks.some(track=>Boolean(track.audioUrl))} onClick={()=>void downloadMixOffline(mix)}>{offlineMixId===mix.id?<LoaderCircle size={14} className="spin"/>:<Download size={14}/>} {offlineMixId===mix.id?"Saving offline...":"Download mix"}</button></div>)}</div>:homeMixSeeds.length?<div className="mix-grid">{homeMixSeeds.map((track,i)=><button className="mix-tile" key={track.id} onClick={()=>play(track,homeMixSeeds)}><div className={`mix-art mix-${i%3}`} style={track.artwork?{backgroundImage:`url("${track.artwork}")`}:undefined}><span className="mix-brand-label">LYNE MIX</span><strong>{String(i+1).padStart(2,"0")}</strong><span className="mix-cover-play"><Play size={20} fill="currentColor"/></span></div><b>{i===0?"Daily Mix":i===1?"On Repeat":i===2?"Discovery":`Your Mix ${i+1}`}</b><small>{track.artist}</small></button>)}</div>:<Empty title="Your mixes will show up here" text="Connect the LYNE catalogue to start building artwork-led mixes."/ >}
         </>}
         {(homeFilter==="all"||homeFilter==="albums")&&<><div className="section-heading"><h2>Popular albums</h2><span className="section-note">FROM LYNE</span></div>{renderAlbumCards(popularAlbums)}</>}
         {(homeFilter==="all"||homeFilter==="charts")&&listeningNowTracks.length>0&&<><div className="section-heading"><h2>What everyone's on</h2><span className="section-note">LAST 12 HOURS</span></div>{renderHomeCards(listeningNowTracks)}</>}
