@@ -357,6 +357,8 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (path === "/v1/home" && request.method === "GET") {
     const userId = await tokenUser(request,env);
     const popular = await env.DB.prepare(TRACK_SELECT + " WHERE t.published=1 ORDER BY t.plays_count DESC,t.created_at DESC LIMIT 16").all<TrackRow>();
+    const listeningSince = new Date(Date.now()-12*60*60*1000).toISOString();
+    const listeningNow = await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.played_at>=? GROUP BY t.id ORDER BY SUM(le.listened_ms) DESC,MAX(le.played_at) DESC LIMIT 10").bind(listeningSince).all<TrackRow>();
     const recent = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY MAX(le.played_at) DESC LIMIT 10").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
     const personalized = userId ? await env.DB.prepare(TRACK_SELECT + " JOIN listening_events le ON le.track_id=t.id WHERE t.published=1 AND le.user_id=? GROUP BY t.id ORDER BY SUM(le.listened_ms) DESC LIMIT 12").bind(userId).all<TrackRow>() : { results: [] as TrackRow[] };
     const dailyTracks=(personalized.results.length?personalized.results:popular.results).map(publicTrack);
@@ -378,7 +380,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
       {id:"discovery",title:"Discovery Mix",tracks:(discoveryTracks.length?discoveryTracks:dailyTracks).slice(0,10)},
       ...(recentTracks.length?[{id:"recently-played",title:"Your Recent Mix",tracks:recentTracks.slice(0,10)}]:[])
     ].filter(mix=>mix.tracks.length>0).map(mix=>({...mix,artwork:mix.tracks[0]?.artwork||""}));
-    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), popularAlbums:popularAlbums.results, mixes });
+    return json({ recentlyPlayed: recentTracks, popular: popular.results.map(publicTrack), listeningNow:listeningNow.results.map(publicTrack), popularAlbums:popularAlbums.results, mixes });
   }
 
   if (path === "/v1/tracks" && request.method === "GET") {
