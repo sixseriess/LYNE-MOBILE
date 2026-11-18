@@ -1058,3 +1058,6 @@ body{background:#09090b;color:#f4f4f5}
 .eq-scale{display:flex;justify-content:space-between;color:var(--muted);font-size:9px;padding:8px 3px 0}
 .eq-note{font-size:10px;color:var(--muted);line-height:1.55;margin:9px 1px}
 @media(max-width:360px){.eq-preset-grid{gap:4px}.eq-preset-grid>button,.eq-custom-preset>button:first-child{font-size:10px;padding:5px 4px}.eq-bands{gap:1px}.eq-slider{width:18px;height:108px}.eq-band small{font-size:7px}}
+
+.artist-detail-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:15px 0 5px}
+.artist-detail-actions .primary-button,.artist-detail-actions .secondary-action{align-self:stretch;justify-content:center;display:flex;align-items:center;gap:7px;min-height:42px;border-radius:10px}
