@@ -113,40 +113,44 @@ async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
   return { provider:"spotify",kind:kind as ImportKind,providerId:id,title:clean(data.name)||"Untitled",subtitle:kind==="track"?(tracks[0]?.artist||"Spotify"):(kind==="album"?(data.artists||[]).map((a:any)=>a.name).join(", "):clean(data.owner?.display_name)||"Spotify playlist"),externalUrl,artwork:firstImage(kind==="track"?data.album?.images:data.images),embedUrl:`https://open.spotify.com/embed/${kind}/${id}`,tracks };
 }
 
-let cachedSoundCloudClientId:string|undefined;
-async function getSoundCloudClientId(configured?:string):Promise<string>{
-  if(configured?.trim())return configured.trim();
-  if(cachedSoundCloudClientId)return cachedSoundCloudClientId;
-  const home=await fetch("https://soundcloud.com",{headers:{accept:"text/html,application/xhtml+xml"}});
-  if(!home.ok)throw new Error("SoundCloud is unavailable right now.");
-  const html=await home.text();
-  const scripts=[...html.matchAll(/src="([^"]+\.js)"/g)]
-    .map(match=>match[1].startsWith("//")?"https:"+match[1]:match[1])
-    .filter(url=>url.includes("a-v2.sndcdn.com/assets/"))
-    .reverse();
-  for(const script of scripts){
-    const response=await fetch(script);
-    if(!response.ok)continue;
-    const source=await response.text();
-    const found=source.match(/client_id[ \t]*[:=][ \t]*"([a-zA-Z0-9]{32})"/)?.[1];
-    if(found){cachedSoundCloudClientId=found;return found;}
-  }
-  throw new Error("Could not initialize the official SoundCloud API client.");
-}
-async function soundCloudApiJson(path:string,clientId:string):Promise<any>{
-  const url=new URL(path,"https://api-v2.soundcloud.com");
-  url.searchParams.set("client_id",clientId);
-  return providerJson(url.toString());
+let cachedSoundCloudAccessToken="";
+let soundCloudAccessTokenExpiresAt=0;
+let soundCloudTokenRequest:Promise<string>|null=null;
+
+async function getSoundCloudAccessToken(env:ProviderEnv):Promise<string>{
+  if(cachedSoundCloudAccessToken&&soundCloudAccessTokenExpiresAt>Date.now()+60_000)return cachedSoundCloudAccessToken;
+  if(soundCloudTokenRequest)return soundCloudTokenRequest;
+  if(!env.SOUNDCLOUD_CLIENT_ID||!env.SOUNDCLOUD_CLIENT_SECRET)throw new Error("SoundCloud API credentials are not configured. Add SOUNDCLOUD_CLIENT_ID and SOUNDCLOUD_CLIENT_SECRET as LYNE Worker secrets.");
+  soundCloudTokenRequest=(async()=>{
+    const basic=btoa(env.SOUNDCLOUD_CLIENT_ID+":"+env.SOUNDCLOUD_CLIENT_SECRET);
+    const form=new URLSearchParams({grant_type:"client_credentials"});
+    const data=await providerJson("https://secure.soundcloud.com/oauth/token",{
+      method:"POST",
+      headers:{Authorization:"Basic "+basic,"Content-Type":"application/x-www-form-urlencoded",Accept:"application/json"},
+      body:form
+    });
+    if(!data.access_token)throw new Error("SoundCloud did not provide an API access token.");
+    cachedSoundCloudAccessToken=String(data.access_token);
+    soundCloudAccessTokenExpiresAt=Date.now()+Math.max(60,Number(data.expires_in)||3600)*1000;
+    return cachedSoundCloudAccessToken;
+  })().finally(()=>{soundCloudTokenRequest=null;});
+  return soundCloudTokenRequest;
 }
 
-async function soundcloudToken(env: ProviderEnv) {
-  if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) throw new Error("SoundCloud API credentials are not configured.");
-  const basic=btoa(env.SOUNDCLOUD_CLIENT_ID+":"+env.SOUNDCLOUD_CLIENT_SECRET);
-  const form=new URLSearchParams({ grant_type:"client_credentials" });
-  const data=await providerJson("https://secure.soundcloud.com/oauth/token",{method:"POST",headers:{Authorization:"Basic "+basic,"Content-Type":"application/x-www-form-urlencoded"},body:form});
-  if(!data.access_token)throw new Error("SoundCloud didn't provide an API token.");
-  return data.access_token as string;
+async function soundCloudApiJson(path:string,env:ProviderEnv):Promise<any>{
+  const token=await getSoundCloudAccessToken(env);
+  const url=new URL(path,"https://api.soundcloud.com");
+  const response=await fetch(url.toString(),{
+    headers:{Authorization:"OAuth "+token,Accept:"application/json; charset=utf-8"},
+    signal:timeout()
+  });
+  if(!response.ok){
+    const detail=await response.text().catch(()=>"");
+    throw new Error("SoundCloud API request failed ("+response.status+")"+(detail?": "+detail.slice(0,160):""));
+  }
+  return response.json();
 }
+
 async function soundcloudOembedImport(url:URL):Promise<ResolvedImport>{
   const data=await providerJson("https://soundcloud.com/oembed?format=json&url="+encodeURIComponent(url.toString()));
   const playlist=/\/sets\//i.test(url.pathname);
@@ -158,31 +162,34 @@ async function soundcloudOembedImport(url:URL):Promise<ResolvedImport>{
   const track:ImportedTrack={providerId:url.pathname.replace(/^\/+|\/+$/g,""),title:by?.[1]||title,artist:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl};
   return {provider:"soundcloud",kind,providerId:track.providerId,title,subtitle:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl,tracks:kind==="track"?[track]:[]};
 }
-async function soundcloudImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
-  const clientId=await getSoundCloudClientId(env.SOUNDCLOUD_CLIENT_ID);
-  const data=await soundCloudApiJson("/resolve?url="+encodeURIComponent(url.toString()),clientId);
-  const kind=(data.kind==="playlist"||data.kind==="system-playlist")?"playlist":"track";
-  const tracks:ImportedTrack[]=(kind==="track"?[data]:(data.tracks||[])).filter((t:any)=>t?.id).slice(0,100).map((t:any)=>({
-    providerId:String(t.id),
-    title:clean(t.title),
-    artist:clean(t.user?.username||t.publisher_metadata?.artist),
-    externalUrl:t.permalink_url||url.toString(),
-    artwork:firstImage(t.artwork_url),
-    durationMs:Number(t.duration)||undefined,
-    embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(t.permalink_url||url.toString())
+async function soundcloudImport(url:URL,env:ProviderEnv):Promise<ResolvedImport>{
+  const data=await soundCloudApiJson("/resolve?url="+encodeURIComponent(url.toString()),env);
+  const kind=(data.kind==="playlist"||data.kind==="system-playlist"||Array.isArray(data.tracks))?"playlist":"track";
+  const rawTracks=kind==="track"?[data]:(Array.isArray(data.tracks)?data.tracks:[]);
+  const tracks:ImportedTrack[]=rawTracks.filter((track:any)=>track?.id||track?.urn).slice(0,100).map((track:any)=>({
+    providerId:String(track.id??track.urn),
+    title:clean(track.title),
+    artist:clean(track.metadata_artist||track.user?.username||track.publisher_metadata?.artist),
+    externalUrl:track.permalink_url||url.toString(),
+    artwork:firstImage(track.artwork_url||data.artwork_url),
+    durationMs:Number(track.duration)||undefined,
+    embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(track.permalink_url||url.toString())
   }));
+  const trackId=String(data.id??data.urn??"");
+  if(!trackId)throw new Error("SoundCloud didn't return a stable track or playlist identifier.");
   return {
     provider:"soundcloud",
     kind,
-    providerId:String(data.id),
+    providerId:trackId,
     title:clean(data.title)||"SoundCloud item",
-    subtitle:kind==="track"?clean(data.user?.username):clean(data.user?.username||data.description),
+    subtitle:clean(data.metadata_artist||data.user?.username||data.description)||"SoundCloud",
     externalUrl:data.permalink_url||url.toString(),
     artwork:firstImage(data.artwork_url),
     embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(data.permalink_url||url.toString()),
     tracks
   };
 }
+
 function youtubeIdFromUrl(url: URL) {
   if(url.hostname==="youtu.be") return url.pathname.slice(1);
   if(url.searchParams.get("v")) return url.searchParams.get("v")!;
@@ -369,45 +376,35 @@ export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<R
 }
 
 
-export type SoundCloudPlaybackResult = { url:string; mimeType:string; durationMs?:number; expiresAt?:string };
+export type SoundCloudPlaybackResult = {
+  url:string; mimeType:string; durationMs?:number; expiresAt?:string;
+  uploader:string; permalinkUrl:string; artworkUrl?:string;
+};
 
 export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEnv):Promise<SoundCloudPlaybackResult>{
-  if(!/^\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
-  const clientId=await getSoundCloudClientId(env.SOUNDCLOUD_CLIENT_ID);
-  const track=await soundCloudApiJson("/tracks/"+providerId,clientId);
-  if(track?.policy==="BLOCK"||track?.streamable===false)throw new Error("This SoundCloud track is not available for streaming.");
-  const duration=Number(track?.duration)||0;
-  const fullDuration=Number(track?.full_duration)||duration;
-  if(fullDuration>0&&duration>0&&duration+5000<fullDuration)throw new Error("SoundCloud only provides a preview for this track.");
-  const transcodings=Array.isArray(track?.media?.transcodings)?track.media.transcodings:[];
-  const playable=transcodings.filter((item:any)=>{
-    const format=item?.format||{};
-    const protocol=String(format.protocol||"");
-    const mime=String(format.mime_type||"").toLowerCase();
-    return item?.snipped!==true&&protocol==="progressive"&&!mime.includes("mpegurl");
-  }).sort((a:any,b:any)=>{
-    const rank=(item:any)=>item?.format?.protocol==="progressive"?(String(item?.format?.mime_type||"").includes("mpeg")?0:1):2;
-    return rank(a)-rank(b);
-  });
-  if(!playable.length)throw new Error("SoundCloud has no full-length playable audio stream for this track.");
-  let lastError:unknown;
-  for(const item of playable){
-    try{
-      const streamUrl=new URL(item.url);
-      if(streamUrl.protocol!=="https:"||!/(^|\.)soundcloud\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
-      if(track.track_authorization)streamUrl.searchParams.set("track_authorization",String(track.track_authorization));
-      streamUrl.searchParams.set("client_id",clientId);
-      const response=await fetch(streamUrl.toString(),{headers:{Accept:"application/json"}});
-      if(!response.ok)throw new Error("SoundCloud stream authorization failed ("+response.status+").");
-      const payload=await response.json() as {url?:unknown};
-      if(typeof payload.url!=="string")throw new Error("SoundCloud did not return a playable stream URL.");
-      const mediaUrl=new URL(payload.url);
-      if(mediaUrl.protocol!=="https:")throw new Error("SoundCloud returned an insecure media URL.");
-      const mime=String(item?.format?.mime_type||"audio/mpeg").toLowerCase();
-      const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
-      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
-    }catch(error){lastError=error;}
-  }
-  throw lastError instanceof Error?lastError:new Error("Could not resolve a SoundCloud stream.");
+  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
+  const track=await soundCloudApiJson("/tracks/"+encodeURIComponent(providerId),env);
+  const access=String(track?.access||"");
+  if(access==="blocked"||track?.streamable===false)throw new Error("This SoundCloud track is blocked by the uploader or unavailable in this region.");
+  if(access==="preview")throw new Error("SoundCloud only allows a preview of this track. LYNE will not play preview audio.");
+  if(access&&access!=="playable")throw new Error("SoundCloud has not marked this track as fully playable.");
+  if(!track?.id&&!track?.urn)throw new Error("SoundCloud track details were not found.");
+  const streams=await soundCloudApiJson("/tracks/"+encodeURIComponent(providerId)+"/streams",env);
+  const streamUrl=String(streams?.hls_aac_160_url||streams?.hls_mp3_128_url||"");
+  if(!streamUrl)throw new Error("SoundCloud did not provide a full-length stream for this track.");
+  const mediaUrl=new URL(streamUrl);
+  if(mediaUrl.protocol!=="https:"||!/(^|\\.)sndcdn\\.com$/i.test(mediaUrl.hostname))throw new Error("SoundCloud returned an unexpected media URL.");
+  const duration=Number(track.duration)||0;
+  const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
+  return {
+    url:mediaUrl.toString(),
+    mimeType:"application/vnd.apple.mpegurl",
+    durationMs:duration||undefined,
+    expiresAt:expires&&/^\\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined,
+    uploader:clean(track.user?.username||track.user?.permalink),
+    permalinkUrl:typeof track.permalink_url==="string"?track.permalink_url:"",
+    artworkUrl:firstImage(track.artwork_url)
+  };
 }
+
 
