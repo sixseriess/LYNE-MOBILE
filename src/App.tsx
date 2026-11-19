@@ -306,6 +306,8 @@ export default function App() {
   const [listeningNowTracks,setListeningNowTracks]=useState<Track[]>([]);
   const [homeMixes,setHomeMixes]=useState<{id:string;title:string;artwork?:string;tracks:Track[]}[]>([]);
   const [popularAlbums,setPopularAlbums]=useState<{id:string;title:string;artist:string;artistId:string;releaseDate?:string;artwork?:string;trackCount?:number}[]>([]);
+  const [homeLoading,setHomeLoading]=useState(false);
+  const [homeError,setHomeError]=useState("");
   const [loadingSearch,setLoadingSearch]=useState(false);
   const [modal,setModal]=useState<"playlist"|"playlistDetail"|"publicPlaylistDetail"|"track"|"artistDetail"|"albumDetail"|"account"|"profileEdit"|"settings"|"queue"|"lyrics"|"equalizer"|"import"|"collection"|null>(null);
   const modalDialogRef=useRef<HTMLDivElement|null>(null);
@@ -593,7 +595,19 @@ export default function App() {
     return ()=>{cancelled=true;urls.forEach(url=>URL.revokeObjectURL(url));};
   },[]);
   useEffect(()=>{ let live=true; if(!isApiConfigured()){setApiStatus("offline");setApiMessage("API URL not configured. Deploy the LYNE Worker, then paste its URL in Settings → About.");return ()=>{live=false;};} lyneApi.health().then(()=>{if(live){setApiStatus("online");setApiMessage("");}}).catch(e=>{if(live){setApiStatus("offline");setApiMessage(e.message);}}); return ()=>{live=false;}; },[]);
-  useEffect(()=>{ if(apiStatus!=="online")return; lyneApi.home().then(data=>{setHomeTracks([...(data.recentlyPlayed||[]),...(data.popular||[])]);setListeningNowTracks(data.listeningNow||[]);setHomeMixes(data.mixes||[]);setPopularAlbums(data.popularAlbums||[]);}).catch(e=>setApiMessage(e.message)); },[apiStatus]);
+  const loadHome=useCallback(async()=>{
+    setHomeLoading(true);setHomeError("");
+    try{
+      const data=await lyneApi.home();
+      setHomeTracks([...(data.recentlyPlayed||[]),...(data.popular||[])]);
+      setListeningNowTracks(data.listeningNow||[]);
+      setHomeMixes(data.mixes||[]);
+      setPopularAlbums(data.popularAlbums||[]);
+    }catch(error){
+      setHomeError(error instanceof Error?error.message:"LYNE Home could not be loaded.");
+    }finally{setHomeLoading(false);}
+  },[]);
+  useEffect(()=>{if(apiStatus==="online")void loadHome();},[apiStatus,loadHome]);
   useEffect(()=>{ if(!current?.audioUrl){ if(audioRef.current)audioRef.current.pause(); return; } const audio=audioRef.current; if(!audio)return; audio.crossOrigin="anonymous"; audio.src=current.audioUrl; audio.volume=volume; if(playing)void audio.play().catch(()=>{setPlaying(false);setNotice("This track couldn't be played.");}); },[current?.id,current?.audioUrl]);
   useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.volume",String(volume));},[volume]);
@@ -1135,6 +1149,9 @@ export default function App() {
     {!networkOnline&&<div className="api-note network-banner"><span>You're offline</span><small>Your on-device library, saved catalogue tracks, profile and settings remain available. Catalogue search and account sync need a connection.</small></div>}
     <section className={`page page-${tab.toLowerCase()}`} key={tab}>
       {tab==="Home"&&<>
+        {apiStatus==="checking"&&<div className="loading home-loading"><LoaderCircle className="spin"/> Connecting to LYNE...</div>}
+        {homeLoading&&<div className="loading home-loading"><LoaderCircle className="spin"/> Loading your home...</div>}
+        {homeError&&<div className="api-note home-error" role="alert"><span>Home could not load</span><small>{homeError}</small><button type="button" className="secondary-action" onClick={()=>void loadHome()}>Try again</button></div>}
         {homeMixes.length>0&&<>
           <div className="windows-daily-mixes-heading">
             <div className="mix-fluid-square" aria-hidden="true"><i/><i/><i/></div>
@@ -1168,6 +1185,7 @@ export default function App() {
         {listeningNowTracks.length>0&&<><div className="section-heading windows-section-heading"><span className="windows-section-icon listening-icon"><FireFill size={24}/></span><h2>Listening right now</h2></div>{renderHomeCards(listeningNowTracks)}</>}
         {state.history.length>0&&<><div className="section-heading windows-section-heading"><span className="windows-section-icon recent-icon"><TimeFill size={24}/></span><h2>Jump back in</h2></div>{renderHomeCards(state.history.slice(0,12))}</>}
         {homeTracks.length>0&&<><div className="section-heading windows-section-heading"><span className="windows-section-icon popular-icon"><TrophyFill size={24}/></span><h2>Most listened of all time</h2></div>{renderHomeCards(homeTracks.slice(0,12))}</>}
+        {!homeLoading&&!homeError&&apiStatus==="online"&&homeMixes.length===0&&popularAlbums.length===0&&listeningNowTracks.length===0&&state.history.length===0&&localTracks.length===0&&<Empty title="Your LYNE home is quiet" text="Search the catalogue or add your own audio to start building your library."/>}
         {apiStatus==="offline"&&networkOnline&&<div className="api-note"><span>LYNE API isn't connected</span><small>{apiMessage||"Configure the first-party API to load catalogue content and sync your account."}</small></div>}
       </>}
       {tab==="Search"&&<><label className="searchbox"><Search/><input aria-label="Search tracks, artists, albums and playlists" value={query} onChange={e=>void search(e.target.value,filter)} placeholder="What do you want to listen to?"/></label><div className="filter-pills">{(["all","tracks","artists","albums","playlists"] as SearchKind[]).map(x=><button key={x} className={filter===x?"selected":""} onClick={()=>void search(query,x)}>{x[0].toUpperCase()+x.slice(1)}</button>)}</div>{loadingSearch?<div className="loading"><LoaderCircle className="spin"/> Searching LYNE...</div>:<>{(filter==="all"||filter==="artists")&&artistResults.length>0&&<><div className="section-heading"><h2>Artists</h2></div><div className="catalog-grid">{artistResults.map(a=><button className="catalog-card" key={a.id} onClick={()=>void openArtist(a.id)}><div className="artist-avatar"><UserRound/></div><b>{a.name}</b><small>Artist</small></button>)}</div></>}{(filter==="all"||filter==="albums")&&albumResults.length>0&&<><div className="section-heading"><h2>Albums</h2></div><div className="catalog-grid">{albumResults.map(a=><button className="catalog-card" key={a.id} onClick={()=>void openAlbum(a.id)}><div className="cover" style={a.artwork?{backgroundImage:`url("${a.artwork}")`}:undefined}>{!a.artwork&&<Disc3/>}</div><b>{a.title}</b><small>{a.artist}</small></button>)}</div></>}{(filter==="all"||filter==="playlists")&&playlistResults.length>0&&<><div className="section-heading"><h2>Playlists</h2></div><div className="catalog-grid">{playlistResults.map(playlist=><button className="catalog-card" key={playlist.id} onClick={()=>void openPublicPlaylist(playlist.id)}><div className="cover" style={playlist.cover?{backgroundImage:`url("${playlist.cover}")`}:undefined}>{!playlist.cover&&<ListMusic/>}</div><b>{playlist.name}</b><small>by {playlist.owner}</small></button>)}</div></>}{searchError&&<div className="api-note"><span>Search unavailable</span><small>{searchError}</small></div>}{results.length===0&&artistResults.length===0&&albumResults.length===0&&playlistResults.length===0&&query.trim().length>=2&&!loadingSearch&&!searchError&&<Empty title="No matches found" text="Try a different track, artist, album or playlist name."/>}{renderRows(results)}</>}</>}
