@@ -293,7 +293,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     catch(error){return fail(error instanceof Error?error.message:"YouTube playback could not be resolved.",422);}
   }
 
-  const soundCloudPlaybackMatch=path.match(/^\\/v1\\/providers\\/soundcloud\\/playback\\/(\\d+)$/);
+  const soundCloudPlaybackMatch=path.match(/^\/v1\/providers\/soundcloud\/playback\/(\d+)$/);
   if(soundCloudPlaybackMatch&&request.method==="GET"){
     try{return json(await resolveSoundCloudPlayback(soundCloudPlaybackMatch[1],env));}
     catch(error){return fail(error instanceof Error?error.message:"SoundCloud playback could not be resolved.",422);}
@@ -301,13 +301,13 @@ async function handle(request: Request, env: Env): Promise<Response> {
 
   // Stable first-party audio URLs start playback during the tap; the Worker resolves and
   // forwards the provider stream, including byte-range requests, after the audio request begins.
-  const soundCloudStreamMatch=path.match(/^\\/v1\\/providers\\/soundcloud\\/stream\\/(\\d+)$/);
+  const soundCloudStreamMatch=path.match(/^\/v1\/providers\/soundcloud\/stream\/(\d+)$/);
   if(soundCloudStreamMatch&&["GET","HEAD"].includes(request.method)){
     try{return await audioStreamResponse(request,()=>resolveSoundCloudPlayback(soundCloudStreamMatch[1],env));}
     catch(error){return fail(error instanceof Error?error.message:"SoundCloud audio could not be streamed.",502);}
   }
 
-  const youtubeStreamMatch=path.match(/^\\/v1\\/providers\\/youtube\\/stream\\/([a-zA-Z0-9_-]{11})$/);
+  const youtubeStreamMatch=path.match(/^\/v1\/providers\/youtube\/stream\/([a-zA-Z0-9_-]{11})$/);
   if(youtubeStreamMatch&&["GET","HEAD"].includes(request.method)){
     try{return await audioStreamResponse(request,()=>resolveYouTubePlayback(youtubeStreamMatch[1]));}
     catch(error){return fail(error instanceof Error?error.message:"YouTube audio could not be streamed.",502);}
