@@ -1,4 +1,4 @@
-import { resolveMusicLink, resolveSoundCloudPlayback, resolveYouTubePlayback, resolveYouTubeMatch, type ResolvedImport } from "./providers";
+import { resolveMusicLink, resolveSoundCloudPlayback, type ResolvedImport } from "./providers";
 
 interface Env {
   SPOTIFY_CLIENT_ID?: string; SPOTIFY_CLIENT_SECRET?: string;
@@ -279,20 +279,6 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
   }
 
-  if(path==="/v1/providers/youtube/match"&&request.method==="GET"){
-    try{
-      const title=url.searchParams.get("title")||"";
-      const artist=url.searchParams.get("artist")||"";
-      return json(await resolveYouTubeMatch(title,artist));
-    }catch(error){return fail(error instanceof Error?error.message:"No matching YouTube recording was found.",404);}
-  }
-
-  const youtubePlaybackMatch=path.match(/^\/v1\/providers\/youtube\/playback\/([a-zA-Z0-9_-]{11})$/);
-  if(youtubePlaybackMatch&&request.method==="GET"){
-    try{return json(await resolveYouTubePlayback(youtubePlaybackMatch[1]));}
-    catch(error){return fail(error instanceof Error?error.message:"YouTube playback could not be resolved.",422);}
-  }
-
   const soundCloudPlaybackMatch=path.match(/^\/v1\/providers\/soundcloud\/playback\/(\d+)$/);
   if(soundCloudPlaybackMatch&&request.method==="GET"){
     try{return json(await resolveSoundCloudPlayback(soundCloudPlaybackMatch[1],env));}
@@ -307,26 +293,6 @@ async function handle(request: Request, env: Env): Promise<Response> {
     catch(error){return fail(error instanceof Error?error.message:"SoundCloud audio could not be streamed.",502);}
   }
 
-  const youtubeStreamMatch=path.match(/^\/v1\/providers\/youtube\/stream\/([a-zA-Z0-9_-]{11})$/);
-  if(youtubeStreamMatch&&["GET","HEAD"].includes(request.method)){
-    try{return await audioStreamResponse(request,()=>resolveYouTubePlayback(youtubeStreamMatch[1]));}
-    catch(error){return fail(error instanceof Error?error.message:"YouTube audio could not be streamed.",502);}
-  }
-
-  if(path==="/v1/providers/import/stream"&&["GET","HEAD"].includes(request.method)){
-    try{
-      const title=(url.searchParams.get("title")||"").trim();
-      const artist=(url.searchParams.get("artist")||"").trim();
-      if(!title||!artist)return fail("A track title and artist are required.",400);
-      return await audioStreamResponse(request,async()=>{
-        const catalogue=await env.DB.prepare(`${TRACK_SELECT} WHERE lower(t.title)=? AND lower(a.name)=? AND t.published=1 LIMIT 1`)
-          .bind(normalized(title),normalized(artist)).first<TrackRow>();
-        if(catalogue)return {url:storageObjectUrl(env,catalogue.audioKey,true),mimeType:catalogue.audioMime};
-        const match=await resolveYouTubeMatch(title,artist);
-        return resolveYouTubePlayback(match.videoId);
-      });
-    }catch(error){return fail(error instanceof Error?error.message:"LYNE could not find a full-length stream for this track.",502);}
-  }
 
   if (path === "/v1/providers/status" && request.method === "GET") {
     return json({
@@ -336,7 +302,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
         apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "metadata" },
       },
-      playback: { soundcloud: "official public API; full-length tracks only", youtube: "direct full-length audio where YouTube exposes a playable stream" },
+      playback: { soundcloud: "official public API; eligible full-length tracks only", youtube: "metadata only; use a licensed LYNE catalogue file or a local file for playback" },
     });
   }
 
