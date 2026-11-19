@@ -890,27 +890,42 @@ export default function App() {
     }finally{setImportSaving(false);}
   };
   const likeImportedTrack=(collection:SavedImport,track:NonNullable<SavedImport["tracks"]>[number])=>{const saved:SavedImport={provider:collection.provider,kind:"track",providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]};setState(s=>({...s,importedLikes:[saved,...s.importedLikes.filter(x=>!(x.provider===saved.provider&&x.providerId===saved.providerId))]}));if(user)void lyneApi.saveImport(saved).catch(()=>setNotice("Added locally. Account sync couldn't be completed."));setNotice(`Added ${track.title} to Liked Songs.`);};
+  const normalizeImportedText=(value:string)=>value.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const findLocalTrackForImport=(title:string,artist:string):Track|null=>{
+    const wantedTitle=normalizeImportedText(title);
+    if(!wantedTitle)return null;
+    const titleMatches=localTracks.filter(track=>normalizeImportedText(track.title)===wantedTitle);
+    const wantedArtist=normalizeImportedText(artist);
+    const artistMatches=titleMatches.filter(track=>{
+      const localArtist=normalizeImportedText(track.artist);
+      return !localArtist||localArtist==="local file"||localArtist===wantedArtist;
+    });
+    return artistMatches.length===1?artistMatches[0]:null;
+  };
   const findPlayableCatalogTrackForImport=async(title:string,artist:string):Promise<Track|null>=>{
-    const normalize=(value:string)=>value.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+    const wantedTitle=normalizeImportedText(title),wantedArtist=normalizeImportedText(artist);
+    if(!wantedTitle||!wantedArtist)return null;
     try{
       const result=await lyneApi.search([title,artist].filter(Boolean).join(" "),"tracks");
       const playable=result.tracks.filter(track=>Boolean(track.audioUrl));
-      const wantedTitle=normalize(title),wantedArtist=normalize(artist);
-      const exact=playable.find(track=>normalize(track.title)===wantedTitle&&normalize(track.artist)===wantedArtist);
-      if(exact)return exact;
-      const titleMatches=playable.filter(track=>normalize(track.title)===wantedTitle);
-      return titleMatches.length===1?titleMatches[0]:null;
+      return playable.find(track=>normalizeImportedText(track.title)===wantedTitle&&normalizeImportedText(track.artist)===wantedArtist)||null;
     }catch{return null;}
   };
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;embedUrl?:string;artwork?:string})=>{
-    setNotice("Checking the LYNE catalogue for a full-length version...");
+    const localMatch=findLocalTrackForImport(item.title,item.subtitle);
+    if(localMatch){
+      play(localMatch,[localMatch]);
+      setNotice("Playing your local audio file in LYNE.");
+      return;
+    }
+    setNotice("Checking the LYNE catalogue for an exact full-length match...");
     const match=await findPlayableCatalogTrackForImport(item.title,item.subtitle);
     if(match){
       play(match,[match]);
       setNotice("Playing "+match.title+" in LYNE.");
       return;
     }
-    setNotice('“'+item.title+'” is saved in your Library, but no matching full-length LYNE audio source was found. Add the licensed audio file in Local Files or publish it to the LYNE catalogue to play it here.');
+    setNotice('“'+item.title+'” is saved in your Library, but no exact full-length match is available yet. Add the audio file in Local Files or publish a recording you have rights to distribute to the LYNE catalogue. Provider links are never used as embedded playback.');
   };
   const likeAllImportedTracks=async(collection:SavedImport)=>{
     const tracks=collection.tracks||[];
