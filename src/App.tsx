@@ -11,6 +11,19 @@ import { Home7Fill as WindowsHomeIcon, Search3Fill as WindowsSearchIcon, Bookmar
 import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, playSpotifyTracks, getSpotifyPlaybackSnapshot, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
 import { authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
 
+type HlsPlayback = {
+  attachMedia(media:HTMLMediaElement):void;
+  loadSource(url:string):void;
+  on(event:string,listener:(event:string,data?:{fatal?:boolean;details?:string;type?:string})=>void):void;
+  destroy():void;
+};
+type HlsPlaybackConstructor = {
+  new(options?:Record<string,unknown>):HlsPlayback;
+  isSupported():boolean;
+  Events:{MANIFEST_PARSED:string;ERROR:string};
+};
+declare global { interface Window { Hls?:HlsPlaybackConstructor } }
+
 type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
 type Period = "day" | "week" | "month" | "year";
 type EqualizerCategory = "enhance" | "genre" | "accent" | "custom";
@@ -371,7 +384,7 @@ export default function App() {
     setPosition(snapshot.positionMs);
     setDuration(snapshot.durationMs);
     setPlaybackMessage(snapshot.paused?"Paused on Spotify":"Playing on Spotify");
-    setCurrent(old=>old?.source==="spotify"?({...old,title:snapshot.title,artist:snapshot.artist,artwork:snapshot.artwork||old.artwork,durationMs:snapshot.durationMs||old.durationMs}):old);
+    setCurrent(old=>old?.source==="spotify"?({...old,id:"spotify:"+snapshot.trackId,providerId:snapshot.trackId,title:snapshot.title,artist:snapshot.artist,artwork:snapshot.artwork||old.artwork,durationMs:snapshot.durationMs||old.durationMs,externalUrl:"https://open.spotify.com/track/"+snapshot.trackId}):old);
   },[]);
   const loadProviderStatus=async()=>{try{const result=await lyneApi.providerStatus();setProviderStatus(result.providers);setProviderStatusError("");}catch(error){setProviderStatusError(error instanceof Error?error.message:"Could not check provider connections.");}};
   const connectSpotifyAccount=async()=>{
@@ -527,6 +540,7 @@ export default function App() {
   const [customBackground,setCustomBackground]=useState(()=>localStorage.getItem("lyne.mobile.background")||"");
   const backgroundFileRef=useRef<HTMLInputElement|null>(null);
   const audioRef=useRef<HTMLAudioElement|null>(null);
+  const hlsRef=useRef<HlsPlayback|null>(null);
   const fileRef=useRef<HTMLInputElement|null>(null);
   const currentRef=useRef<Track|null>(null);
   const listeningReportedRef=useRef<string|null>(null);
@@ -716,6 +730,10 @@ export default function App() {
   useEffect(()=>{
     const audio=audioRef.current;
     if(!audio)return;
+    if(current?.source==="soundcloud"&&current.audioMime?.includes("mpegurl")&&audio.canPlayType("application/vnd.apple.mpegurl")===""&&hlsRef.current){
+      audio.volume=volume;
+      return;
+    }
     if(!current?.audioUrl){
       if(audio.getAttribute("src")){audio.pause();audio.removeAttribute("src");audio.dataset.trackId="";audio.load();}
       return;
@@ -735,6 +753,7 @@ export default function App() {
     const audio=audioRef.current;
     if(!audio)return;
     audio.volume=volume;
+    if(current?.source==="soundcloud"&&current.audioMime?.includes("mpegurl")&&audio.canPlayType("application/vnd.apple.mpegurl")===""&&hlsRef.current)return;
     if(playing&&current?.audioUrl){
       if(audio.dataset.trackId!==current.id||audio.getAttribute("src")!==current.audioUrl){
         audio.pause();
@@ -835,7 +854,42 @@ export default function App() {
     // from an effect can lose browser user activation, especially on mobile Safari.
     const audio=audioRef.current;
     setPlaybackMessage("Loading audio…");
-    if(audio){
+    const useHlsJs=selected.source==="soundcloud"&&Boolean(selected.audioMime?.includes("mpegurl"))&&Boolean(audio)&&audio!.canPlayType("application/vnd.apple.mpegurl")==="";
+    if(useHlsJs&&audio){
+      const Hls=window.Hls;
+      if(!Hls?.isSupported()){
+        const message="This browser can't play SoundCloud's full-length stream format. Try Safari or another supported browser.";
+        setCurrent(selected);setQueue(selectedList.length?selectedList:[selected]);
+        setPlaying(false);setExpanded(true);setPlaybackMessage(message);setNotice(message);
+        return;
+      }
+      hlsRef.current?.destroy();
+      const hls=new Hls({enableWorker:true,lowLatencyMode:false});
+      hlsRef.current=hls;
+      audio.pause();audio.removeAttribute("src");audio.dataset.trackId=selected.id;audio.load();
+      hls.attachMedia(audio);
+      hls.loadSource(selected.audioUrl!);
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+        audio.volume=volume;
+        void audio.play().then(()=>setPlaybackMessage("Playing on SoundCloud")).catch(error=>{
+          setPlaying(false);
+          const message="SoundCloud playback was blocked by the browser. "+(error instanceof Error?error.message:"Tap Play again.");
+          setPlaybackMessage(message);setNotice(message);
+        });
+      });
+      hls.on(Hls.Events.ERROR,(_event,data)=>{
+        if(data?.fatal){
+          hls.destroy();if(hlsRef.current===hls)hlsRef.current=null;
+          setPlaying(false);
+          const message="SoundCloud stream error: "+(data.details||data.type||"The full-length stream failed.");
+          setPlaybackMessage(message);setNotice(message);
+        }
+      });
+      // Make the play request in the tap handler; HLS.js fills the media source once
+      // the signed playlist and its first segments have loaded.
+      void audio.play().catch(()=>{});
+    }else if(audio){
+      hlsRef.current?.destroy();hlsRef.current=null;
       if(audio.dataset.trackId!==selected.id||audio.getAttribute("src")!==selected.audioUrl){
         audio.pause();
         audio.src=selected.audioUrl;
@@ -864,6 +918,14 @@ export default function App() {
   },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic,volume]);
   const togglePlaybackFromGesture=useCallback(()=>{
     const audio=audioRef.current;
+    if(current?.source==="soundcloud"&&current.audioMime?.includes("mpegurl")&&audio&&audio.canPlayType("application/vnd.apple.mpegurl")===""&&hlsRef.current){
+      if(!audio.paused){audio.pause();setPlaying(false);setPlaybackMessage("Paused on SoundCloud");return;}
+      void audio.play().then(()=>{setPlaying(true);setPlaybackMessage("Playing on SoundCloud");}).catch(error=>{
+        const message=error instanceof Error?error.message:"SoundCloud could not resume playback.";
+        setPlaying(false);setPlaybackMessage(message);setNotice(message);
+      });
+      return;
+    }
     if(current?.source==="spotify"){
       void toggleSpotifyPlayback().then(()=>setPlaybackMessage(playing?"Paused on Spotify":"Playing on Spotify")).catch(error=>setNotice(error instanceof Error?error.message:"Spotify playback control failed."));
       return;
@@ -1213,7 +1275,8 @@ export default function App() {
         id:"sc:"+soundcloudTrackId,title:trackInfo?.title||item.title,
         artist:trackInfo?.artist||item.subtitle,artwork:item.artwork,
         audioUrl:getApiUrl()+"/v1/providers/soundcloud/stream/"+encodeURIComponent(soundcloudTrackId),
-        durationMs:trackInfo?.durationMs,source:"catalog"
+        audioMime:"application/vnd.apple.mpegurl",durationMs:trackInfo?.durationMs,source:"soundcloud",
+        providerId:soundcloudTrackId,externalUrl:trackInfo?.externalUrl||item.externalUrl
       };
       play(playable,[playable]);
       return;
@@ -1664,7 +1727,7 @@ export default function App() {
       <span className="sidebar-spacer"/>
       <button type="button" title="Settings" aria-label="Settings" className="settings-nav-button" onClick={()=>setModal("settings")}><WindowsSettingsIcon size={26}/></button>
     </nav>
-    {expanded&&current&&<div className={`player-overlay ambient-${state.preferences.ambientVisualMode}`} onTouchStart={handlePlayerTouchStart} onTouchEnd={handlePlayerTouchEnd}><div className="player-art-backdrop" style={{backgroundColor:`rgb(${ambientColor})`,...(current.artwork?{backgroundImage:`url("${current.artwork}")`}:{})}}/><div className="player-top"><button className="plain-icon" aria-label="Minimize player" onClick={()=>setExpanded(false)}><Minimize2/></button><span>NOW PLAYING</span><div className="player-top-actions"><button className="plain-icon" aria-label="Open equalizer" onClick={()=>setModal("equalizer")}><SlidersHorizontal/></button><button className="plain-icon" aria-label="Open play queue" onClick={()=>setModal("queue")}><ListMusic/></button></div></div><Cover track={current} className="player-cover"/><div className="player-track"><div><h2>{current.title}</h2><p>{current.artist}</p><small className="audio-source-label">{current.source==="spotify"?"Spotify Premium":current.source==="apple_music"?"Apple Music":getAudioSourceQuality(current).label}</small><small className="audio-playback-status">{playbackMessage}</small></div><button className={state.likes.includes(current.id)?"liked plain-icon":"plain-icon"} onClick={()=>toggleLike(current)}><Heart fill={state.likes.includes(current.id)?"currentColor":"none"}/></button></div><input className="seek" type="range" min="0" max={duration||100} value={Math.min(position,duration||100)} onChange={e=>{const v=Number(e.target.value);setPosition(v);if(current?.source==="spotify")void seekSpotifyPlayback(v).catch(error=>setNotice(error instanceof Error?error.message:"Spotify could not seek."));else if(current?.source==="apple_music")void seekAppleMusicPlayback(v).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music could not seek."));else if(audioRef.current)audioRef.current.currentTime=v/1000;}}/><div className="time-row"><span>{fmtTime(position)}</span><span>{fmtTime(duration)}</span></div><div className="transport"><button aria-label={shuffle?"Turn shuffle off":"Turn shuffle on"} className={shuffle?"control-on":"plain-icon"} onClick={()=>setShuffle(v=>!v)}><Shuffle/></button><button aria-label="Previous track" className="plain-icon large-control" onClick={previous}><SkipBack fill="currentColor"/></button><button aria-label={playing?"Pause playback":"Start playback"} className="main-play" onClick={togglePlaybackFromGesture}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button><button aria-label="Next track" className="plain-icon large-control" onClick={next}><SkipForward fill="currentColor"/></button><button aria-label={"Repeat "+state.repeat} className={state.repeat!=="off"?"control-on":"plain-icon"} onClick={()=>setState(s=>({...s,repeat:s.repeat==="off"?"all":s.repeat==="all"?"one":"off"}))}><Repeat2/></button></div><div className="volume-row"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="plain-icon" onClick={()=>setModal("lyrics")}><Mic2/></button></div></div>}
+    {expanded&&current&&<div className={`player-overlay ambient-${state.preferences.ambientVisualMode}`} onTouchStart={handlePlayerTouchStart} onTouchEnd={handlePlayerTouchEnd}><div className="player-art-backdrop" style={{backgroundColor:`rgb(${ambientColor})`,...(current.artwork?{backgroundImage:`url("${current.artwork}")`}:{})}}/><div className="player-top"><button className="plain-icon" aria-label="Minimize player" onClick={()=>setExpanded(false)}><Minimize2/></button><span>NOW PLAYING</span><div className="player-top-actions"><button className="plain-icon" aria-label="Open equalizer" onClick={()=>setModal("equalizer")}><SlidersHorizontal/></button><button className="plain-icon" aria-label="Open play queue" onClick={()=>setModal("queue")}><ListMusic/></button></div></div><Cover track={current} className="player-cover"/><div className="player-track"><div><h2>{current.title}</h2><p>{current.artist}</p><small className="audio-source-label">{current.source==="spotify"?"Spotify Premium":current.source==="apple_music"?"Apple Music":current.source==="soundcloud"?"SoundCloud · Full stream":getAudioSourceQuality(current).label}</small><small className="audio-playback-status">{playbackMessage}</small>{current.source==="soundcloud"&&current.externalUrl&&<a className="soundcloud-attribution" href={current.externalUrl} target="_blank" rel="noopener noreferrer">SoundCloud · Uploaded by {current.artist} ↗</a>}</div><button className={state.likes.includes(current.id)?"liked plain-icon":"plain-icon"} onClick={()=>toggleLike(current)}><Heart fill={state.likes.includes(current.id)?"currentColor":"none"}/></button></div><input className="seek" type="range" min="0" max={duration||100} value={Math.min(position,duration||100)} onChange={e=>{const v=Number(e.target.value);setPosition(v);if(current?.source==="spotify")void seekSpotifyPlayback(v).catch(error=>setNotice(error instanceof Error?error.message:"Spotify could not seek."));else if(current?.source==="apple_music")void seekAppleMusicPlayback(v).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music could not seek."));else if(audioRef.current)audioRef.current.currentTime=v/1000;}}/><div className="time-row"><span>{fmtTime(position)}</span><span>{fmtTime(duration)}</span></div><div className="transport"><button aria-label={shuffle?"Turn shuffle off":"Turn shuffle on"} className={shuffle?"control-on":"plain-icon"} onClick={()=>setShuffle(v=>!v)}><Shuffle/></button><button aria-label="Previous track" className="plain-icon large-control" onClick={previous}><SkipBack fill="currentColor"/></button><button aria-label={playing?"Pause playback":"Start playback"} className="main-play" onClick={togglePlaybackFromGesture}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button><button aria-label="Next track" className="plain-icon large-control" onClick={next}><SkipForward fill="currentColor"/></button><button aria-label={"Repeat "+state.repeat} className={state.repeat!=="off"?"control-on":"plain-icon"} onClick={()=>setState(s=>({...s,repeat:s.repeat==="off"?"all":s.repeat==="all"?"one":"off"}))}><Repeat2/></button></div><div className="volume-row"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="plain-icon" onClick={()=>setModal("lyrics")}><Mic2/></button></div></div>}
     {modal&&<div className={modal==="artistDetail"||modal==="albumDetail"||modal==="publicPlaylistDetail"?"modal-backdrop artist-page-backdrop":"modal-backdrop"} role="presentation" onClick={()=>setModal(null)}><div className={`modal ${modal==="settings"?"modal-settings":modal==="artistDetail"?"artist-page-modal":modal==="albumDetail"||modal==="publicPlaylistDetail"?"liner-collection-modal":""}`} ref={modalDialogRef} role="dialog" aria-modal="true" aria-labelledby="lyne-dialog-title" onClick={e=>e.stopPropagation()}><div className="modal-head"><h2 id="lyne-dialog-title">{modal==="playlist"?"Create playlist":modal==="playlistDetail"?(selectedPlaylist?.name||"Playlist"):modal==="track"?"Song options":modal==="artistDetail"?(artistDetail?.artist.name||"Artist"):modal==="albumDetail"?(albumDetail?.album.title||"Album"):modal==="publicPlaylistDetail"?(publicPlaylistDetail?.playlist.name||"Playlist"):modal==="account"?"LYNE account":modal==="profileEdit"?"Edit username":modal==="settings"?"Settings":modal==="queue"?"Play queue":modal==="equalizer"?"Equalizer":modal==="import"?"Import music":modal==="collection"?(activeCollection?.title||"Collection"):"Lyrics"}</h2><button ref={modalCloseRef} type="button" className="plain-icon" aria-label="Close dialog" onClick={()=>setModal(null)}><X/></button></div>
       {detailError&&<div className="detail-error" role="alert"><p>{detailError}</p><button className="secondary-action" onClick={()=>detailRetryRef.current?.()}>Try again</button></div>}
       {modal==="artistDetail"&&<>{detailBusy?<div className="loading"><LoaderCircle className="spin"/> Loading artist...</div>:artistDetail&&<><div className="music-detail-hero"><div className="music-detail-art artist-detail-art" style={artistDetail.artist.artwork?{backgroundImage:`url("${artistDetail.artist.artwork}")`}:undefined}>{!artistDetail.artist.artwork&&<UserRound size={30}/>}</div><div><p className="eyebrow">ARTIST</p><h3>{artistDetail.artist.name}{artistDetail.artist.verified&&<span className="artist-verified"><Check size={15}/></span>}</h3><small>{artistDetail.artist.monthlyListeners||(artistDetail.artist.followers?`${artistDetail.artist.followers.toLocaleString()} followers`:`${artistDetail.tracks.length} tracks · ${artistDetail.albums.length} albums`)}</small></div></div><div className="artist-detail-actions"><button className="primary-button" disabled={!artistDetail.tracks.length} onClick={()=>{if(artistDetail.tracks[0])play(artistDetail.tracks[0],artistDetail.tracks);}}><Play size={15} fill="currentColor"/> Play all</button><button className="secondary-action" disabled={!artistDetail.tracks.length} onClick={()=>{const tracks=[...artistDetail.tracks];for(let i=tracks.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tracks[i],tracks[j]]=[tracks[j],tracks[i]];}if(tracks[0])play(tracks[0],tracks);}}><Shuffle size={15}/> Shuffle</button><button className="secondary-action" onClick={()=>toggleSavedArtist(artistDetail.artist)}>{state.savedArtists.some(item=>item.id===artistDetail.artist.id)?<Check size={15}/>:<Plus size={15}/>} {state.savedArtists.some(item=>item.id===artistDetail.artist.id)?"Saved":"Save artist"}</button><button className="secondary-action" onClick={()=>void shareArtist(artistDetail.artist)}><Share2 size={15}/> Share</button></div>{artistDetail.artist.bio&&<p className="detail-description">{artistDetail.artist.bio}</p>}<div className="section-heading"><h2>Popular tracks</h2><span className="section-note">TOP SONGS</span></div>{renderRows(artistDetail.tracks)}{artistDetail.albums.length>0&&<><div className="section-heading"><h2>Albums</h2></div><div className="detail-album-grid">{artistDetail.albums.map(album=><button className="detail-album-card" key={album.id} onClick={()=>void openAlbum(album.id)}><div className="cover" style={album.artwork?{backgroundImage:`url("${album.artwork}")`}:undefined}>{!album.artwork&&<Disc3/>}</div><b>{album.title}</b><small>{album.releaseDate||"Album"}</small></button>)}</div></>}</>}</>}
