@@ -189,6 +189,26 @@ function youtubeIdFromUrl(url: URL) {
   const match=url.pathname.match(/\/(?:shorts|embed|live)\/([^/?]+)/);
   return match?.[1]||"";
 }
+function extractEmbeddedJson(html:string,marker:string):any|null{
+  const markerAt=html.indexOf(marker);
+  if(markerAt<0)return null;
+  const start=html.indexOf("{",markerAt);
+  if(start<0)return null;
+  let depth=0,inString=false,escaped=false;
+  for(let index=start;index<html.length;index++){
+    const char=html[index];
+    if(inString){
+      if(escaped)escaped=false;
+      else if(char==="\\")escaped=true;
+      else if(char==='"')inString=false;
+      continue;
+    }
+    if(char==='"')inString=true;
+    else if(char==="{")depth++;
+    else if(char==="}"&&--depth===0){try{return JSON.parse(html.slice(start,index+1));}catch{return null;}}
+  }
+  return null;
+}
 function findYoutubePlaylistRenderer(value:any,depth=0):any{
   if(!value||typeof value!=="object"||depth>22)return null;
   if(!Array.isArray(value)&&Array.isArray(value.contents)&&value.contents.some((item:any)=>item?.playlistVideoRenderer))return value;
@@ -200,9 +220,8 @@ async function youtubePlaylistHtmlImport(url:URL,playlistId:string):Promise<Reso
   const response=await fetch("https://www.youtube.com/playlist?list="+encodeURIComponent(playlistId),{headers:{accept:"text/html"}});
   if(!response.ok)throw new Error("YouTube playlist page could not be loaded.");
   const html=await response.text();
-  const match=html.match(/(?:var\s+ytInitialData\s*=|window\["ytInitialData"\]\s*=)({[\s\S]*?});<\/script>/);
-  if(!match)throw new Error("YouTube did not provide a public playlist track list.");
-  let data:any;try{data=JSON.parse(match[1]);}catch{throw new Error("YouTube playlist data was invalid.");}
+  const data=extractEmbeddedJson(html,"ytInitialData")||extractEmbeddedJson(html,'window["ytInitialData"]');
+  if(!data)throw new Error("YouTube did not provide a public playlist track list.");
   const renderer=findYoutubePlaylistRenderer(data);
   const tracks:ImportedTrack[]=(renderer?.contents||[]).map((entry:any)=>{
     const video=entry?.playlistVideoRenderer;
@@ -214,7 +233,7 @@ async function youtubePlaylistHtmlImport(url:URL,playlistId:string):Promise<Reso
     return {providerId:videoId,title,artist:artist||"YouTube",externalUrl:"https://www.youtube.com/watch?v="+videoId,artwork:firstImage(thumbs?.slice(-1)[0]?.url),embedUrl:"https://www.youtube-nocookie.com/embed/"+videoId};
   }).filter(Boolean).slice(0,100) as ImportedTrack[];
   if(!tracks.length)throw new Error("No public tracks were found in that YouTube playlist.");
-  const title=clean(html.match(/<title>([^<]+)<\/title>/i)?.[1]?.replace(/\s*-\s*YouTube$/,""))||"YouTube playlist";
+  const title=clean(data?.metadata?.playlistMetadataRenderer?.title||data?.microformat?.playerMicroformatRenderer?.title?.simpleText)||"YouTube playlist";
   return {provider:"youtube",kind:"playlist",providerId:playlistId,title,subtitle:"YouTube",externalUrl:url.toString(),tracks};
 }
 async function youtubeOembedImport(url:URL):Promise<ResolvedImport>{
