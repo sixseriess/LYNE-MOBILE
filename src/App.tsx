@@ -615,22 +615,36 @@ export default function App() {
   useEffect(()=>{
     const audio=audioRef.current;
     if(!audio)return;
-    if(!current?.audioUrl){audio.pause();audio.removeAttribute("src");audio.load();return;}
-    audio.pause();
-    audio.src=current.audioUrl;
+    if(!current?.audioUrl){
+      if(audio.getAttribute("src")){audio.pause();audio.removeAttribute("src");audio.dataset.trackId="";audio.load();}
+      return;
+    }
+    // The play handler assigns the source inside the user gesture. Do not reload it here.
+    if(audio.dataset.trackId!==current.id||audio.getAttribute("src")!==current.audioUrl){
+      audio.pause();
+      audio.src=current.audioUrl;
+      audio.dataset.trackId=current.id;
+      audio.load();
+      setPosition(0);
+      setDuration(current.durationMs||0);
+    }
     audio.volume=volume;
-    audio.load();
-    setPosition(0);
-    setDuration(current.durationMs||0);
   },[current?.id,current?.audioUrl]);
   useEffect(()=>{
     const audio=audioRef.current;
     if(!audio)return;
     audio.volume=volume;
     if(playing&&current?.audioUrl){
-      void audio.play().catch(error=>{
+      if(audio.dataset.trackId!==current.id||audio.getAttribute("src")!==current.audioUrl){
+        audio.pause();
+        audio.src=current.audioUrl;
+        audio.dataset.trackId=current.id;
+        audio.load();
+      }
+      // The click handler normally starts playback synchronously; this is the state-sync fallback.
+      if(audio.paused)void audio.play().catch(error=>{
         setPlaying(false);
-        const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio format or stream could not be decoded.":audio.error?.code===4?"This browser doesn't support the supplied audio format.":"Playback was blocked by the browser or the source.";
+        const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio format or stream could not be decoded.":audio.error?.code===4?"This browser doesn't support the supplied audio format.":"The browser blocked playback or the source rejected the request.";
         setNotice(detail+" "+(error instanceof Error?error.message:"Try another track or a local audio file."));
       });
     }else audio.pause();
@@ -668,12 +682,34 @@ export default function App() {
       setNotice("Lossless only is enabled. "+quality.label+". Choose Auto or use a FLAC, WAV or ALAC source.");
       return;
     }
+    // Assign and start the media element in the same user interaction. Starting it only
+    // from an effect can lose browser user activation, especially on mobile Safari.
+    const audio=audioRef.current;
+    if(audio){
+      if(audio.dataset.trackId!==selected.id||audio.getAttribute("src")!==selected.audioUrl){
+        audio.pause();
+        audio.src=selected.audioUrl;
+        audio.dataset.trackId=selected.id;
+        audio.load();
+      }
+      audio.volume=volume;
+      try{
+        void audio.play().catch(error=>{
+          setPlaying(false);
+          const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio format or stream could not be decoded.":audio.error?.code===4?"This browser doesn't support the supplied audio format.":"The browser blocked playback or the source rejected the request.";
+          setNotice(detail+" "+(error instanceof Error?error.message:"Try another track or a local audio file."));
+        });
+      }catch(error){
+        setPlaying(false);
+        setNotice(error instanceof Error?error.message:"The browser could not start this audio source.");
+      }
+    }
     setCurrent(selected);
     setQueue(selectedList.length?selectedList:[selected]);
     setPosition(0);setDuration(selected.durationMs||0);
     setPlaying(true);setExpanded(false);
     setState(old=>({...old,history:[selected,...old.history.filter(t=>t.id!==selected.id)].slice(0,50)}));
-  },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic]);
+  },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic,volume]);
   const toggleLike=(track:Track)=>{haptic();setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));};
   const next=()=>{
     haptic();
