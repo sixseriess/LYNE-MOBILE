@@ -1224,7 +1224,7 @@ export default function App() {
     }catch{return null;}
   };
   const importedLocalAudioReady=(item:SavedImport)=>Boolean(findLocalTrackForImport(item.title,item.subtitle));
-  const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string}[]})=>{
+  const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;uploader?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string;uploader?:string}[]})=>{
     if(item.kind&&item.kind!=="track"&&item.tracks?.length){
       if(item.provider==="spotify"){
         const trackQueue:Track[]=item.tracks.map(track=>({
@@ -1244,7 +1244,7 @@ export default function App() {
         return;
       }
       const first=item.tracks[0];
-      await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,tracks:[first]});
+      await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,uploader:first.uploader||item.uploader,tracks:[first]});
       return;
     }
 
@@ -1311,7 +1311,7 @@ export default function App() {
 
   const likeAllImportedTracks=async(collection:SavedImport)=>{
     const tracks=collection.tracks||[];
-    const additions=tracks.map(track=>({provider:collection.provider,kind:"track" as const,providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]}));
+    const additions=tracks.map(track=>({provider:collection.provider,kind:"track" as const,providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,uploader:track.uploader,tracks:[track]}));
     const already=new Set(state.importedLikes.map(item=>item.provider+":"+item.providerId));
     const unique=additions.filter(item=>!already.has(item.provider+":"+item.providerId));
     if(!unique.length){setModal(null);setNotice("All tracks from "+collection.title+" are already in Liked Songs.");return;}
