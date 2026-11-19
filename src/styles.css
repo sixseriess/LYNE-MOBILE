@@ -2602,3 +2602,93 @@ html,body,#root{background:var(--bg)}
 .catalog-rights-confirm{display:flex;align-items:flex-start;gap:9px;margin:14px 0;color:rgba(245,245,247,.72);font-size:11px;line-height:1.45}
 .catalog-rights-confirm input{margin:1px 0 0;accent-color:var(--lime);flex:none}
 .provider-redirect-uri{display:block;overflow-wrap:anywhere;padding:10px;border-radius:8px;background:#0b0b0d;color:#ddd;font-size:10px;line-height:1.5}
+
+
+/* LYNE player polish — larger artwork, richer artwork-reactive ambience */
+.player-overlay{
+  isolation:isolate;
+  background:
+    radial-gradient(ellipse at 50% 34%,var(--artwork-glow,rgba(36,38,44,.28)) 0%,transparent 62%),
+    linear-gradient(180deg,rgba(8,9,12,.90),rgba(5,6,9,.97));
+  transition:background 900ms ease;
+}
+.player-overlay:before{
+  z-index:-1;
+  background:
+    radial-gradient(ellipse at 18% 24%,var(--artwork-glow,rgba(36,38,44,.32)),transparent 48%),
+    radial-gradient(ellipse at 84% 68%,rgba(var(--lime-rgb),.19),transparent 52%);
+  filter:blur(34px);
+  opacity:.9;
+  animation:lyne-player-aurora 18s ease-in-out infinite alternate;
+}
+.player-overlay:after{
+  content:"";position:absolute;z-index:-1;inset:-24%;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 30% 35%,rgba(var(--lime-rgb),.24),transparent 36%),
+    radial-gradient(ellipse at 72% 62%,var(--artwork-glow,rgba(36,38,44,.26)),transparent 42%);
+  filter:blur(70px) saturate(1.45);
+  opacity:.8;
+  animation:lyne-player-drift 23s ease-in-out infinite alternate;
+}
+.player-art-backdrop{
+  z-index:-2!important;inset:-18%!important;
+  opacity:.34!important;filter:blur(76px) saturate(1.35)!important;
+  transform:scale(1.12);
+  mask-image:radial-gradient(ellipse at center,black 0%,rgba(0,0,0,.72) 48%,transparent 82%)!important;
+  transition:background-color 900ms ease,opacity 900ms ease;
+}
+.player-overlay .player-top{position:relative;z-index:1;margin-bottom:clamp(12px,2.5vh,28px);color:rgba(255,255,255,.72)}
+.player-overlay .player-cover{
+  position:relative;z-index:1;
+  width:min(88vw,520px);max-width:100%;
+  max-height:min(53dvh,520px);aspect-ratio:1;height:auto;
+  margin:0 auto clamp(20px,3.5vh,34px);
+  border-radius:10px;
+  box-shadow:0 26px 90px rgba(0,0,0,.48),0 0 70px var(--artwork-glow,rgba(36,38,44,.18));
+  transition:box-shadow 900ms ease,transform 450ms ease;
+}
+.player-overlay .player-cover:active{transform:scale(.992)}
+.player-overlay .player-track{position:relative;z-index:1;margin-bottom:18px;gap:12px}
+.player-overlay .player-track>div{min-width:0}
+.player-overlay .player-track h2{font-size:clamp(20px,5vw,25px);line-height:1.18;letter-spacing:-.55px}
+.player-overlay .player-track p{font-size:13px;margin-top:5px}
+.player-overlay .seek,.player-overlay .time-row,.player-overlay .transport,.player-overlay .volume-row{position:relative;z-index:1}
+.player-overlay .transport{margin:clamp(16px,3vh,26px) 0}
+.player-overlay .main-play{width:62px;height:62px;box-shadow:0 8px 30px rgba(0,0,0,.28)}
+.player-overlay .main-play svg{width:27px;height:27px}
+.player-overlay .large-control svg{width:24px;height:24px}
+.player-overlay .volume-row{padding-bottom:4px}
+.player-overlay.ambient-off:before,.player-overlay.ambient-off:after{animation:none;opacity:0}
+.player-overlay.ambient-off .player-art-backdrop{opacity:0!important}
+@keyframes lyne-player-aurora{0%{transform:translate3d(-3%,0,0) scale(1)}100%{transform:translate3d(4%,3%,0) scale(1.12)}}
+@keyframes lyne-player-drift{0%{transform:translate3d(-5%,-3%,0) rotate(-5deg)}100%{transform:translate3d(5%,4%,0) rotate(7deg)}}
+
+/* Keep the app's Windows-inspired surfaces consistent while tabs change */
+.app-shell,.page,.topbar,.app-dock.windows-sidebar,.mini-player{
+  transition:background-color 420ms ease,border-color 420ms ease,box-shadow 420ms ease,backdrop-filter 420ms ease;
+}
+.page{animation:lyne-page-enter 260ms ease both}
+@keyframes lyne-page-enter{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.app-dock.windows-sidebar{
+  background:rgba(30,32,38,.34);
+  border:1px solid rgba(255,255,255,.075);
+  backdrop-filter:blur(30px) saturate(165%);
+  -webkit-backdrop-filter:blur(30px) saturate(165%);
+  box-shadow:0 12px 34px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.045);
+}
+.app-dock.windows-sidebar button.active{color:#fff}
+.app-dock.windows-sidebar button.active:after{background:var(--lime);transition:background-color 700ms ease}
+.mini-player{transition:background-color 700ms ease,border-color 700ms ease,box-shadow 700ms ease}
+@media(max-height:690px){
+  .player-overlay .player-cover{width:min(76vw,360px);max-height:43dvh;margin-bottom:12px}
+  .player-overlay .player-top{margin-bottom:8px}
+  .player-overlay .transport{margin:10px 0}
+}
+@media(min-width:600px){
+  .player-overlay .player-cover{width:min(62vw,540px);max-height:58dvh}
+}
+@media(prefers-reduced-motion:reduce){
+  .player-overlay:before,.player-overlay:after,.page{animation:none!important}
+  .player-overlay,.player-overlay *,.app-shell,.page,.topbar,.app-dock.windows-sidebar,.mini-player{transition:none!important}
+}
