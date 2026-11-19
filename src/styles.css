@@ -2692,3 +2692,87 @@ html,body,#root{background:var(--bg)}
   .player-overlay:before,.player-overlay:after,.page{animation:none!important}
   .player-overlay,.player-overlay *,.app-shell,.page,.topbar,.app-dock.windows-sidebar,.mini-player{transition:none!important}
 }
+
+
+/* Mobile repair: bottom navigation stays fully inside the phone safe area. */
+@media(max-width:600px){
+  .app-shell{height:100dvh;min-height:100dvh;overflow:hidden;padding:0!important}
+  .topbar{position:relative;inset:auto;height:54px;min-height:54px;flex:none;padding-top:env(safe-area-inset-top);box-sizing:content-box}
+  .page{position:relative;inset:auto;left:auto;right:auto;top:auto;bottom:auto;flex:1;min-height:0;width:100%;margin:0;padding:18px 15px calc(142px + env(safe-area-inset-bottom));overflow-y:auto}
+  .app-dock.windows-sidebar{
+    position:absolute;z-index:60;left:9px;right:9px;top:auto;bottom:calc(7px + env(safe-area-inset-bottom));
+    width:auto;height:58px;min-height:58px;transform:none;display:flex;flex-direction:row;
+    align-items:center;justify-content:space-around;gap:0;padding:4px 6px;
+    border:1px solid rgba(255,255,255,.12);border-radius:16px;
+    background:rgba(20,21,25,.78);backdrop-filter:blur(28px) saturate(150%);
+    -webkit-backdrop-filter:blur(28px) saturate(150%);box-shadow:0 8px 30px rgba(0,0,0,.28)
+  }
+  .app-dock.windows-sidebar button,.app-dock.windows-sidebar button.settings-nav-button{
+    position:relative;flex:1;width:25%;height:48px;min-height:48px;margin:0;padding:0;
+    display:grid;place-items:center;border:0;border-radius:11px;background:transparent;
+    color:rgba(245,245,248,.58)
+  }
+  .app-dock.windows-sidebar button.active{color:#fff;background:rgba(255,255,255,.085)}
+  .app-dock.windows-sidebar button:after{display:none!important;content:none!important}
+  .app-dock.windows-sidebar button svg{width:23px;height:23px}
+  .app-dock.windows-sidebar .sidebar-spacer{display:none!important}
+  .mini-player{position:absolute;z-index:55;left:9px;right:9px;top:auto;bottom:calc(76px + env(safe-area-inset-bottom));height:62px;min-height:62px;border-radius:13px;padding:6px 8px;background:rgba(27,28,32,.78);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(30px) saturate(155%);-webkit-backdrop-filter:blur(30px) saturate(155%)}
+  .mini-player .cover{width:46px;height:46px}
+  .api-note.network-banner{position:relative;inset:auto;margin:8px 10px 0}
+  .modal-backdrop{position:absolute;z-index:90;inset:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom));align-items:flex-end}
+  .modal-settings{width:100%;height:min(88dvh,760px);max-height:calc(100dvh - env(safe-area-inset-top) - 12px);min-height:0;padding:14px 14px calc(12px + env(safe-area-inset-bottom));border-radius:18px 18px 12px 12px;overflow:hidden}
+  .modal-settings .modal-head{flex:none}
+  .modal-settings .settings-layout{flex:1;min-height:0;overflow:hidden}
+  .modal-settings .settings-tabs{flex:none;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
+  .modal-settings .settings-content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(28px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
+  .player-overlay{padding-top:calc(10px + env(safe-area-inset-top));padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+}
+@media(max-width:390px){
+  .page{padding-left:12px;padding-right:12px}
+  .mini-player{left:7px;right:7px}
+  .app-dock.windows-sidebar{left:7px;right:7px}
+}
+
+/* Replace the old blue-tinted panels and focus boxes with LYNE's neutral surfaces. */
+:root{--bg:#0b0c0f;--surface:#151619;--elevated:#1b1c20;--panel:#202126;--border:rgba(255,255,255,.09);--muted:rgba(245,245,248,.62);--dim:rgba(245,245,248,.38)}
+html,body,#root{background:#0b0c0f;color:#f4f4f5}
+.app-shell{background:#0b0c0f}
+.empty{border:0!important;background:transparent!important;box-shadow:none!important}
+.empty-icon{background:rgba(255,255,255,.065)!important;border:0!important;box-shadow:none!important}
+.empty b,.empty p{background:transparent!important;border:0!important;box-shadow:none!important;color:rgba(245,245,248,.66)}
+.page button:focus-visible,.modal button:focus-visible,.topbar button:focus-visible,.app-dock button:focus-visible,
+input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)!important;outline-offset:2px!important;box-shadow:none!important}
+.page-search .searchbox:focus-within,.page-library .library-search:focus-within{border-color:rgba(255,255,255,.2)!important;box-shadow:none!important}
+:root[data-theme=light] .empty b{color:#27272a}
+:root[data-theme=light] .empty p{color:rgba(24,24,27,.62)}
+
+/* Full-screen, vivid artwork ambience. The colors move across the entire app,
+   not just a small glow behind the player. */
+.app-shell{position:relative;isolation:isolate;--ambient-strength:.34}
+.app-shell:before{
+  content:"";position:absolute;z-index:0;inset:-22% -38% -24%;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 18% 22%,rgba(var(--lime-rgb),.43) 0%,transparent 42%),
+    radial-gradient(ellipse at 82% 35%,rgba(var(--lime-rgb),.29) 0%,transparent 44%),
+    radial-gradient(ellipse at 48% 82%,rgba(var(--lime-rgb),.34) 0%,transparent 48%),
+    linear-gradient(145deg,rgba(9,10,13,.88),rgba(12,13,17,.78));
+  background-size:145% 145%;filter:blur(58px) saturate(1.55);
+  opacity:.95;transform:scale(1.08);animation:lyne-fullscreen-ambient 17s ease-in-out infinite alternate;
+  mask-image:linear-gradient(180deg,#000 0%,rgba(0,0,0,.98) 72%,rgba(0,0,0,.8) 100%)
+}
+.app-shell:after{
+  content:"";position:absolute;z-index:0;inset:-30% -45%;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 72% 18%,rgba(var(--lime-rgb),.22),transparent 39%),
+    radial-gradient(ellipse at 24% 72%,rgba(var(--lime-rgb),.25),transparent 42%);
+  filter:blur(82px) saturate(1.8);opacity:.78;
+  animation:lyne-fullscreen-flow 24s ease-in-out infinite alternate
+}
+.app-shell>*{position:relative;z-index:1}
+.app-shell>.app-dock,.app-shell>.mini-player,.app-shell>.modal-backdrop,.app-shell>.notice{z-index:60}
+.app-shell>.player-overlay{z-index:70}
+@keyframes lyne-fullscreen-ambient{0%{transform:translate3d(-5%,-2%,0) rotate(-3deg) scale(1.08)}50%{transform:translate3d(2%,2%,0) rotate(2deg) scale(1.16)}100%{transform:translate3d(6%,-1%,0) rotate(5deg) scale(1.1)}}
+@keyframes lyne-fullscreen-flow{0%{transform:translate3d(5%,-4%,0) scale(.96)}100%{transform:translate3d(-6%,5%,0) scale(1.12)}}
+@media(prefers-reduced-motion:reduce){.app-shell:before,.app-shell:after{animation:none!important}}
+:root[data-theme=light] .app-shell{background:#e8e8eb}
+:root[data-theme=light] .app-shell:before,:root[data-theme=light] .app-shell:after{opacity:.2}
