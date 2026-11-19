@@ -2692,3 +2692,92 @@ html,body,#root{background:var(--bg)}
   .player-overlay:before,.player-overlay:after,.page{animation:none!important}
   .player-overlay,.player-overlay *,.app-shell,.page,.topbar,.app-dock.windows-sidebar,.mini-player{transition:none!important}
 }
+
+
+/* LYNE mobile: app-wide artwork ambience and neutral focus styling */
+:root{
+  --artwork-glow:rgba(var(--lime-rgb),.42);
+  --artwork-glow-soft:rgba(var(--lime-rgb),.24);
+}
+.app-shell{
+  background-color:#08090b!important;
+  background-image:
+    radial-gradient(ellipse at 50% 8%,rgba(var(--lime-rgb),.30) 0%,rgba(var(--lime-rgb),.13) 28%,transparent 68%),
+    radial-gradient(ellipse at 12% 72%,rgba(var(--lime-rgb),.13),transparent 48%),
+    radial-gradient(ellipse at 92% 52%,rgba(var(--lime-rgb),.12),transparent 46%)!important;
+  transition:background 900ms ease,background-color 900ms ease;
+}
+.app-shell:before{
+  inset:-12% -22% 4%!important;
+  background-image:
+    linear-gradient(180deg,rgba(5,6,9,.28) 0%,rgba(5,6,9,.48) 52%,rgba(5,6,9,.78) 100%),
+    var(--current-artwork)!important;
+  background-size:cover!important;
+  background-position:center 24%!important;
+  filter:blur(58px) saturate(1.9)!important;
+  opacity:.52!important;
+  transform:scale(1.16);
+  mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.96) 58%,transparent 100%)!important;
+  transition:opacity 900ms ease,filter 900ms ease;
+}
+.topbar{
+  background:rgba(8,9,12,.42)!important;
+  backdrop-filter:blur(25px) saturate(145%)!important;
+  -webkit-backdrop-filter:blur(25px) saturate(145%)!important;
+}
+.page{
+  background:linear-gradient(180deg,rgba(8,9,12,.10),rgba(8,9,12,.22))!important;
+}
+.app-dock.windows-sidebar{
+  background:rgba(20,22,27,.42)!important;
+  border-color:rgba(255,255,255,.10)!important;
+  backdrop-filter:blur(30px) saturate(175%)!important;
+  -webkit-backdrop-filter:blur(30px) saturate(175%)!important;
+}
+.mini-player{
+  background:rgba(24,26,31,.72)!important;
+  border-color:rgba(var(--lime-rgb),.30)!important;
+  box-shadow:0 10px 36px rgba(0,0,0,.34),0 0 28px rgba(var(--lime-rgb),.13)!important;
+}
+.app-dock.windows-sidebar button.active,
+.topbar .brand span,.eyebrow,.subtle-action{
+  color:rgb(var(--lime-rgb))!important;
+}
+.app-dock.windows-sidebar button.active:after{
+  background:rgb(var(--lime-rgb))!important;
+  box-shadow:0 0 12px rgba(var(--lime-rgb),.55);
+}
+/* Remove browser-blue focus/selection rectangles; keep a quiet accessible focus cue. */
+:where(button,input,select,textarea,a,[role="button"],[role="switch"]):focus{
+  outline:none!important;
+  box-shadow:none!important;
+}
+:where(button,input,select,textarea,a,[role="button"],[role="switch"]):focus-visible{
+  outline:1px solid rgba(245,245,247,.42)!important;
+  outline-offset:2px!important;
+  box-shadow:none!important;
+}
+:where(input,textarea)::selection{
+  color:#fff!important;
+  background:rgba(225,225,230,.24)!important;
+}
+:where(button,a,[role="button"]){
+  -webkit-tap-highlight-color:transparent;
+}
+:root[data-theme=light] .app-shell{
+  background-color:#e6e6e9!important;
+  background-image:
+    radial-gradient(ellipse at 50% 8%,rgba(var(--lime-rgb),.22) 0%,rgba(var(--lime-rgb),.08) 32%,transparent 70%),
+    linear-gradient(180deg,#f4f4f6,#e6e6e9)!important;
+}
+:root[data-theme=light] .app-shell:before{
+  opacity:.28!important;
+  filter:blur(62px) saturate(1.65)!important;
+}
+:root[data-theme=light] .topbar{background:rgba(248,248,250,.55)!important}
+:root[data-theme=light] .page{background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.18))!important}
+:root[data-theme=light] .app-dock.windows-sidebar{background:rgba(255,255,255,.48)!important;border-color:rgba(0,0,0,.08)!important}
+:root[data-theme=light] .mini-player{background:rgba(255,255,255,.72)!important;border-color:rgba(var(--lime-rgb),.25)!important}
+@media(prefers-reduced-motion:reduce){
+  .app-shell,.app-shell:before{transition:none!important}
+}
