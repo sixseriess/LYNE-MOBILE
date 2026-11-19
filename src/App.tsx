@@ -342,7 +342,7 @@ export default function App() {
   const [localTracks,setLocalTracks]=useState<Track[]>([]);
   const [shuffle,setShuffle]=useState(()=>localStorage.getItem("lyne.mobile.shuffle")==="true");
   const [notice,setNotice]=useState("");
-  const [settingsSection,setSettingsSection]=useState<"Profile"|"Playback"|"Listening"|"Shortcuts"|"Appearance"|"Overlay"|"YouTube"|"Discord"|"Storage"|"About">("Appearance");
+  const [settingsSection,setSettingsSection]=useState<"Profile"|"Playback"|"Listening"|"Shortcuts"|"Appearance"|"Overlay"|"Connections"|"YouTube"|"Discord"|"Storage"|"About">("Appearance");
   const [providerStatus,setProviderStatus]=useState<Record<string,{configured:boolean;capability:string}>|null>(null);
   const [providerStatusError,setProviderStatusError]=useState("");
   const loadProviderStatus=async()=>{try{const result=await lyneApi.providerStatus();setProviderStatus(result.providers);setProviderStatusError("");}catch(error){setProviderStatusError(error instanceof Error?error.message:"Could not check provider connections.");}};
