@@ -122,12 +122,29 @@ async function soundcloudOembedImport(url:URL):Promise<ResolvedImport>{
   return {provider:"soundcloud",kind,providerId:track.providerId,title,subtitle:by?.[2]||"SoundCloud",externalUrl:url.toString(),artwork,embedUrl,tracks:kind==="track"?[track]:[]};
 }
 async function soundcloudImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
-  if(!env.SOUNDCLOUD_CLIENT_ID||!env.SOUNDCLOUD_CLIENT_SECRET)return soundcloudOembedImport(url);
-  const token=await soundcloudToken(env);
-  const data=await providerJson("https://api.soundcloud.com/resolve?url="+encodeURIComponent(url.toString()),{headers:{Authorization:"OAuth "+token,Accept:"application/json; charset=utf-8"}});
+  const clientId=await getSoundCloudClientId(env.SOUNDCLOUD_CLIENT_ID);
+  const data=await soundCloudApiJson("/resolve?url="+encodeURIComponent(url.toString()),clientId);
   const kind=(data.kind==="playlist"||data.kind==="system-playlist")?"playlist":"track";
-  const tracks:ImportedTrack[]=(kind==="track"?[data]:(data.tracks||[])).filter((t:any)=>t?.id).slice(0,100).map((t:any)=>({providerId:String(t.id),title:clean(t.title),artist:clean(t.user?.username||t.publisher_metadata?.artist),externalUrl:t.permalink_url||url.toString(),artwork:firstImage(t.artwork_url),durationMs:Number(t.duration)||undefined,embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(t.permalink_url||url.toString())}));
-  return {provider:"soundcloud",kind,providerId:String(data.id),title:clean(data.title)||"SoundCloud item",subtitle:kind==="track"?clean(data.user?.username):clean(data.user?.username||data.description),externalUrl:data.permalink_url||url.toString(),artwork:firstImage(data.artwork_url),embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(data.permalink_url||url.toString()),tracks};
+  const tracks:ImportedTrack[]=(kind==="track"?[data]:(data.tracks||[])).filter((t:any)=>t?.id).slice(0,100).map((t:any)=>({
+    providerId:String(t.id),
+    title:clean(t.title),
+    artist:clean(t.user?.username||t.publisher_metadata?.artist),
+    externalUrl:t.permalink_url||url.toString(),
+    artwork:firstImage(t.artwork_url),
+    durationMs:Number(t.duration)||undefined,
+    embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(t.permalink_url||url.toString())
+  }));
+  return {
+    provider:"soundcloud",
+    kind,
+    providerId:String(data.id),
+    title:clean(data.title)||"SoundCloud item",
+    subtitle:kind==="track"?clean(data.user?.username):clean(data.user?.username||data.description),
+    externalUrl:data.permalink_url||url.toString(),
+    artwork:firstImage(data.artwork_url),
+    embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(data.permalink_url||url.toString()),
+    tracks
+  };
 }
 function youtubeIdFromUrl(url: URL) {
   if(url.hostname==="youtu.be") return url.pathname.slice(1);
@@ -254,7 +271,7 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
     const format=item?.format||{};
     const protocol=String(format.protocol||"");
     const mime=String(format.mime_type||"").toLowerCase();
-    return item?.snipped!==true&&(protocol==="progressive"||protocol==="hls")&&!mime.includes("mpegurl");
+    return item?.snipped!==true&&protocol==="progressive"&&!mime.includes("mpegurl");
   }).sort((a:any,b:any)=>{
     const rank=(item:any)=>item?.format?.protocol==="progressive"?(String(item?.format?.mime_type||"").includes("mpeg")?0:1):2;
     return rank(a)-rank(b);

@@ -233,7 +233,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({
       providers: {
         spotify: { configured: !!(env.SPOTIFY_CLIENT_ID && env.SPOTIFY_CLIENT_SECRET), capability: "metadata" },
-        soundcloud: { configured: !!env.SOUNDCLOUD_CLIENT_ID, capability: "metadata and full-length streams where SoundCloud permits" },
+        soundcloud: { configured: true, capability: "public API metadata and eligible full-length streams" },
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
         apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "metadata" },
       },
