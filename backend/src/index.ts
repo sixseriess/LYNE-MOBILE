@@ -80,20 +80,42 @@ async function tokenUser(request: Request, env: Env): Promise<string | null> {
     return null;
   }
 }
-async function passwordHash(password: string, salt?: Uint8Array) {
-  const actualSalt = salt || crypto.getRandomValues(new Uint8Array(16));
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: actualSalt, iterations: 210000, hash: "SHA-256" }, material, 256);
-  return "pbkdf2$210000$" + b64url(actualSalt) + "$" + b64url(new Uint8Array(bits));
+async function derivePasswordBits(passwordBytes:Uint8Array,salt:Uint8Array,iterations:number){
+  const material=await crypto.subtle.importKey("raw",passwordBytes,"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt,iterations,hash:"SHA-256"},material,256);
+  return new Uint8Array(bits);
 }
-async function verifyPassword(password: string, stored: string) {
-  const [kind, rounds, salt, expected] = stored.split("$");
-  if (kind !== "pbkdf2" || !rounds || !salt || !expected) return false;
-  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: decodeB64url(salt), iterations: Number(rounds), hash: "SHA-256" }, material, 256);
-  const actual = b64url(new Uint8Array(bits));
-  return actual.length === expected.length && [...actual].every((c, i) => c === expected[i]);
+async function passwordHash(password:string){
+  // Cloudflare WebCrypto caps PBKDF2 at 100,000 iterations per deriveBits call.
+  // Two independently salted stages retain a higher work factor without exceeding that cap.
+  const passwordBytes=new TextEncoder().encode(password);
+  const firstSalt=crypto.getRandomValues(new Uint8Array(16));
+  const secondSalt=crypto.getRandomValues(new Uint8Array(16));
+  const first=await derivePasswordBits(passwordBytes,firstSalt,100000);
+  const second=await derivePasswordBits(first,secondSalt,100000);
+  return "pbkdf2x2$100000$"+b64url(firstSalt)+"$"+b64url(secondSalt)+"$"+b64url(second);
 }
+async function verifyPassword(password:string,stored:string){
+  const parts=stored.split("$");
+  if(parts[0]==="pbkdf2x2"){
+    const [,rounds,firstSalt,secondSalt,expected]=parts;
+    const iterations=Number(rounds);
+    if(iterations<1||iterations>100000||!firstSalt||!secondSalt||!expected)return false;
+    const first=await derivePasswordBits(new TextEncoder().encode(password),decodeB64url(firstSalt),iterations);
+    const second=await derivePasswordBits(first,decodeB64url(secondSalt),iterations);
+    const actual=b64url(second);
+    return actual.length===expected.length&&[...actual].every((char,index)=>char===expected[index]);
+  }
+  if(parts[0]==="pbkdf2"){
+    const [,rounds,salt,expected]=parts;
+    const iterations=Number(rounds);
+    if(iterations<1||iterations>100000||!salt||!expected)return false;
+    const actual=b64url(await derivePasswordBits(new TextEncoder().encode(password),decodeB64url(salt),iterations));
+    return actual.length===expected.length&&[...actual].every((char,index)=>char===expected[index]);
+  }
+  return false;
+}
+
 function mediaUrl(key: string | null | undefined) {
   if (!key) return "";
   if (key.startsWith("data:image/")) return key;
