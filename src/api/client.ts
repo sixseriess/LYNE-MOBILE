@@ -111,8 +111,6 @@ export const lyneApi = {
   resolveImport: (url: string) => api<ResolvedImport>(`/v1/import/resolve?url=${encodeURIComponent(url)}`),
   providerStatus: () => api<{providers:Record<MusicProvider,{configured:boolean;capability:string}>;playback:{soundcloud:boolean;youtube:string}}>("/v1/providers/status"),
   soundcloudPlayback: (id:string) => api<{url:string;mimeType:string;durationMs?:number;expiresAt?:string}>(`/v1/providers/soundcloud/playback/${encodeURIComponent(id)}`),
-  youtubePlayback: (id:string) => api<{url:string;mimeType:string;durationMs?:number}>(`/v1/providers/youtube/playback/${encodeURIComponent(id)}`),
-  youtubeMatch: (title:string,artist:string) => api<{videoId:string;title:string;artist:string;durationMs?:number}>(`/v1/providers/youtube/match?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`),
   saveImport: (item: ResolvedImport) => api<{ saved:boolean; kind:string; id:string }>("/v1/me/imports", { method:"POST", body:JSON.stringify(item) }),
   getImports: () => api<{ likes:SavedImport[]; collections:SavedImport[] }>("/v1/me/imports"),
 };
