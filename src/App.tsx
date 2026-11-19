@@ -654,8 +654,8 @@ export default function App() {
       if(!active)return;
       try{
         const colors=extractCoverFluidColors(image);
-        const primary=colors.color2.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/)?.[0]||"120,140,175";
-        const secondary=colors.color1.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/)?.[0]||"72,76,88";
+        const primary=colors.color2.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"120,140,175";
+        const secondary=colors.color1.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"72,76,88";
         setAmbientColor(primary);
         setAmbientSecondaryColor(secondary);
       }catch{setAmbientColor("200,245,106");setAmbientSecondaryColor("95,72,132");}
