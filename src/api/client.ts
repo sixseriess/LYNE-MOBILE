@@ -1,14 +1,14 @@
 export type Track = {
   id: string; title: string; artist: string; album?: string; artwork?: string;
-  audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local" | "spotify" | "apple_music" | "soundcloud"; providerId?: string; externalUrl?: string;
+  audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local" | "spotify" | "apple_music" | "soundcloud"; providerId?: string; externalUrl?: string; uploader?: string;
   lyrics?: string; offline?: boolean;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
 export type SearchPlaylist = { id: string; name: string; description?: string; owner: string; cover?: string };
 export type SearchKind = "all" | "tracks" | "artists" | "albums" | "playlists";
 export type MusicProvider = "spotify" | "soundcloud" | "youtube" | "apple_music";
-export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string };
-export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; tracks:ExternalTrack[] };
+export type ExternalTrack = { providerId:string; title:string; artist:string; externalUrl:string; artwork?:string; durationMs?:number; embedUrl?:string; uploader?:string };
+export type ResolvedImport = { provider:MusicProvider; kind:"track"|"playlist"|"album"; providerId:string; title:string; subtitle:string; externalUrl:string; artwork?:string; embedUrl?:string; uploader?:string; tracks:ExternalTrack[] };
 export type SavedImport = ResolvedImport & { createdAt?:string; addedTracks?:Track[] };
 
 export class ApiError extends Error { constructor(message: string, public status = 0) { super(message); this.name = "ApiError"; } }
