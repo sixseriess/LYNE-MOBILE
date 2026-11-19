@@ -2694,45 +2694,6 @@ html,body,#root{background:var(--bg)}
 }
 
 
-/* Mobile repair: bottom navigation stays fully inside the phone safe area. */
-@media(max-width:600px){
-  .app-shell{height:100dvh;min-height:100dvh;overflow:hidden;padding:0!important}
-  .topbar{position:relative;inset:auto;height:54px;min-height:54px;flex:none;padding-top:env(safe-area-inset-top);box-sizing:content-box}
-  .page{position:relative;inset:auto;left:auto;right:auto;top:auto;bottom:auto;flex:1;min-height:0;width:100%;margin:0;padding:18px 15px calc(142px + env(safe-area-inset-bottom));overflow-y:auto}
-  .app-dock.windows-sidebar{
-    position:absolute;z-index:60;left:9px;right:9px;top:auto;bottom:calc(7px + env(safe-area-inset-bottom));
-    width:auto;height:58px;min-height:58px;transform:none;display:flex;flex-direction:row;
-    align-items:center;justify-content:space-around;gap:0;padding:4px 6px;
-    border:1px solid rgba(255,255,255,.12);border-radius:16px;
-    background:rgba(20,21,25,.78);backdrop-filter:blur(28px) saturate(150%);
-    -webkit-backdrop-filter:blur(28px) saturate(150%);box-shadow:0 8px 30px rgba(0,0,0,.28)
-  }
-  .app-dock.windows-sidebar button,.app-dock.windows-sidebar button.settings-nav-button{
-    position:relative;flex:1;width:25%;height:48px;min-height:48px;margin:0;padding:0;
-    display:grid;place-items:center;border:0;border-radius:11px;background:transparent;
-    color:rgba(245,245,248,.58)
-  }
-  .app-dock.windows-sidebar button.active{color:#fff;background:rgba(255,255,255,.085)}
-  .app-dock.windows-sidebar button:after{display:none!important;content:none!important}
-  .app-dock.windows-sidebar button svg{width:23px;height:23px}
-  .app-dock.windows-sidebar .sidebar-spacer{display:none!important}
-  .mini-player{position:absolute;z-index:55;left:9px;right:9px;top:auto;bottom:calc(76px + env(safe-area-inset-bottom));height:62px;min-height:62px;border-radius:13px;padding:6px 8px;background:rgba(27,28,32,.78);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(30px) saturate(155%);-webkit-backdrop-filter:blur(30px) saturate(155%)}
-  .mini-player .cover{width:46px;height:46px}
-  .api-note.network-banner{position:relative;inset:auto;margin:8px 10px 0}
-  .modal-backdrop{position:absolute;z-index:90;inset:0;padding:8px 8px calc(8px + env(safe-area-inset-bottom));align-items:flex-end}
-  .modal-settings{width:100%;height:min(88dvh,760px);max-height:calc(100dvh - env(safe-area-inset-top) - 12px);min-height:0;padding:14px 14px calc(12px + env(safe-area-inset-bottom));border-radius:18px 18px 12px 12px;overflow:hidden}
-  .modal-settings .modal-head{flex:none}
-  .modal-settings .settings-layout{flex:1;min-height:0;overflow:hidden}
-  .modal-settings .settings-tabs{flex:none;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain}
-  .modal-settings .settings-content{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:calc(28px + env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
-  .player-overlay{padding-top:calc(10px + env(safe-area-inset-top));padding-bottom:calc(14px + env(safe-area-inset-bottom))}
-}
-@media(max-width:390px){
-  .page{padding-left:12px;padding-right:12px}
-  .mini-player{left:7px;right:7px}
-  .app-dock.windows-sidebar{left:7px;right:7px}
-}
-
 /* Replace the old blue-tinted panels and focus boxes with LYNE's neutral surfaces. */
 :root{--bg:#0b0c0f;--surface:#151619;--elevated:#1b1c20;--panel:#202126;--border:rgba(255,255,255,.09);--muted:rgba(245,245,248,.62);--dim:rgba(245,245,248,.38)}
 html,body,#root{background:#0b0c0f;color:#f4f4f5}
@@ -2776,3 +2737,68 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
 @media(prefers-reduced-motion:reduce){.app-shell:before,.app-shell:after{animation:none!important}}
 :root[data-theme=light] .app-shell{background:#e8e8eb}
 :root[data-theme=light] .app-shell:before,:root[data-theme=light] .app-shell:after{opacity:.2}
+
+
+/* Restore the intended mobile LYNE layout: vertical navigation rail on the left,
+   content in the main column, and the playback bar anchored to the bottom. */
+@media(max-width:600px){
+  .app-shell{
+    position:relative;display:block;width:100%;max-width:none;height:100dvh;min-height:100dvh;
+    margin:0;padding:0;overflow:hidden;isolation:isolate;
+  }
+  .app-shell>.topbar{
+    position:absolute;z-index:45;top:calc(6px + env(safe-area-inset-top));left:6px;right:6px;
+    height:50px;min-height:50px;
+  }
+  .app-shell>.app-dock.windows-sidebar{
+    position:absolute;z-index:46;left:6px;right:auto;
+    top:calc(56px + env(safe-area-inset-top));bottom:calc(6px + env(safe-area-inset-bottom));
+    width:58px;height:auto;min-height:0;transform:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    gap:20px;padding:16px 0;border:0;border-radius:12px;
+    background:rgba(30,31,35,.42);backdrop-filter:blur(26px) saturate(155%);
+    -webkit-backdrop-filter:blur(26px) saturate(155%);box-shadow:none;
+  }
+  .app-shell>.app-dock.windows-sidebar button{
+    position:relative;flex:none;width:58px;height:29px;min-height:29px;margin:0;padding:0;
+    display:grid;place-items:center;border:0;border-radius:0;background:transparent;
+    color:rgba(244,245,248,.58)
+  }
+  .app-shell>.app-dock.windows-sidebar button.active{color:#fff;background:transparent}
+  .app-shell>.app-dock.windows-sidebar button.active:after{
+    content:"";position:absolute;right:0;left:auto;top:5px;bottom:5px;width:2px;height:auto;
+    border-radius:2px;background:var(--lime);box-shadow:0 0 12px rgba(var(--lime-rgb),.4)
+  }
+  .app-shell>.app-dock.windows-sidebar .sidebar-spacer{display:block;flex:1}
+  .app-shell>.app-dock.windows-sidebar .settings-nav-button{margin-top:auto}
+  .app-shell>.page{
+    position:absolute;z-index:2;top:calc(56px + env(safe-area-inset-top));
+    left:70px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom));
+    width:auto;height:auto;min-height:0;margin:0;padding:0 12px 86px;
+    overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  }
+  .app-shell>.mini-player{
+    position:absolute;z-index:55;left:70px;right:6px;top:auto;
+    bottom:calc(6px + env(safe-area-inset-bottom));width:auto;height:62px;min-height:62px;
+    padding:7px 9px;gap:9px;border-radius:10px;
+    background:rgba(27,28,32,.82);border:1px solid rgba(255,255,255,.12);
+    backdrop-filter:blur(28px) saturate(155%);-webkit-backdrop-filter:blur(28px) saturate(155%);
+    box-shadow:0 10px 30px rgba(0,0,0,.38)
+  }
+  .app-shell>.mini-player:before{display:none}
+  .app-shell>.mini-player .cover{width:44px;height:44px;flex:none}
+  .app-shell>.modal-backdrop{position:absolute;z-index:90}
+  .app-shell>.player-overlay{position:absolute;z-index:80;inset:0}
+}
+@media(max-width:390px){
+  .app-shell>.app-dock.windows-sidebar{left:6px;width:54px}
+  .app-shell>.app-dock.windows-sidebar button{width:54px}
+  .app-shell>.page{left:66px;right:5px;padding-left:10px;padding-right:10px}
+  .app-shell>.mini-player{left:66px;right:5px}
+}
+@media(max-width:350px){
+  .app-shell>.app-dock.windows-sidebar{width:50px}
+  .app-shell>.app-dock.windows-sidebar button{width:50px}
+  .app-shell>.page{left:62px;padding-left:8px;padding-right:8px}
+  .app-shell>.mini-player{left:62px}
+}
