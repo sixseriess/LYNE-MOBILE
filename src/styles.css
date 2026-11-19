@@ -2781,3 +2781,45 @@ html,body,#root{background:var(--bg)}
 @media(prefers-reduced-motion:reduce){
   .app-shell,.app-shell:before{transition:none!important}
 }
+
+
+/* Final mobile polish: empty states are plain text, never outlined cards. */
+.empty{
+  border:0!important;
+  outline:0!important;
+  box-shadow:none!important;
+  background:transparent!important;
+  border-radius:0!important;
+}
+.empty::before,.empty::after,.empty-icon::before,.empty-icon::after{
+  border:0!important;outline:0!important;box-shadow:none!important;
+}
+.empty-icon{
+  border:0!important;
+  box-shadow:none!important;
+}
+
+/* Artwork colour is shared by every screen, not gated by the expanded player. */
+.app-shell{
+  background-image:
+    radial-gradient(ellipse at 50% 8%,rgba(var(--lime-rgb),.46) 0%,rgba(var(--lime-rgb),.22) 32%,transparent 72%),
+    radial-gradient(ellipse at 8% 68%,rgba(var(--lime-rgb),.22),transparent 52%),
+    radial-gradient(ellipse at 94% 48%,rgba(var(--lime-rgb),.20),transparent 50%)!important;
+}
+.app-shell:before{
+  opacity:.78!important;
+  filter:blur(54px) saturate(2.35)!important;
+  background-image:
+    linear-gradient(180deg,rgba(5,6,9,.12) 0%,rgba(5,6,9,.32) 48%,rgba(5,6,9,.66) 100%),
+    var(--current-artwork,transparent)!important;
+  transition:opacity 900ms ease,filter 900ms ease,background-image 900ms ease;
+}
+:root[data-theme=light] .app-shell{
+  background-image:
+    radial-gradient(ellipse at 50% 8%,rgba(var(--lime-rgb),.34) 0%,rgba(var(--lime-rgb),.15) 34%,transparent 72%),
+    linear-gradient(180deg,#f4f4f6,#e6e6e9)!important;
+}
+:root[data-theme=light] .app-shell:before{
+  opacity:.48!important;
+  filter:blur(58px) saturate(2)!important;
+}
