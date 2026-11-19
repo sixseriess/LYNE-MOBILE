@@ -3444,3 +3444,43 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
 @media (prefers-reduced-motion: reduce) {
   .app-shell.has-song-ambience::before { animation: none !important; }
 }
+
+
+/* Keep song ambience on the app canvas only; never tint or sit behind Settings. */
+.app-shell.has-song-ambience::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  inset: -18% -24% -10% !important;
+  pointer-events: none !important;
+  background:
+    radial-gradient(ellipse at 18% 24%, rgba(var(--ambient-color-a, 200,245,106), .68) 0%, transparent 58%),
+    radial-gradient(ellipse at 82% 34%, rgba(var(--ambient-color-b, 110,90,180), .62) 0%, transparent 56%),
+    radial-gradient(ellipse at 52% 82%, rgba(var(--ambient-color-a, 200,245,106), .42) 0%, transparent 62%) !important;
+  background-size: 145% 145%, 150% 150%, 135% 135% !important;
+  filter: blur(42px) saturate(1.75) !important;
+  opacity: .95 !important;
+  transform: scale(1.08);
+  animation: lyne-live-cover-colours 18s ease-in-out infinite alternate !important;
+  mask-image: none !important;
+}
+.app-shell.has-song-ambience::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background: linear-gradient(180deg, rgba(8,9,12,.08), rgba(8,9,12,.18) 55%, rgba(8,9,12,.36)) !important;
+  opacity: 1 !important;
+}
+.app-shell.settings-open::before,
+.app-shell.settings-open::after {
+  opacity: 0 !important;
+  animation: none !important;
+}
+.app-shell.has-song-ambience > * { position: relative; z-index: 1; }
+@keyframes lyne-live-cover-colours {
+  0% { transform: scale(1.04) translate3d(-2%, -1%, 0); }
+  50% { transform: scale(1.13) translate3d(1%, 1%, 0); }
+  100% { transform: scale(1.2) translate3d(2%, -1%, 0); }
+}
