@@ -56,13 +56,23 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!API_URL) throw new ApiError("LYNE's API has not been deployed or configured yet.");
   if (!path.startsWith("/") || path.startsWith("//")) throw new ApiError("Invalid LYNE API path.");
   const token = localStorage.getItem("lyne.accessToken");
-  let response: Response;
-  try {
-    response = await fetch(API_URL + path, {
-      ...init, credentials: "omit",
-      headers: { Accept: "application/json", ...(init.body && !(typeof FormData!=="undefined" && init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
-    });
-  } catch { throw new ApiError("Can't reach the LYNE API. Check your connection."); }
+  const request=(base:string)=>fetch(base+path,{
+    ...init,credentials:"omit",
+    headers:{Accept:"application/json",...(init.body&&!(typeof FormData!=="undefined"&&init.body instanceof FormData)?{"Content-Type":"application/json"}:{}),...(token?{Authorization:`Bearer ${token}`}:{}),...init.headers}
+  });
+  let response:Response;
+  try{response=await request(API_URL);}
+  catch{
+    if(API_URL===DEFAULT_API_URL)throw new ApiError("Can't reach the LYNE API. Check your connection.");
+    API_URL=DEFAULT_API_URL;
+    if(typeof localStorage!=="undefined")localStorage.removeItem("lyne.apiUrl");
+    try{response=await request(API_URL);}catch{throw new ApiError("Can't reach the LYNE API. Check your connection.");}
+  }
+  if((response.status===404||response.status===502||response.status===503)&&API_URL!==DEFAULT_API_URL){
+    API_URL=DEFAULT_API_URL;
+    if(typeof localStorage!=="undefined")localStorage.removeItem("lyne.apiUrl");
+    try{response=await request(API_URL);}catch{throw new ApiError("Can't reach the LYNE API. Check your connection.");}
+  }
   if (response.status === 204) return undefined as T;
   const raw=await response.text();
   let data:unknown=null;
