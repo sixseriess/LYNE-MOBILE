@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type Playlist, type SearchKind, type SearchPlaylist, type ResolvedImport, type SavedImport } from "./api/client";
 import { Home7Fill as WindowsHomeIcon, Search3Fill as WindowsSearchIcon, BookmarksFill as WindowsLibraryIcon, Settings4Fill as WindowsSettingsIcon, AlbumFill, FireFill, TimeFill, TrophyFill } from "@mingcute/react";
-import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, playSpotifyTracks, getSpotifyPlaybackSnapshot, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
+import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, playSpotifyTracks, getSpotifyPlaybackSnapshot, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, setSpotifyClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
 import { appleMusicIsAuthorized, authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
 
 type HlsPlayback = {
@@ -391,10 +391,10 @@ export default function App() {
   const loadProviderStatus=async()=>{try{const result=await lyneApi.providerStatus();setProviderStatus(result.providers);setProviderStatusError("");}catch(error){setProviderStatusError(error instanceof Error?error.message:"Could not check provider connections.");}};
   const connectSpotifyAccount=async()=>{
     try{
-      const clientId=spotifyClientIdInput.trim();
-      if(!clientId){setSpotifyConnectionStatus("Enter your Spotify Client ID first.");return;}
+      const clientId=spotifySavedClientId()||spotifyClientIdInput.trim();
+      if(!clientId){setSpotifyConnectionStatus("Spotify hasn't been configured by LYNE yet. Please try again later.");return;}
       setProviderBusy(true);
-      localStorage.setItem("lyne.spotify.clientId",clientId);
+      setSpotifyClientId(clientId);
       await beginSpotifyAuthorization(clientId,spotifyRedirectUri);
     }catch(error){setSpotifyConnectionStatus(error instanceof Error?error.message:"Spotify sign-in could not start.");setProviderBusy(false);}
   };
@@ -587,8 +587,25 @@ export default function App() {
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); },[state]);
   useEffect(()=>{
     let active=true;
+    void lyneApi.providerStatus().then(result=>{
+      const sharedClientId=result.providers.spotify?.clientId||"";
+      if(sharedClientId){setSpotifyClientId(sharedClientId);setSpotifyClientIdInput(sharedClientId);}
+      return sharedClientId;
+    }).then(async clientId=>{
+      if(!active||!clientId)return;
+      try{
+        const completed=await handleSpotifyAuthorizationRedirect(clientId,spotifyRedirectUri);
+        if(completed&&active)setSpotifyConnectionStatus("Spotify authorized. Connecting LYNE player…");
+        if(spotifyHasSession()){
+          await connectSpotifyPlayer(clientId,onSpotifyPlaybackSnapshot);
+          if(active){setSpotifyConnected(true);setSpotifyConnectionStatus("Connected · LYNE playback device ready");}
+        }
+      }catch(error){
+        if(active){setSpotifyConnected(false);setSpotifyConnectionStatus(error instanceof Error?error.message:"Spotify could not connect.");}
+      }
+    }).catch(error=>{if(active)setSpotifyConnectionStatus(error instanceof Error?error.message:"LYNE Spotify connection is not configured.");});
     const clientId=spotifySavedClientId();
-    if(clientId){
+    if(clientId&&!spotifyHasSession()){
       void (async()=>{
         try{
           const completed=await handleSpotifyAuthorizationRedirect(clientId,spotifyRedirectUri);
@@ -1844,9 +1861,7 @@ export default function App() {
             <div className="storage-card">
               <div className="section-heading"><h2>Spotify</h2><span className={"status-pill "+(spotifyConnected?"online":"offline")}>{spotifyConnected?"Connected":"Not connected"}</span></div>
               <p className="settings-note">{spotifyConnectionStatus}</p>
-              <label className="field-label">Spotify app Client ID<input value={spotifyClientIdInput} onChange={e=>setSpotifyClientIdInput(e.target.value)} placeholder="Paste your Spotify Client ID" autoCapitalize="none" autoCorrect="off"/></label>
-              <p className="settings-note">In the Spotify Developer Dashboard, add this exact Redirect URI to your app:</p>
-              <code className="provider-redirect-uri">{spotifyRedirectUri}</code>
+              <p className="settings-note">LYNE manages the Spotify app connection. You only need to connect your own Spotify account — no Client ID or developer setup required.</p>
               <button className="secondary-action full-action" type="button" onClick={()=>void connectSpotifyAccount()} disabled={providerBusy}>{providerBusy?"Connecting…":spotifyConnected?"Reconnect Spotify":"Connect Spotify"}</button>
               {spotifyConnected&&<button className="provider-open" type="button" onClick={disconnectSpotifyAccount}>Disconnect Spotify</button>}
               <p className="settings-note">Requires Spotify Premium and approval for your app. Spotify's Web Playback SDK is subject to Spotify's developer and commercial-use rules.</p>
