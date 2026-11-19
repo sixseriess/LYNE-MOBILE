@@ -2224,3 +2224,48 @@ html,body,#root{width:100%;height:100%;min-height:100%;margin:0;background:#000;
   .player-overlay{padding-left:16px;padding-right:16px}
   .player-cover{width:min(76vw,340px)}
 }
+
+
+/* Final phone fit-and-finish: keep the Windows rail and content geometry inside
+   iPhone/Android safe areas without changing the LYNE desktop visual language. */
+.app-shell{box-sizing:border-box;padding:calc(6px + env(safe-area-inset-top)) 6px calc(6px + env(safe-area-inset-bottom))}
+.topbar{top:calc(6px + env(safe-area-inset-top));left:6px;right:6px;height:50px;min-height:50px}
+.app-dock.windows-sidebar{left:6px;top:calc(56px + env(safe-area-inset-top));bottom:calc(6px + env(safe-area-inset-bottom));width:58px}
+.page{top:calc(56px + env(safe-area-inset-top));left:70px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom));padding-bottom:84px}
+.mini-player{left:70px;right:6px;bottom:calc(6px + env(safe-area-inset-bottom));}
+.api-note.network-banner{top:calc(58px + env(safe-area-inset-top));left:72px;right:6px}
+.page button,.modal button{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.page button:focus-visible,.modal button:focus-visible,.topbar button:focus-visible,.app-dock button:focus-visible{
+  outline:2px solid rgba(var(--lime-rgb),.9);outline-offset:3px
+}
+.page-home .mix-grid,.page-home .home-card-rail,.page-library .library-content-grid{overscroll-behavior-x:contain}
+.page-search .searchbox:focus-within,.page-library .library-search:focus-within{
+  border-color:rgba(var(--lime-rgb),.48);box-shadow:0 0 0 2px rgba(var(--lime-rgb),.08)
+}
+.page-search .filter-pills button,.page-library .library-tab-row button,.period-pills button{
+  transition:background .16s ease,color .16s ease,border-color .16s ease
+}
+.modal-settings .settings-content{scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.2) transparent}
+:root[data-theme=light] .modal-settings .settings-content{scrollbar-color:rgba(0,0,0,.2) transparent}
+:root[data-theme=light] .app-shell{background:#f5f5f7}
+:root[data-theme=light] .app-shell:before{opacity:.38}
+:root[data-theme=light] .app-dock.windows-sidebar{border-color:rgba(0,0,0,.055)}
+:root[data-theme=light] .page-search .searchbox:focus-within,:root[data-theme=light] .page-library .library-search:focus-within{border-color:rgba(0,0,0,.28);box-shadow:0 0 0 2px rgba(0,0,0,.045)}
+@media(max-width:390px){
+  .app-dock.windows-sidebar{left:5px;width:56px}
+  .app-dock.windows-sidebar button{width:56px}
+  .page{left:67px;right:5px;padding-left:10px;padding-right:10px}
+  .mini-player{left:67px;right:5px}
+  .topbar{left:5px;right:5px}
+  .page-home .mix-card,.page-home .home-track-card{flex-basis:148px;width:148px}
+  .page-home .mix-grid,.page-home .home-card-rail{gap:17px}
+}
+@media(max-width:350px){
+  .app-dock.windows-sidebar{width:52px}
+  .app-dock.windows-sidebar button{width:52px}
+  .page{left:62px;padding-left:8px;padding-right:8px}
+  .mini-player{left:62px}
+}
+@media(prefers-reduced-motion:reduce){
+  .page-search .filter-pills button,.page-library .library-tab-row button,.period-pills button{transition:none}
+}
