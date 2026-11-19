@@ -393,14 +393,14 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
   const streamUrl=String(streams?.hls_aac_160_url||streams?.hls_mp3_128_url||"");
   if(!streamUrl)throw new Error("SoundCloud did not provide a full-length stream for this track.");
   const mediaUrl=new URL(streamUrl);
-  if(mediaUrl.protocol!=="https:"||!/(^|\\.)sndcdn\\.com$/i.test(mediaUrl.hostname))throw new Error("SoundCloud returned an unexpected media URL.");
+  if(mediaUrl.protocol!=="https:"||!/(^|\.)sndcdn\.com$/i.test(mediaUrl.hostname))throw new Error("SoundCloud returned an unexpected media URL.");
   const duration=Number(track.duration)||0;
   const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
   return {
     url:mediaUrl.toString(),
     mimeType:"application/vnd.apple.mpegurl",
     durationMs:duration||undefined,
-    expiresAt:expires&&/^\\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined,
+    expiresAt:expires&&/^\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined,
     uploader:clean(track.user?.username||track.user?.permalink),
     permalinkUrl:typeof track.permalink_url==="string"?track.permalink_url:"",
     artworkUrl:firstImage(track.artwork_url)
