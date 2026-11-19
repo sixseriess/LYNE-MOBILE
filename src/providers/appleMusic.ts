@@ -81,9 +81,9 @@ export async function initializeAppleMusic(token: string): Promise<void> {
   instance = window.MusicKit.getInstance();
 }
 
-export async function authorizeAppleMusic(token: string): Promise<void> {
-  await initializeAppleMusic(token);
-  if (!instance) throw new Error("Apple Music could not initialize.");
+export async function authorizeAppleMusic(token?: string): Promise<void> {
+  if (token) await initializeAppleMusic(token);
+  if (!instance) throw new Error("Apple Music has not finished initializing. Check the developer token in Settings → Connections.");
   await instance.authorize();
 }
 
