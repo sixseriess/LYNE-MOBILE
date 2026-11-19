@@ -2,12 +2,12 @@ export type ProviderName = "spotify" | "soundcloud" | "youtube" | "apple_music";
 export type ImportKind = "track" | "playlist" | "album";
 export type ImportedTrack = {
   providerId: string; title: string; artist: string; externalUrl: string;
-  artwork?: string; durationMs?: number; embedUrl?: string;
+  artwork?: string; durationMs?: number; embedUrl?: string; uploader?: string;
 };
 export type ResolvedImport = {
   provider: ProviderName; kind: ImportKind; providerId: string;
   title: string; subtitle: string; externalUrl: string; artwork?: string;
-  embedUrl?: string; tracks: ImportedTrack[];
+  embedUrl?: string; uploader?: string; tracks: ImportedTrack[];
 };
 export interface ProviderEnv {
   SPOTIFY_CLIENT_ID?: string; SPOTIFY_CLIENT_SECRET?: string;
@@ -170,6 +170,7 @@ async function soundcloudImport(url:URL,env:ProviderEnv):Promise<ResolvedImport>
     providerId:String(track.id??track.urn),
     title:clean(track.title),
     artist:clean(track.metadata_artist||track.user?.username||track.publisher_metadata?.artist),
+    uploader:clean(track.user?.username||track.user?.permalink),
     externalUrl:track.permalink_url||url.toString(),
     artwork:firstImage(track.artwork_url||data.artwork_url),
     durationMs:Number(track.duration)||undefined,
@@ -183,6 +184,7 @@ async function soundcloudImport(url:URL,env:ProviderEnv):Promise<ResolvedImport>
     providerId:trackId,
     title:clean(data.title)||"SoundCloud item",
     subtitle:clean(data.metadata_artist||data.user?.username||data.description)||"SoundCloud",
+    uploader:clean(data.user?.username||data.user?.permalink),
     externalUrl:data.permalink_url||url.toString(),
     artwork:firstImage(data.artwork_url),
     embedUrl:"https://w.soundcloud.com/player/?url="+encodeURIComponent(data.permalink_url||url.toString()),
