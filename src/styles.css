@@ -3315,7 +3315,7 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
 /* Full-screen animated artwork ambience for LYNE Mobile.
    The two colour fields are extracted from the active track's cover art. */
 @media screen and (max-width: 600px) {
-  .app-shell {
+  .app-shell:not([style*="background-image"]) {
     background-color: var(--bg) !important;
     background-image:
       radial-gradient(ellipse at 16% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .38) 0%, transparent 52%),
@@ -3338,7 +3338,7 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
     }
   }
 
-  :root[data-theme="light"] .app-shell {
+  :root[data-theme="light"] .app-shell:not([style*="background-image"]) {
     background-color: #f0f0f3 !important;
     background-image:
       radial-gradient(ellipse at 16% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .2) 0%, transparent 52%),
@@ -3352,7 +3352,11 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
     background-position: 50% 50%, 50% 50%, 50% 50% !important;
   }
 
-  :root[data-ambient-mode="off"] .app-shell {
+  :root[data-ambient-mode="off"] .app-shell:not([style*="background-image"]) {
     background-image: none !important;
+  }
+
+  .app-shell[style*="background-image"] {
+    animation: none !important;
   }
 }
