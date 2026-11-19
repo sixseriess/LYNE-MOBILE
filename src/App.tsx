@@ -1005,10 +1005,31 @@ export default function App() {
       await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,tracks:[first]});
       return;
     }
+
+    // Provider links supply metadata. Use actual playable audio already stored by the user
+    // or published in LYNE before attempting a provider-specific source.
+    const localMatch=findLocalTrackForImport(item.title,item.subtitle);
+    if(localMatch){
+      play(localMatch,[localMatch]);
+      setNotice("Playing your local audio file in LYNE.");
+      return;
+    }
+
+    setNotice("Checking the LYNE catalogue for playable audio...");
+    const catalogueMatch=await findPlayableCatalogTrackForImport(item.title,item.subtitle);
+    if(catalogueMatch){
+      play(catalogueMatch,[catalogueMatch]);
+      setNotice("Playing "+catalogueMatch.title+" from the LYNE catalogue.");
+      return;
+    }
+
     if(item.provider==="soundcloud"){
       const trackInfo=item.tracks?.[0];
       const soundcloudTrackId=item.kind==="track"?item.providerId:trackInfo?.providerId||"";
-      if(!soundcloudTrackId){setNotice("This SoundCloud collection has no playable tracks.");return;}
+      if(!soundcloudTrackId){
+        const message="This SoundCloud collection doesn't contain a playable track.";
+        setPlaybackMessage(message);setNotice(message);return;
+      }
       const playable:Track={
         id:"sc:"+soundcloudTrackId,title:trackInfo?.title||item.title,
         artist:trackInfo?.artist||item.subtitle,artwork:item.artwork,
@@ -1016,34 +1037,23 @@ export default function App() {
         durationMs:trackInfo?.durationMs,source:"catalog"
       };
       play(playable,[playable]);
-      setNotice("Loading the full-length SoundCloud stream in LYNE...");
       return;
     }
-    if(item.provider==="youtube"){
-      const playable:Track={
-        id:"yt:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,
-        audioUrl:getApiUrl()+"/v1/providers/youtube/stream/"+encodeURIComponent(item.providerId),
-        source:"catalog"
-      };
-      play(playable,[playable]);
-      setNotice("Loading YouTube audio in LYNE...");
-      return;
-    }
-    const localMatch=findLocalTrackForImport(item.title,item.subtitle);
-    if(localMatch){
-      play(localMatch,[localMatch]);
-      setNotice("Playing your local audio file in LYNE.");
-      return;
-    }
-    const matchedStreamUrl=getApiUrl()+"/v1/providers/import/stream?title="+encodeURIComponent(item.title)+"&artist="+encodeURIComponent(item.subtitle);
-    const playable:Track={
-      id:"import:"+item.provider+":"+item.providerId,title:item.title,artist:item.subtitle,
-      artwork:item.artwork,audioUrl:matchedStreamUrl,source:"catalog"
-    };
-    play(playable,[playable]);
-    setNotice("Finding and loading the full-length recording in LYNE...");
 
+    const metadataTrack:Track={
+      id:"import:"+item.provider+":"+item.providerId,title:item.title,artist:item.subtitle,
+      artwork:item.artwork,durationMs:item.tracks?.[0]?.durationMs,source:"catalog"
+    };
+    play(metadataTrack,[metadataTrack]);
+    const message=item.provider==="spotify"
+      ?"Spotify supplied song information, not a playable audio stream. Full playback needs Spotify's official Web Playback SDK, a Spotify Premium account and user authorization, or a licensed audio file in the LYNE catalogue."
+      :item.provider==="apple_music"
+      ?"Apple Music supplied song information, not a playable audio stream. Full playback needs MusicKit user authorization and an active Apple Music subscription, or a licensed audio file in the LYNE catalogue."
+      :"YouTube supplied video information, not a direct audio file. LYNE won't extract or rip YouTube audio. Add a licensed audio file to Local Files or the LYNE catalogue to play it here.";
+    setPlaybackMessage(message);
+    setNotice(message);
   };
+
   const likeAllImportedTracks=async(collection:SavedImport)=>{
     const tracks=collection.tracks||[];
     const additions=tracks.map(track=>({provider:collection.provider,kind:"track" as const,providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]}));
