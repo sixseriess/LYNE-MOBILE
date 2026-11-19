@@ -94,7 +94,11 @@ async function spotifyOembedImport(url:URL):Promise<ResolvedImport>{
 async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   const { kind, id } = spotifyParts(url);
   if (kind === "artist") throw new Error("Paste a Spotify song, album or playlist link. Artist-only imports aren't library items yet.");
-  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyEmbedImport(url);
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) {
+    // A single track has a dedicated oEmbed response; do not depend on Spotify's
+    // private/unstable embed-page trackList payload for one song.
+    return kind === "track" ? spotifyOembedImport(url) : spotifyEmbedImport(url);
+  }
   const token = await spotifyToken(env);
   const data = await providerJson(`https://api.spotify.com/v1/${kind}s/${id}?market=CA`, { headers:{ Authorization:"Bearer "+token } });
   const externalUrl = data.external_urls?.spotify || url.toString();
