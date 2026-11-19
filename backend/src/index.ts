@@ -1,4 +1,4 @@
-import { resolveMusicLink, type ResolvedImport } from "./providers";
+import { resolveMusicLink, resolveSoundCloudPlayback, type ResolvedImport } from "./providers";
 
 interface Env {
   SPOTIFY_CLIENT_ID?: string; SPOTIFY_CLIENT_SECRET?: string;
@@ -223,6 +223,12 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
   }
 
+  const soundCloudPlaybackMatch=path.match(/^\/v1\/providers\/soundcloud\/playback\/(\d+)$/);
+  if(soundCloudPlaybackMatch&&request.method==="GET"){
+    try{return json(await resolveSoundCloudPlayback(soundCloudPlaybackMatch[1],env));}
+    catch(error){return fail(error instanceof Error?error.message:"SoundCloud playback could not be resolved.",422);}
+  }
+
   if (path === "/v1/providers/status" && request.method === "GET") {
     return json({
       providers: {
@@ -231,7 +237,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
         apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "metadata" },
       },
-      playback: "LYNE catalogue only",
+      playback: { soundcloud: !!(env.SOUNDCLOUD_CLIENT_ID && env.SOUNDCLOUD_CLIENT_SECRET), youtube: "LYNE catalogue or local licensed audio" },
     });
   }
 

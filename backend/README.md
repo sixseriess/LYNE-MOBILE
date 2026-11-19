@@ -87,3 +87,9 @@ Add provider credentials as Worker secrets only when those integrations are appr
 Spotify and SoundCloud public resources use app tokens; YouTube uses a Data API key; Apple Music uses a signed developer token. Private or user-library resources need their own user authorization flow, which is not included in this public-link resolver.
 
 For local development, run `npm install`, `npx wrangler dev` in `backend/`. Do not run a production deploy until the Cloudflare and Supabase secrets above are configured.
+
+
+### Provider playback
+
+- `GET /v1/providers/soundcloud/playback/:trackId` resolves a full-length SoundCloud stream using the configured official SoundCloud API client credentials. It rejects blocked, non-streamable, preview-only, and unsupported tracks, and returns the short-lived HTTPS media URL for the browser audio element. Configure `SOUNDCLOUD_CLIENT_ID` and `SOUNDCLOUD_CLIENT_SECRET` as Worker secrets; no credentials are exposed to the PWA.
+- YouTube Data API/oEmbed is used for metadata imports only. The YouTube Data API does not return an audio stream URL. LYNE mobile plays an exact match from the LYNE catalogue or a local licensed audio file instead of silently substituting an embed or preview.

@@ -213,3 +213,48 @@ export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<R
   if(host==="music.apple.com")return appleImport(url,env);
   throw new Error("Supported links: Spotify, SoundCloud, YouTube and Apple Music.");
 }
+
+
+export type SoundCloudPlaybackResult = { url:string; mimeType:string; durationMs?:number; expiresAt?:string };
+
+export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEnv):Promise<SoundCloudPlaybackResult>{
+  if(!/^\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
+  if(!env.SOUNDCLOUD_CLIENT_ID||!env.SOUNDCLOUD_CLIENT_SECRET)throw new Error("SoundCloud playback needs the official API client ID and secret configured on the LYNE backend.");
+  const token=await soundcloudToken(env);
+  const base="https://api-v2.soundcloud.com";
+  const track=await providerJson(base+"/tracks/"+providerId+"?client_id="+encodeURIComponent(env.SOUNDCLOUD_CLIENT_ID),{headers:{Authorization:"OAuth "+token,Accept:"application/json; charset=utf-8"}});
+  if(track?.policy==="BLOCK"||track?.streamable===false)throw new Error("This SoundCloud track is not available for streaming.");
+  const duration=Number(track?.duration)||0;
+  const fullDuration=Number(track?.full_duration)||duration;
+  if(fullDuration>0&&duration>0&&duration+5000<fullDuration)throw new Error("SoundCloud only provides a preview for this track.");
+  const transcodings=Array.isArray(track?.media?.transcodings)?track.media.transcodings:[];
+  const playable=transcodings.filter((item:any)=>{
+    const format=item?.format||{};
+    const protocol=String(format.protocol||"");
+    const mime=String(format.mime_type||"").toLowerCase();
+    return item?.snipped!==true&&(protocol==="progressive"||protocol==="hls")&&!mime.includes("mpegurl");
+  }).sort((a:any,b:any)=>{
+    const rank=(item:any)=>item?.format?.protocol==="progressive"?(String(item?.format?.mime_type||"").includes("mpeg")?0:1):2;
+    return rank(a)-rank(b);
+  });
+  if(!playable.length)throw new Error("SoundCloud has no full-length playable audio stream for this track.");
+  let lastError:unknown;
+  for(const item of playable){
+    try{
+      const streamUrl=new URL(item.url);
+      if(streamUrl.protocol!=="https:"||!/(^|\.)soundcloud\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
+      if(track.track_authorization)streamUrl.searchParams.set("track_authorization",String(track.track_authorization));
+      streamUrl.searchParams.set("client_id",env.SOUNDCLOUD_CLIENT_ID);
+      const response=await fetch(streamUrl.toString(),{headers:{Authorization:"OAuth "+token,Accept:"application/json"}});
+      if(!response.ok)throw new Error("SoundCloud stream authorization failed ("+response.status+").");
+      const payload=await response.json() as {url?:unknown};
+      if(typeof payload.url!=="string")throw new Error("SoundCloud did not return a playable stream URL.");
+      const mediaUrl=new URL(payload.url);
+      if(mediaUrl.protocol!=="https:")throw new Error("SoundCloud returned an insecure media URL.");
+      const mime=String(item?.format?.mime_type||"audio/mpeg").toLowerCase();
+      const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
+      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
+    }catch(error){lastError=error;}
+  }
+  throw lastError instanceof Error?lastError:new Error("Could not resolve a SoundCloud stream.");
+}
