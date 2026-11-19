@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type Playlist, type SearchKind, type SearchPlaylist, type ResolvedImport, type SavedImport } from "./api/client";
 import { Home7Fill as WindowsHomeIcon, Search3Fill as WindowsSearchIcon, BookmarksFill as WindowsLibraryIcon, Settings4Fill as WindowsSettingsIcon, AlbumFill, FireFill, TimeFill, TrophyFill } from "@mingcute/react";
-import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
+import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, playSpotifyTracks, getSpotifyPlaybackSnapshot, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
 import { authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
 
 type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
@@ -751,6 +751,10 @@ export default function App() {
     }else audio.pause();
   },[playing,volume,current?.id,current?.audioUrl]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.volume",String(volume));},[volume]);
+  useEffect(()=>{
+    void setSpotifyVolume(volume).catch(()=>{});
+    void setAppleMusicVolume(volume).catch(()=>{});
+  },[volume]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.playbackRate",String(playbackRate));},[playbackRate]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.shuffle",String(shuffle));},[shuffle]);
   useEffect(()=>{
@@ -764,10 +768,14 @@ export default function App() {
     if(equalizerPreampRef.current)equalizerPreampRef.current.gain.setTargetAtTime(enabled?eqPreampGain(gains):1,context.currentTime,0.02);
   },[state.preferences.equalizerEnabled,state.preferences.equalizerBands]);
   useEffect(()=>{if(audioRef.current)audioRef.current.playbackRate=playbackRate;},[playbackRate,current?.id]);
-  useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{ const audio=audioRef.current; if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);} },500); return ()=>window.clearInterval(timer); },[playing,current?.id]);
+  useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{
+    if(current.source==="spotify"){void getSpotifyPlaybackSnapshot().then(snapshot=>{if(snapshot){setPosition(snapshot.positionMs);setDuration(snapshot.durationMs);}});return;}
+    if(current.source==="apple_music"){const snapshot=getAppleMusicPlaybackState();if(snapshot){setPosition(snapshot.positionMs);setDuration(snapshot.durationMs);setPlaying(snapshot.isPlaying);}return;}
+    const audio=audioRef.current;if(audio){setPosition(audio.currentTime*1000);setDuration(Number.isFinite(audio.duration)?audio.duration*1000:0);}
+  },500); return ()=>window.clearInterval(timer); },[playing,current?.id,current?.source]);
   useEffect(()=>{ if(!playing||!current)return; const timer=window.setInterval(()=>{setState(s=>{const key=dayKey();const old=s.stats.find(x=>x.id===current.id&&x.day===key);const item={id:current.id,title:current.title,artist:current.artist,ms:(old?.ms||0)+1000,day:key};return {...s,stats:old?s.stats.map(x=>x===old?item:x):[...s.stats,item]};});},1000);return()=>window.clearInterval(timer); },[playing,current?.id]);
   const reportListening=useCallback((track:Track|null,listenedMs:number)=>{
-    if(!user||!track||track.source==="local"||listenedMs<1000||listeningReportedRef.current===track.id)return;
+    if(!user||!track||track.source!=="catalog"||listenedMs<1000||listeningReportedRef.current===track.id)return;
     listeningReportedRef.current=track.id;
     void lyneApi.listening({trackId:track.id,listenedMs:Math.min(3600000,Math.floor(listenedMs)),playedAt:new Date().toISOString()}).catch(()=>{listeningReportedRef.current=null;});
   },[user]);
@@ -775,6 +783,39 @@ export default function App() {
     haptic();
     const selected=localTracks.find(item=>item.id===track.id&&item.offline)||track;
     const selectedList=list.map(item=>localTracks.find(saved=>saved.id===item.id&&saved.offline)||item);
+    if(selected.source==="spotify"||selected.source==="apple_music"){
+      if(current&&current.id!==selected.id)reportListening(current,position);
+      listeningReportedRef.current=null;
+      audioRef.current?.pause();
+      setCurrent(selected);setQueue(selectedList.length?selectedList:[selected]);
+      setPosition(0);setDuration(selected.durationMs||0);setPlaying(false);setExpanded(true);
+      setPlaybackMessage(selected.source==="spotify"?"Starting Spotify playback…":"Starting Apple Music playback…");
+      setState(old=>({...old,history:[selected,...old.history.filter(t=>t.id!==selected.id)].slice(0,50)}));
+      if(selected.source==="spotify"){
+        const clientId=spotifySavedClientId();
+        if(!clientId){const message="Add your Spotify Client ID and connect your Premium account in Settings → Connections.";setPlaybackMessage(message);setNotice(message);return;}
+        const uris=selectedList.filter(item=>item.source==="spotify"&&item.providerId).map(item=>"spotify:track:"+item.providerId);
+        void playSpotifyTracks(uris.length?uris:["spotify:track:"+String(selected.providerId||"")],clientId).then(()=>{
+          setPlaying(true);setPlaybackMessage("Playing on Spotify");
+        }).catch(error=>{
+          const message=error instanceof Error?error.message:"Spotify playback could not start.";
+          setPlaying(false);setPlaybackMessage(message);setNotice(message);
+        });
+      }else{
+        void (async()=>{
+          const token=await lyneApi.appleMusicDeveloperToken();
+          await authorizeAppleMusic(token.developerToken);
+          if(!selected.externalUrl)throw new Error("This Apple Music import has no playable catalogue URL.");
+          await playAppleMusicSong(selected.externalUrl);
+        })().then(()=>{
+          setPlaying(true);setPlaybackMessage("Playing on Apple Music");
+        }).catch(error=>{
+          const message=error instanceof Error?error.message:"Apple Music playback could not start.";
+          setPlaying(false);setPlaybackMessage(message);setNotice(message);
+        });
+      }
+      return;
+    }
     if(!selected.audioUrl){
       const message="No playable audio is attached to this import yet. Add a licensed audio file to Local Files or the LYNE catalogue.";
       audioRef.current?.pause();
@@ -823,6 +864,14 @@ export default function App() {
   },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic,volume]);
   const togglePlaybackFromGesture=useCallback(()=>{
     const audio=audioRef.current;
+    if(current?.source==="spotify"){
+      void toggleSpotifyPlayback().then(()=>setPlaybackMessage(playing?"Paused on Spotify":"Playing on Spotify")).catch(error=>setNotice(error instanceof Error?error.message:"Spotify playback control failed."));
+      return;
+    }
+    if(current?.source==="apple_music"){
+      void toggleAppleMusicPlayback().then(()=>setPlaybackMessage("Apple Music playback updated")).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music playback control failed."));
+      return;
+    }
     if(!audio||!current?.audioUrl){setPlaying(false);const message="No playable audio is attached to this track.";setPlaybackMessage(message);setNotice(message);return;}
     if(!audio.paused){audio.pause();setPlaying(false);return;}
     const activeContext=audioContextRef.current;
@@ -845,10 +894,12 @@ export default function App() {
       const message=error instanceof Error?error.message:"The browser could not start this track.";
       setPlaybackMessage(message);setNotice(message);
     }
-  },[current?.id,current?.audioUrl,volume]);
+  },[current?.id,current?.audioUrl,current?.source,volume,playing]);
   const toggleLike=(track:Track)=>{haptic();setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));};
   const next=()=>{
     haptic();
+    if(current?.source==="spotify"){void nextSpotifyTrack().catch(error=>setNotice(error instanceof Error?error.message:"Spotify could not skip this track."));return;}
+    if(current?.source==="apple_music"){void nextAppleMusicTrack().catch(error=>setNotice(error instanceof Error?error.message:"Apple Music could not skip this track."));return;}
     if(!queue.length){setPlaying(false);return;}
     const idx=queue.findIndex(t=>t.id===current?.id);
     if(shuffle){const choices=queue.filter(t=>t.id!==current?.id);const target=choices[Math.floor(Math.random()*choices.length)];if(target){play(target,queue);return;}}
@@ -859,6 +910,8 @@ export default function App() {
   };
   const previous=()=>{
     haptic();
+    if(current?.source==="spotify"){void previousSpotifyTrack().catch(error=>setNotice(error instanceof Error?error.message:"Spotify could not go back."));return;}
+    if(current?.source==="apple_music"){void previousAppleMusicTrack().catch(error=>setNotice(error instanceof Error?error.message:"Apple Music could not go back."));return;}
     if(position>3000){if(audioRef.current)audioRef.current.currentTime=0;setPosition(0);return;}
     const idx=queue.findIndex(t=>t.id===current?.id);
     if(idx>0){play(queue[idx-1],queue);return;}
