@@ -3552,3 +3552,53 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
   -webkit-backdrop-filter: blur(38px) saturate(175%) !important;
   backdrop-filter: blur(38px) saturate(175%) !important;
 }
+
+
+/* Keep mobile navigation icons bright while tapped, selected, or focused. */
+@media screen and (max-width: 600px) {
+  .app-shell > .app-dock.windows-sidebar button,
+  .app-shell > .app-dock.windows-sidebar button svg {
+    color: rgba(255,255,255,.82) !important;
+    opacity: 1 !important;
+    filter: none !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .app-shell > .app-dock.windows-sidebar button.active,
+  .app-shell > .app-dock.windows-sidebar button:active,
+  .app-shell > .app-dock.windows-sidebar button:focus,
+  .app-shell > .app-dock.windows-sidebar button:focus-visible,
+  .app-shell > .app-dock.windows-sidebar button.active svg,
+  .app-shell > .app-dock.windows-sidebar button:active svg,
+  .app-shell > .app-dock.windows-sidebar button:focus svg {
+    color: rgb(var(--lime-rgb)) !important;
+    opacity: 1 !important;
+    filter: drop-shadow(0 0 7px rgba(var(--lime-rgb),.35)) !important;
+    background: transparent !important;
+    outline: none !important;
+  }
+
+  .app-shell > .app-dock.windows-sidebar button:active {
+    transform: none !important;
+  }
+}
+
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button svg {
+  color: rgba(24,24,27,.78) !important;
+  opacity: 1 !important;
+}
+
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button.active,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button:active,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button:focus,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button:focus-visible,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button.active svg,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button:active svg,
+:root[data-theme="light"] .app-shell > .app-dock.windows-sidebar button:focus svg {
+  color: rgb(105,145,28) !important;
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px rgba(105,145,28,.22)) !important;
+  background: transparent !important;
+  outline: none !important;
+}
