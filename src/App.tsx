@@ -343,6 +343,7 @@ export default function App() {
   const [catalogTracks,setCatalogTracks]=useState<Track[]>([]);
   const [shuffle,setShuffle]=useState(()=>localStorage.getItem("lyne.mobile.shuffle")==="true");
   const [notice,setNotice]=useState("");
+  const [playbackMessage,setPlaybackMessage]=useState("");
   const [settingsSection,setSettingsSection]=useState<"Profile"|"Playback"|"Listening"|"Shortcuts"|"Appearance"|"Overlay"|"Connections"|"YouTube"|"Discord"|"Storage"|"About">("Appearance");
   const [providerStatus,setProviderStatus]=useState<Record<string,{configured:boolean;capability:string}>|null>(null);
   const [providerStatusError,setProviderStatusError]=useState("");
@@ -674,7 +675,14 @@ export default function App() {
     haptic();
     const selected=localTracks.find(item=>item.id===track.id&&item.offline)||track;
     const selectedList=list.map(item=>localTracks.find(saved=>saved.id===item.id&&saved.offline)||item);
-    if(!selected.audioUrl){setPlaying(false);setNotice("This track doesn't have a playable audio file yet. Add its licensed audio to Local Files or the LYNE catalogue.");return;}
+    if(!selected.audioUrl){
+      const message="No playable audio is attached to this import yet. Add a licensed audio file to Local Files or the LYNE catalogue.";
+      audioRef.current?.pause();
+      setCurrent(selected);setQueue(selectedList.length?selectedList:[selected]);
+      setPosition(0);setDuration(selected.durationMs||0);
+      setPlaying(false);setExpanded(true);setPlaybackMessage(message);setNotice(message);
+      return;
+    }
     if(current&&current.id!==selected.id)reportListening(current,position);
     listeningReportedRef.current=null;
     const quality=getAudioSourceQuality(selected);
@@ -685,6 +693,7 @@ export default function App() {
     // Assign and start the media element in the same user interaction. Starting it only
     // from an effect can lose browser user activation, especially on mobile Safari.
     const audio=audioRef.current;
+    setPlaybackMessage("Loading audio…");
     if(audio){
       if(audio.dataset.trackId!==selected.id||audio.getAttribute("src")!==selected.audioUrl){
         audio.pause();
@@ -694,25 +703,27 @@ export default function App() {
       }
       audio.volume=volume;
       try{
-        void audio.play().catch(error=>{
+        void audio.play().then(()=>setPlaybackMessage("Playing")).catch(error=>{
           setPlaying(false);
           const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio format or stream could not be decoded.":audio.error?.code===4?"This browser doesn't support the supplied audio format.":"The browser blocked playback or the source rejected the request.";
-          setNotice(detail+" "+(error instanceof Error?error.message:"Try another track or a local audio file."));
+          const message=detail+" "+(error instanceof Error?error.message:"Try another track or a local audio file.");
+          setPlaybackMessage(message);setNotice(message);
         });
       }catch(error){
         setPlaying(false);
-        setNotice(error instanceof Error?error.message:"The browser could not start this audio source.");
+        const message=error instanceof Error?error.message:"The browser could not start this audio source.";
+        setPlaybackMessage(message);setNotice(message);
       }
     }
     setCurrent(selected);
     setQueue(selectedList.length?selectedList:[selected]);
     setPosition(0);setDuration(selected.durationMs||0);
-    setPlaying(true);setExpanded(false);
+    setPlaying(true);setExpanded(true);
     setState(old=>({...old,history:[selected,...old.history.filter(t=>t.id!==selected.id)].slice(0,50)}));
   },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic,volume]);
   const togglePlaybackFromGesture=useCallback(()=>{
     const audio=audioRef.current;
-    if(!audio||!current?.audioUrl){setPlaying(false);return;}
+    if(!audio||!current?.audioUrl){setPlaying(false);const message="No playable audio is attached to this track.";setPlaybackMessage(message);setNotice(message);return;}
     if(!audio.paused){audio.pause();setPlaying(false);return;}
     const activeContext=audioContextRef.current;
     if(activeContext?.state==="suspended")void activeContext.resume().catch(()=>{});
@@ -722,15 +733,17 @@ export default function App() {
     audio.volume=volume;
     try{
       const request=audio.play();
-      setPlaying(true);
-      if(request)void request.catch(error=>{
+      setPlaying(true);setPlaybackMessage("Loading audio…");
+      if(request)void request.then(()=>setPlaybackMessage("Playing")).catch(error=>{
         setPlaying(false);
         const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio file could not be decoded.":audio.error?.code===4?"This browser doesn't support this audio format.":"The browser blocked playback.";
-        setNotice(detail+" "+(error instanceof Error?error.message:"Tap Play again to retry."));
+        const message=detail+" "+(error instanceof Error?error.message:"Tap Play again to retry.");
+        setPlaybackMessage(message);setNotice(message);
       });
     }catch(error){
       setPlaying(false);
-      setNotice(error instanceof Error?error.message:"The browser could not start this track.");
+      const message=error instanceof Error?error.message:"The browser could not start this track.";
+      setPlaybackMessage(message);setNotice(message);
     }
   },[current?.id,current?.audioUrl,volume]);
   const toggleLike=(track:Track)=>{haptic();setState(s=>({...s,likes:s.likes.includes(track.id)?s.likes.filter(id=>id!==track.id):[...s.likes,track.id]}));};
@@ -1268,7 +1281,7 @@ export default function App() {
   </main>;
 
   return <main className="app-shell" style={customBackground?{backgroundImage:`linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),url("${customBackground}")`,backgroundSize:"cover",backgroundPosition:"center"}:undefined}>
-    <audio ref={audioRef} preload="auto" onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={e=>{const code=e.currentTarget.error?.code;setPlaying(false);setNotice(code===2?"The audio source could not be fetched. Check the stream URL or connection.":code===3?"The audio file could not be decoded. Try a different format.":code===4?"This audio format isn't supported by this browser.":"The audio stream failed. Try another track or add a local audio file.");}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>{const value=e.currentTarget.duration;setDuration(Number.isFinite(value)?value*1000:0);}} />
+    <audio ref={audioRef} preload="auto" onLoadStart={()=>setPlaybackMessage("Loading audio…")} onWaiting={()=>setPlaybackMessage("Buffering audio…")} onPlaying={()=>setPlaybackMessage("Playing")} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={e=>{const code=e.currentTarget.error?.code;setPlaying(false);const message=code===2?"The audio source could not be fetched. Check the LYNE stream connection.":code===3?"The audio file could not be decoded. Try a different format.":code===4?"This audio format isn't supported by this browser.":"The audio stream failed. The imported link may not include playable audio.";setPlaybackMessage(message);setNotice(message);}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>{const value=e.currentTarget.duration;setDuration(Number.isFinite(value)?value*1000:0);}} />
     <header className="topbar">
       <button className="brand" type="button" aria-label="LYNE Home" onClick={()=>setTab("Home")}>
         <img src="/LYNE-MOBILE/lyne-wordmark.png" alt="LYNE" width="54" height="27"/>
@@ -1450,7 +1463,7 @@ export default function App() {
       <span className="sidebar-spacer"/>
       <button type="button" title="Settings" aria-label="Settings" className="settings-nav-button" onClick={()=>setModal("settings")}><WindowsSettingsIcon size={26}/></button>
     </nav>
-    {expanded&&current&&<div className={`player-overlay ambient-${state.preferences.ambientVisualMode}`} onTouchStart={handlePlayerTouchStart} onTouchEnd={handlePlayerTouchEnd}><div className="player-art-backdrop" style={{backgroundColor:`rgb(${ambientColor})`,...(current.artwork?{backgroundImage:`url("${current.artwork}")`}:{})}}/><div className="player-top"><button className="plain-icon" aria-label="Minimize player" onClick={()=>setExpanded(false)}><Minimize2/></button><span>NOW PLAYING</span><div className="player-top-actions"><button className="plain-icon" aria-label="Open equalizer" onClick={()=>setModal("equalizer")}><SlidersHorizontal/></button><button className="plain-icon" aria-label="Open play queue" onClick={()=>setModal("queue")}><ListMusic/></button></div></div><Cover track={current} className="player-cover"/><div className="player-track"><div><h2>{current.title}</h2><p>{current.artist}</p><small className="audio-source-label">{getAudioSourceQuality(current).label}</small></div><button className={state.likes.includes(current.id)?"liked plain-icon":"plain-icon"} onClick={()=>toggleLike(current)}><Heart fill={state.likes.includes(current.id)?"currentColor":"none"}/></button></div><input className="seek" type="range" min="0" max={duration||100} value={Math.min(position,duration||100)} onChange={e=>{const v=Number(e.target.value);setPosition(v);if(audioRef.current)audioRef.current.currentTime=v/1000;}}/><div className="time-row"><span>{fmtTime(position)}</span><span>{fmtTime(duration)}</span></div><div className="transport"><button aria-label={shuffle?"Turn shuffle off":"Turn shuffle on"} className={shuffle?"control-on":"plain-icon"} onClick={()=>setShuffle(v=>!v)}><Shuffle/></button><button aria-label="Previous track" className="plain-icon large-control" onClick={previous}><SkipBack fill="currentColor"/></button><button aria-label={playing?"Pause playback":"Start playback"} className="main-play" onClick={togglePlaybackFromGesture}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button><button aria-label="Next track" className="plain-icon large-control" onClick={next}><SkipForward fill="currentColor"/></button><button aria-label={"Repeat "+state.repeat} className={state.repeat!=="off"?"control-on":"plain-icon"} onClick={()=>setState(s=>({...s,repeat:s.repeat==="off"?"all":s.repeat==="all"?"one":"off"}))}><Repeat2/></button></div><div className="volume-row"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="plain-icon" onClick={()=>setModal("lyrics")}><Mic2/></button></div></div>}
+    {expanded&&current&&<div className={`player-overlay ambient-${state.preferences.ambientVisualMode}`} onTouchStart={handlePlayerTouchStart} onTouchEnd={handlePlayerTouchEnd}><div className="player-art-backdrop" style={{backgroundColor:`rgb(${ambientColor})`,...(current.artwork?{backgroundImage:`url("${current.artwork}")`}:{})}}/><div className="player-top"><button className="plain-icon" aria-label="Minimize player" onClick={()=>setExpanded(false)}><Minimize2/></button><span>NOW PLAYING</span><div className="player-top-actions"><button className="plain-icon" aria-label="Open equalizer" onClick={()=>setModal("equalizer")}><SlidersHorizontal/></button><button className="plain-icon" aria-label="Open play queue" onClick={()=>setModal("queue")}><ListMusic/></button></div></div><Cover track={current} className="player-cover"/><div className="player-track"><div><h2>{current.title}</h2><p>{current.artist}</p><small className="audio-source-label">{getAudioSourceQuality(current).label}</small><small className="audio-playback-status">{playbackMessage}</small></div><button className={state.likes.includes(current.id)?"liked plain-icon":"plain-icon"} onClick={()=>toggleLike(current)}><Heart fill={state.likes.includes(current.id)?"currentColor":"none"}/></button></div><input className="seek" type="range" min="0" max={duration||100} value={Math.min(position,duration||100)} onChange={e=>{const v=Number(e.target.value);setPosition(v);if(audioRef.current)audioRef.current.currentTime=v/1000;}}/><div className="time-row"><span>{fmtTime(position)}</span><span>{fmtTime(duration)}</span></div><div className="transport"><button aria-label={shuffle?"Turn shuffle off":"Turn shuffle on"} className={shuffle?"control-on":"plain-icon"} onClick={()=>setShuffle(v=>!v)}><Shuffle/></button><button aria-label="Previous track" className="plain-icon large-control" onClick={previous}><SkipBack fill="currentColor"/></button><button aria-label={playing?"Pause playback":"Start playback"} className="main-play" onClick={togglePlaybackFromGesture}>{playing?<Pause fill="currentColor"/>:<Play fill="currentColor"/>}</button><button aria-label="Next track" className="plain-icon large-control" onClick={next}><SkipForward fill="currentColor"/></button><button aria-label={"Repeat "+state.repeat} className={state.repeat!=="off"?"control-on":"plain-icon"} onClick={()=>setState(s=>({...s,repeat:s.repeat==="off"?"all":s.repeat==="all"?"one":"off"}))}><Repeat2/></button></div><div className="volume-row"><Volume2 size={17}/><input type="range" min="0" max="1" step=".01" value={volume} onChange={e=>setVolume(Number(e.target.value))}/><button className="plain-icon" onClick={()=>setModal("lyrics")}><Mic2/></button></div></div>}
     {modal&&<div className={modal==="artistDetail"||modal==="albumDetail"||modal==="publicPlaylistDetail"?"modal-backdrop artist-page-backdrop":"modal-backdrop"} role="presentation" onClick={()=>setModal(null)}><div className={`modal ${modal==="settings"?"modal-settings":modal==="artistDetail"?"artist-page-modal":modal==="albumDetail"||modal==="publicPlaylistDetail"?"liner-collection-modal":""}`} ref={modalDialogRef} role="dialog" aria-modal="true" aria-labelledby="lyne-dialog-title" onClick={e=>e.stopPropagation()}><div className="modal-head"><h2 id="lyne-dialog-title">{modal==="playlist"?"Create playlist":modal==="playlistDetail"?(selectedPlaylist?.name||"Playlist"):modal==="track"?"Song options":modal==="artistDetail"?(artistDetail?.artist.name||"Artist"):modal==="albumDetail"?(albumDetail?.album.title||"Album"):modal==="publicPlaylistDetail"?(publicPlaylistDetail?.playlist.name||"Playlist"):modal==="account"?"LYNE account":modal==="profileEdit"?"Edit username":modal==="settings"?"Settings":modal==="queue"?"Play queue":modal==="equalizer"?"Equalizer":modal==="import"?"Import music":modal==="collection"?(activeCollection?.title||"Collection"):"Lyrics"}</h2><button ref={modalCloseRef} type="button" className="plain-icon" aria-label="Close dialog" onClick={()=>setModal(null)}><X/></button></div>
       {detailError&&<div className="detail-error" role="alert"><p>{detailError}</p><button className="secondary-action" onClick={()=>detailRetryRef.current?.()}>Try again</button></div>}
       {modal==="artistDetail"&&<>{detailBusy?<div className="loading"><LoaderCircle className="spin"/> Loading artist...</div>:artistDetail&&<><div className="music-detail-hero"><div className="music-detail-art artist-detail-art" style={artistDetail.artist.artwork?{backgroundImage:`url("${artistDetail.artist.artwork}")`}:undefined}>{!artistDetail.artist.artwork&&<UserRound size={30}/>}</div><div><p className="eyebrow">ARTIST</p><h3>{artistDetail.artist.name}{artistDetail.artist.verified&&<span className="artist-verified"><Check size={15}/></span>}</h3><small>{artistDetail.artist.monthlyListeners||(artistDetail.artist.followers?`${artistDetail.artist.followers.toLocaleString()} followers`:`${artistDetail.tracks.length} tracks · ${artistDetail.albums.length} albums`)}</small></div></div><div className="artist-detail-actions"><button className="primary-button" disabled={!artistDetail.tracks.length} onClick={()=>{if(artistDetail.tracks[0])play(artistDetail.tracks[0],artistDetail.tracks);}}><Play size={15} fill="currentColor"/> Play all</button><button className="secondary-action" disabled={!artistDetail.tracks.length} onClick={()=>{const tracks=[...artistDetail.tracks];for(let i=tracks.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tracks[i],tracks[j]]=[tracks[j],tracks[i]];}if(tracks[0])play(tracks[0],tracks);}}><Shuffle size={15}/> Shuffle</button><button className="secondary-action" onClick={()=>toggleSavedArtist(artistDetail.artist)}>{state.savedArtists.some(item=>item.id===artistDetail.artist.id)?<Check size={15}/>:<Plus size={15}/>} {state.savedArtists.some(item=>item.id===artistDetail.artist.id)?"Saved":"Save artist"}</button><button className="secondary-action" onClick={()=>void shareArtist(artistDetail.artist)}><Share2 size={15}/> Share</button></div>{artistDetail.artist.bio&&<p className="detail-description">{artistDetail.artist.bio}</p>}<div className="section-heading"><h2>Popular tracks</h2><span className="section-note">TOP SONGS</span></div>{renderRows(artistDetail.tracks)}{artistDetail.albums.length>0&&<><div className="section-heading"><h2>Albums</h2></div><div className="detail-album-grid">{artistDetail.albums.map(album=><button className="detail-album-card" key={album.id} onClick={()=>void openAlbum(album.id)}><div className="cover" style={album.artwork?{backgroundImage:`url("${album.artwork}")`}:undefined}>{!album.artwork&&<Disc3/>}</div><b>{album.title}</b><small>{album.releaseDate||"Album"}</small></button>)}</div></>}</>}</>}
