@@ -2849,3 +2849,50 @@ html,body,#root{background:var(--bg)}
   backdrop-filter:blur(34px) saturate(175%)!important;
   -webkit-backdrop-filter:blur(34px) saturate(175%)!important;
 }
+
+
+/* LYNE mobile: make the playing track's palette fill and drift through the app. */
+.app-shell{
+  background:
+    radial-gradient(ellipse at 24% 18%,rgba(var(--lime-rgb),.42),transparent 48%),
+    radial-gradient(ellipse at 82% 58%,rgba(var(--lime-rgb),.28),transparent 52%),
+    #09090b!important;
+  transition:background 1.2s ease!important;
+}
+.app-shell:before{
+  inset:-24% -35% -12%!important;
+  z-index:0!important;
+  background-image:
+    radial-gradient(ellipse at 28% 30%,rgba(var(--lime-rgb),.62) 0%,rgba(var(--lime-rgb),.25) 30%,transparent 62%),
+    radial-gradient(ellipse at 76% 56%,rgba(var(--lime-rgb),.46) 0%,rgba(var(--lime-rgb),.18) 34%,transparent 66%),
+    var(--current-artwork,transparent)!important;
+  background-size:150% 150%,145% 145%,cover!important;
+  background-position:12% 12%,88% 72%,center 24%!important;
+  filter:blur(76px) saturate(2.15)!important;
+  opacity:.92!important;
+  transform:scale(1.18);
+  mask-image:linear-gradient(to bottom,#000 0%,rgba(0,0,0,.98) 68%,rgba(0,0,0,.62) 100%)!important;
+  animation:lyne-artwork-drift 22s ease-in-out infinite alternate;
+  transition:opacity 1s ease,filter 1s ease;
+}
+@keyframes lyne-artwork-drift{
+  0%{background-position:8% 18%,90% 68%,center 20%;transform:scale(1.14) translate3d(-1.5%,0,0)}
+  50%{background-position:82% 36%,18% 84%,center 38%;transform:scale(1.23) translate3d(1.5%,-1%,0)}
+  100%{background-position:28% 88%,76% 12%,center 28%;transform:scale(1.17) translate3d(-.5%,1%,0)}
+}
+.page{
+  background:linear-gradient(180deg,rgba(8,9,12,.025),rgba(8,9,12,.12))!important;
+}
+:root[data-theme=light] .app-shell{
+  background:
+    radial-gradient(ellipse at 24% 18%,rgba(var(--lime-rgb),.34),transparent 50%),
+    radial-gradient(ellipse at 82% 58%,rgba(var(--lime-rgb),.22),transparent 54%),
+    #f1f1f3!important;
+}
+:root[data-theme=light] .app-shell:before{
+  opacity:.68!important;
+  filter:blur(78px) saturate(1.9)!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .app-shell:before{animation:none!important}
+}
