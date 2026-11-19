@@ -2896,3 +2896,70 @@ html,body,#root{background:var(--bg)}
 @media(prefers-reduced-motion:reduce){
   .app-shell:before{animation:none!important}
 }
+
+
+/* Full-bleed now-playing artwork ambience: the cover should tint the entire app, not a small glow. */
+.app-shell{
+  isolation:isolate;
+  background:#09090b!important;
+}
+.app-shell:before{
+  content:""!important;
+  position:absolute!important;
+  inset:-18%!important;
+  z-index:0!important;
+  pointer-events:none!important;
+  background:var(--current-artwork,none) center/cover no-repeat!important;
+  filter:blur(82px) saturate(1.9) brightness(.78)!important;
+  opacity:.62!important;
+  transform:scale(1.28)!important;
+  mask-image:none!important;
+  animation:lyne-full-cover-drift 28s ease-in-out infinite alternate!important;
+  transition:opacity 1s ease,filter 1s ease!important;
+}
+.app-shell:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  z-index:0;
+  pointer-events:none;
+  background:
+    radial-gradient(ellipse at 18% 22%,rgba(var(--lime-rgb),.38),transparent 58%),
+    radial-gradient(ellipse at 84% 72%,rgba(var(--lime-rgb),.28),transparent 60%),
+    linear-gradient(180deg,rgba(5,6,9,.22),rgba(5,6,9,.38));
+  mix-blend-mode:screen;
+  opacity:.9;
+  animation:lyne-full-color-drift 24s ease-in-out infinite alternate;
+}
+.app-shell>*{position:relative;z-index:1}
+.app-shell>.player-overlay{z-index:10}
+.app-shell>.modal-backdrop{z-index:15}
+@keyframes lyne-full-cover-drift{
+  0%{transform:scale(1.25) translate3d(-1.5%,-1%,0);background-position:42% 35%}
+  100%{transform:scale(1.38) translate3d(1.5%,1%,0);background-position:58% 65%}
+}
+@keyframes lyne-full-color-drift{
+  0%{background-position:0% 0%,100% 100%,center}
+  100%{background-position:100% 35%,0% 65%,center}
+}
+.page{background:transparent!important}
+.topbar,.bottom-nav,.app-dock.windows-sidebar,.mini-player{
+  backdrop-filter:blur(28px) saturate(175%)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(175%)!important;
+}
+:root[data-theme=light] .app-shell{background:#e8e8eb!important}
+:root[data-theme=light] .app-shell:before{
+  opacity:.44!important;
+  filter:blur(86px) saturate(1.65) brightness(1.08)!important;
+}
+:root[data-theme=light] .app-shell:after{
+  background:
+    radial-gradient(ellipse at 18% 22%,rgba(var(--lime-rgb),.24),transparent 58%),
+    radial-gradient(ellipse at 84% 72%,rgba(var(--lime-rgb),.18),transparent 60%),
+    linear-gradient(180deg,rgba(245,245,248,.12),rgba(235,235,240,.24));
+  mix-blend-mode:multiply;
+  opacity:.8;
+}
+@media(prefers-reduced-motion:reduce){
+  .app-shell:before,.app-shell:after{animation:none!important}
+}
