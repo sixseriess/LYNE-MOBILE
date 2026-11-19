@@ -200,7 +200,7 @@ async function youtubePlaylistHtmlImport(url:URL,playlistId:string):Promise<Reso
   const response=await fetch("https://www.youtube.com/playlist?list="+encodeURIComponent(playlistId),{headers:{accept:"text/html"}});
   if(!response.ok)throw new Error("YouTube playlist page could not be loaded.");
   const html=await response.text();
-  const match=html.match(/(?:var\\s+ytInitialData\\s*=|window\\["ytInitialData"\\]\\s*=)({[\\s\\S]*?});<\\/script>/);
+  const match=html.match(/(?:var\s+ytInitialData\s*=|window\["ytInitialData"\]\s*=)({[\s\S]*?});<\/script>/);
   if(!match)throw new Error("YouTube did not provide a public playlist track list.");
   let data:any;try{data=JSON.parse(match[1]);}catch{throw new Error("YouTube playlist data was invalid.");}
   const renderer=findYoutubePlaylistRenderer(data);
@@ -214,7 +214,7 @@ async function youtubePlaylistHtmlImport(url:URL,playlistId:string):Promise<Reso
     return {providerId:videoId,title,artist:artist||"YouTube",externalUrl:"https://www.youtube.com/watch?v="+videoId,artwork:firstImage(thumbs?.slice(-1)[0]?.url),embedUrl:"https://www.youtube-nocookie.com/embed/"+videoId};
   }).filter(Boolean).slice(0,100) as ImportedTrack[];
   if(!tracks.length)throw new Error("No public tracks were found in that YouTube playlist.");
-  const title=clean(html.match(/<title>([^<]+)<\\/title>/i)?.[1]?.replace(/\\s*-\\s*YouTube$/,""))||"YouTube playlist";
+  const title=clean(html.match(/<title>([^<]+)<\/title>/i)?.[1]?.replace(/\s*-\s*YouTube$/,""))||"YouTube playlist";
   return {provider:"youtube",kind:"playlist",providerId:playlistId,title,subtitle:"YouTube",externalUrl:url.toString(),tracks};
 }
 async function youtubeOembedImport(url:URL):Promise<ResolvedImport>{
@@ -324,7 +324,7 @@ export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<R
 export type SoundCloudPlaybackResult = { url:string; mimeType:string; durationMs?:number; expiresAt?:string };
 
 export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEnv):Promise<SoundCloudPlaybackResult>{
-  if(!/^\\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
+  if(!/^\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
   const clientId=await getSoundCloudClientId(env.SOUNDCLOUD_CLIENT_ID);
   const track=await soundCloudApiJson("/tracks/"+providerId,clientId);
   if(track?.policy==="BLOCK"||track?.streamable===false)throw new Error("This SoundCloud track is not available for streaming.");
@@ -346,7 +346,7 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
   for(const item of playable){
     try{
       const streamUrl=new URL(item.url);
-      if(streamUrl.protocol!=="https:"||!/(^|\\.)soundcloud\\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
+      if(streamUrl.protocol!=="https:"||!/(^|\.)soundcloud\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
       if(track.track_authorization)streamUrl.searchParams.set("track_authorization",String(track.track_authorization));
       streamUrl.searchParams.set("client_id",clientId);
       const response=await fetch(streamUrl.toString(),{headers:{Accept:"application/json"}});
@@ -357,7 +357,7 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
       if(mediaUrl.protocol!=="https:")throw new Error("SoundCloud returned an insecure media URL.");
       const mime=String(item?.format?.mime_type||"audio/mpeg").toLowerCase();
       const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
-      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
+      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
     }catch(error){lastError=error;}
   }
   throw lastError instanceof Error?lastError:new Error("Could not resolve a SoundCloud stream.");
@@ -384,7 +384,7 @@ export async function resolveYouTubePlayback(videoId:string):Promise<{url:string
       if(!audio.length)throw new Error("YouTube did not return a direct audio stream for this video.");
       const best=audio[0];
       const mediaUrl=new URL(best.url);
-      if(mediaUrl.protocol!=="https:"||!/(^|\\.)googlevideo\\.com$/i.test(mediaUrl.hostname))throw new Error("YouTube returned an unexpected audio URL.");
+       if(mediaUrl.protocol!=="https:"||!/(^|\.)googlevideo\.com$/i.test(mediaUrl.hostname))throw new Error("YouTube returned an unexpected audio URL.");
       return {url:mediaUrl.toString(),mimeType:String(best.mimeType).split(";")[0],durationMs:Number(response?.videoDetails?.lengthSeconds)*1000||undefined};
     }catch(error){lastError=error;}
   }
