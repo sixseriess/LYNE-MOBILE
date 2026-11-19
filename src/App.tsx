@@ -642,7 +642,8 @@ export default function App() {
   },[state.theme]);
   useEffect(()=>{
     document.documentElement.dataset.reducedMotion=state.preferences.reduceMotion?"true":"false";
-  },[state.preferences.reduceMotion]);
+    document.documentElement.dataset.ambientMode=state.preferences.ambientVisualMode;
+  },[state.preferences.reduceMotion,state.preferences.ambientVisualMode]);
   useEffect(()=>{
     const artworkUrl=current?.artwork;
     if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");return;}
