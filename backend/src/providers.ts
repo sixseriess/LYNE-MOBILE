@@ -278,8 +278,37 @@ function appleEmbedUrl(raw?:string):string|undefined{
   try{const embed=new URL(raw);if(embed.protocol!=="https:"||embed.hostname!=="music.apple.com")return undefined;embed.hostname="embed.music.apple.com";return embed.toString();}
   catch{return undefined;}
 }
+function findApplePlaylist(value:any,depth=0):any{
+  if(!value||typeof value!=="object"||depth>18)return null;
+  if(!Array.isArray(value)){
+    const type=value["@type"];
+    if((type==="MusicPlaylist"||type==="Playlist"||Array.isArray(type)&&type.includes("MusicPlaylist"))&&Array.isArray(value.track))return value;
+  }
+  const children=Array.isArray(value)?value:Object.values(value);
+  for(const child of children){const found=findApplePlaylist(child,depth+1);if(found)return found;}
+  return null;
+}
+async function applePlaylistPageImport(url:URL,id:string,storefront:string):Promise<ResolvedImport>{
+  const response=await fetch(url.toString(),{headers:{accept:"text/html"}});
+  if(!response.ok)throw new Error("Apple Music playlist page could not be loaded.");
+  const html=await response.text();
+  const scripts=[...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  let playlist:any=null;
+  for(const script of scripts){try{playlist=findApplePlaylist(JSON.parse(script[1]));if(playlist)break;}catch{}}
+  if(!playlist)throw new Error("Apple Music did not expose this playlist's track list. Its developer-token API connection is still required for this playlist.");
+  const tracks:ImportedTrack[]=(playlist.track||[]).map((item:any)=>{
+    const name=clean(item?.name);
+    const artist=clean(item?.byArtist?.name||item?.byArtist?.[0]?.name);
+    const external=typeof item?.url==="string"?item.url:url.toString();
+    const parsedId=external.match(/\/id(\d+)/)?.[1]||external.match(/\/(\d+)(?:\?|$)/)?.[1];
+    if(!name||!parsedId)return null;
+    return {providerId:parsedId,title:name,artist:artist||"Apple Music",externalUrl:safeExternalUrl(external),artwork:firstImage(item?.image)};
+  }).filter(Boolean).slice(0,100) as ImportedTrack[];
+  if(!tracks.length)throw new Error("No public tracks were found in that Apple Music playlist.");
+  return {provider:"apple_music",kind:"playlist",providerId:id,title:clean(playlist.name)||"Apple Music playlist",subtitle:clean(playlist.creator?.name)||"Apple Music",externalUrl:url.toString(),artwork:firstImage(playlist.image),tracks};
+}
 async function appleItunesLookup(url:URL,id:string,kind:ImportKind,storefront:string):Promise<ResolvedImport>{
-  if(kind==="playlist")throw new Error("Apple Music playlist track lists require an Apple Music developer token. Song and album links can be imported without one.");
+  if(kind==="playlist")return applePlaylistPageImport(url,id,storefront);
   const query=new URLSearchParams({id,country:storefront});
   if(kind==="album")query.set("entity","song");
   const data=await providerJson("https://itunes.apple.com/lookup?"+query.toString());
