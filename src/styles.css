@@ -2595,3 +2595,10 @@ html,body,#root{background:var(--bg)}
 :root[data-theme=light] .player-overlay .player-track h2{color:#f5f5f6}
 
 .audio-playback-status{display:block;min-height:14px;margin-top:5px;font-size:10px;line-height:1.4;color:rgba(245,245,247,.68)}
+
+.soundcloud-attribution{display:flex;align-items:center;gap:9px;width:max-content;max-width:100%;margin-top:8px;color:#fafafa;text-decoration:none;font-size:10px;line-height:1.35}
+.soundcloud-attribution img{display:block;width:90px;height:auto;object-fit:contain}
+.soundcloud-attribution span{color:rgba(245,245,247,.6)}
+.catalog-rights-confirm{display:flex;align-items:flex-start;gap:9px;margin:14px 0;color:rgba(245,245,247,.72);font-size:11px;line-height:1.45}
+.catalog-rights-confirm input{margin:1px 0 0;accent-color:var(--lime);flex:none}
+.provider-redirect-uri{display:block;overflow-wrap:anywhere;padding:10px;border-radius:8px;background:#0b0b0d;color:#ddd;font-size:10px;line-height:1.5}
