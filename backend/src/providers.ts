@@ -458,7 +458,7 @@ function youtubeDuration(value:string):number|undefined{
 }
 export async function resolveYouTubeMatch(title:string,artist:string):Promise<{videoId:string;title:string;artist:string;durationMs?:number}>{
   const wantedTitle=normalizeMatchText(title);
-  const wantedArtist=normalizeMatchText(artist);
+  const wantedArtist=normalizeMatchText(artist.split(/[,;&]|\bfeat\.?\b/i)[0]);
   if(wantedTitle.length<2||wantedArtist.length<2)throw new Error("A song title and artist are required to find a matching YouTube recording.");
   const query=encodeURIComponent(title+" "+artist+" official audio");
   const response=await fetch("https://www.youtube.com/results?search_query="+query,{headers:{accept:"text/html"}});
@@ -474,7 +474,7 @@ export async function resolveYouTubeMatch(title:string,artist:string):Promise<{v
     const normalizedTitle=normalizeMatchText(candidateTitle);
     const normalizedArtist=normalizeMatchText(candidateArtist);
     if(!/^[a-zA-Z0-9_-]{11}$/.test(videoId))continue;
-    const titleMatches=normalizedTitle===wantedTitle;
+    const titleMatches=normalizedTitle===wantedTitle||normalizedTitle.includes(wantedTitle);
     const artistMatches=normalizedArtist===wantedArtist||normalizedArtist.includes(wantedArtist)||wantedArtist.includes(normalizedArtist);
     if(titleMatches&&artistMatches){
       const durationText=String(video.lengthText?.simpleText||"");

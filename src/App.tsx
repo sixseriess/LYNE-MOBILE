@@ -920,7 +920,12 @@ export default function App() {
     play(playable,[playable]);
     setNotice("Playing the matched full-length recording in LYNE.");
   };
-  const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;durationMs?:number}[]})=>{
+  const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string}[]})=>{
+    if(item.kind&&item.kind!=="track"&&item.tracks?.length){
+      const first=item.tracks[0];
+      await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,tracks:[first]});
+      return;
+    }
     if(item.provider==="soundcloud"){
       const trackInfo=item.tracks?.[0];
       const soundcloudTrackId=item.kind==="track"?item.providerId:trackInfo?.providerId||"";
