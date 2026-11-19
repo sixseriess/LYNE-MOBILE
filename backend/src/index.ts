@@ -274,9 +274,10 @@ async function handle(request: Request, env: Env): Promise<Response> {
       await env.DB.prepare("INSERT INTO users (id,username,username_norm,email,password_hash) VALUES (?,?,?,?,?)").bind(userId,username,normalized(username),email,hash).run();
     } catch(error) {
       console.error("LYNE account registration failed",error);
-      const detail=error instanceof Error?error.message:"";
+      const detail=error instanceof Error?error.message:String(error);
       if(/unique|constraint/i.test(detail))return fail("That username or email is already registered.",409);
-      return fail("LYNE couldn't create your account right now. Please try again.",503);
+      const adminDebug=Boolean(env.ADMIN_API_TOKEN)&&request.headers.get("x-admin-token")===env.ADMIN_API_TOKEN;
+      return fail(adminDebug?"Account registration diagnostic: "+detail.slice(0,240):"LYNE couldn't create your account right now. Please try again.",503);
     }
     return json({ accessToken: await issueToken(userId,env.AUTH_SECRET), user: { id: userId, username } },201);
   }
