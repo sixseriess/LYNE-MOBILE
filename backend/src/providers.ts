@@ -86,12 +86,15 @@ async function getSoundCloudClientId(configured?:string):Promise<string>{
   const home=await fetch("https://soundcloud.com",{headers:{accept:"text/html,application/xhtml+xml"}});
   if(!home.ok)throw new Error("SoundCloud is unavailable right now.");
   const html=await home.text();
-  const scripts=[...html.matchAll(/src="([^"]+\\.js)"/g)].map(match=>match[1].startsWith("//")?"https:"+match[1]:match[1]).filter(url=>url.includes("a-v2.sndcdn.com/assets/")).reverse();
+  const scripts=[...html.matchAll(/src="([^"]+\.js)"/g)]
+    .map(match=>match[1].startsWith("//")?"https:"+match[1]:match[1])
+    .filter(url=>url.includes("a-v2.sndcdn.com/assets/"))
+    .reverse();
   for(const script of scripts){
-    const found=source.match(/client_id[ \\t]*[:=][ \\t]*"([a-zA-Z0-9]{32})"/)?.[1];
+    const response=await fetch(script);
     if(!response.ok)continue;
     const source=await response.text();
-    const found=source.match(/client_id\\s*[:=]\\s*"([a-zA-Z0-9]{32})"/)?.[1];
+    const found=source.match(/client_id[ \t]*[:=][ \t]*"([a-zA-Z0-9]{32})"/)?.[1];
     if(found){cachedSoundCloudClientId=found;return found;}
   }
   throw new Error("Could not initialize the official SoundCloud API client.");
