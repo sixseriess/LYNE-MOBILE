@@ -223,6 +223,40 @@ async function media(request: Request, env: Env, key: string) {
   });
 }
 
+
+async function audioStreamResponse(
+  request: Request,
+  resolve: () => Promise<{ url: string; mimeType: string }>
+): Promise<Response> {
+  const stream = await resolve();
+  const target = new URL(stream.url);
+  if (target.protocol !== "https:") return fail("The audio provider returned an insecure stream URL.", 502);
+  const upstreamHeaders = new Headers();
+  const range = request.headers.get("range");
+  if (range) upstreamHeaders.set("range", range);
+  const upstream = await fetch(target.toString(), {
+    method: request.method === "HEAD" ? "HEAD" : "GET",
+    headers: upstreamHeaders,
+    redirect: "follow",
+  });
+  if (!upstream.ok && upstream.status !== 206 && upstream.status !== 416) {
+    return fail("The audio provider refused the stream request (" + upstream.status + ").", 502);
+  }
+  const headers = new Headers();
+  for (const name of ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"]) {
+    const value = upstream.headers.get(name);
+    if (value) headers.set(name, value);
+  }
+  if (!headers.has("content-type")) headers.set("content-type", stream.mimeType || "audio/mpeg");
+  if (!headers.has("accept-ranges")) headers.set("accept-ranges", "bytes");
+  headers.set("cache-control", "no-store");
+  headers.set("x-content-type-options", "nosniff");
+  return new Response(request.method === "HEAD" ? null : upstream.body, {
+    status: upstream.status,
+    headers,
+  });
+}
+
 async function handle(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, "") || "/";
@@ -259,10 +293,39 @@ async function handle(request: Request, env: Env): Promise<Response> {
     catch(error){return fail(error instanceof Error?error.message:"YouTube playback could not be resolved.",422);}
   }
 
-  const soundCloudPlaybackMatch=path.match(/^\/v1\/providers\/soundcloud\/playback\/(\d+)$/);
+  const soundCloudPlaybackMatch=path.match(/^\\/v1\\/providers\\/soundcloud\\/playback\\/(\\d+)$/);
   if(soundCloudPlaybackMatch&&request.method==="GET"){
     try{return json(await resolveSoundCloudPlayback(soundCloudPlaybackMatch[1],env));}
     catch(error){return fail(error instanceof Error?error.message:"SoundCloud playback could not be resolved.",422);}
+  }
+
+  // Stable first-party audio URLs start playback during the tap; the Worker resolves and
+  // forwards the provider stream, including byte-range requests, after the audio request begins.
+  const soundCloudStreamMatch=path.match(/^\\/v1\\/providers\\/soundcloud\\/stream\\/(\\d+)$/);
+  if(soundCloudStreamMatch&&["GET","HEAD"].includes(request.method)){
+    try{return await audioStreamResponse(request,()=>resolveSoundCloudPlayback(soundCloudStreamMatch[1],env));}
+    catch(error){return fail(error instanceof Error?error.message:"SoundCloud audio could not be streamed.",502);}
+  }
+
+  const youtubeStreamMatch=path.match(/^\\/v1\\/providers\\/youtube\\/stream\\/([a-zA-Z0-9_-]{11})$/);
+  if(youtubeStreamMatch&&["GET","HEAD"].includes(request.method)){
+    try{return await audioStreamResponse(request,()=>resolveYouTubePlayback(youtubeStreamMatch[1]));}
+    catch(error){return fail(error instanceof Error?error.message:"YouTube audio could not be streamed.",502);}
+  }
+
+  if(path==="/v1/providers/import/stream"&&["GET","HEAD"].includes(request.method)){
+    try{
+      const title=(url.searchParams.get("title")||"").trim();
+      const artist=(url.searchParams.get("artist")||"").trim();
+      if(!title||!artist)return fail("A track title and artist are required.",400);
+      return await audioStreamResponse(request,async()=>{
+        const catalogue=await env.DB.prepare(`${TRACK_SELECT} WHERE lower(t.title)=? AND lower(a.name)=? AND t.published=1 LIMIT 1`)
+          .bind(normalized(title),normalized(artist)).first<TrackRow>();
+        if(catalogue)return {url:storageObjectUrl(env,catalogue.audioKey,true),mimeType:catalogue.audioMime};
+        const match=await resolveYouTubeMatch(title,artist);
+        return resolveYouTubePlayback(match.videoId);
+      });
+    }catch(error){return fail(error instanceof Error?error.message:"LYNE could not find a full-length stream for this track.",502);}
   }
 
   if (path === "/v1/providers/status" && request.method === "GET") {
