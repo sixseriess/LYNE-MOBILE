@@ -349,7 +349,80 @@ export default function App() {
   const [settingsSection,setSettingsSection]=useState<"Profile"|"Playback"|"Listening"|"Shortcuts"|"Appearance"|"Overlay"|"Connections"|"YouTube"|"Discord"|"Storage"|"About">("Appearance");
   const [providerStatus,setProviderStatus]=useState<Record<string,{configured:boolean;capability:string}>|null>(null);
   const [providerStatusError,setProviderStatusError]=useState("");
+  const [spotifyClientIdInput,setSpotifyClientIdInput]=useState(()=>spotifySavedClientId());
+  const [spotifyConnected,setSpotifyConnected]=useState(false);
+  const [spotifyConnectionStatus,setSpotifyConnectionStatus]=useState("Not connected");
+  const [appleMusicConnected,setAppleMusicConnected]=useState(false);
+  const [appleMusicConnectionStatus,setAppleMusicConnectionStatus]=useState("Checking Apple Music configuration…");
+  const [providerBusy,setProviderBusy]=useState(false);
+  const [catalogAdminToken,setCatalogAdminToken]=useState("");
+  const [catalogUploadTitle,setCatalogUploadTitle]=useState("");
+  const [catalogUploadArtist,setCatalogUploadArtist]=useState("");
+  const [catalogUploadAlbum,setCatalogUploadAlbum]=useState("");
+  const [catalogUploadRights,setCatalogUploadRights]=useState<"owned"|"licensed"|"public_domain">("owned");
+  const [catalogUploadReference,setCatalogUploadReference]=useState("");
+  const [catalogUploadFile,setCatalogUploadFile]=useState<File|null>(null);
+  const [catalogUploadArtwork,setCatalogUploadArtwork]=useState<File|null>(null);
+  const [catalogUploadBusy,setCatalogUploadBusy]=useState(false);
+  const spotifyRedirectUri=window.location.origin+import.meta.env.BASE_URL;
+  const onSpotifyPlaybackSnapshot=useCallback((snapshot:SpotifyPlaybackSnapshot|null)=>{
+    if(!snapshot)return;
+    setPlaying(!snapshot.paused);
+    setPosition(snapshot.positionMs);
+    setDuration(snapshot.durationMs);
+    setPlaybackMessage(snapshot.paused?"Paused on Spotify":"Playing on Spotify");
+    setCurrent(old=>old?.source==="spotify"?({...old,title:snapshot.title,artist:snapshot.artist,artwork:snapshot.artwork||old.artwork,durationMs:snapshot.durationMs||old.durationMs}):old);
+  },[]);
   const loadProviderStatus=async()=>{try{const result=await lyneApi.providerStatus();setProviderStatus(result.providers);setProviderStatusError("");}catch(error){setProviderStatusError(error instanceof Error?error.message:"Could not check provider connections.");}};
+  const connectSpotifyAccount=async()=>{
+    try{
+      const clientId=spotifyClientIdInput.trim();
+      if(!clientId){setSpotifyConnectionStatus("Enter your Spotify Client ID first.");return;}
+      setProviderBusy(true);
+      localStorage.setItem("lyne.spotify.clientId",clientId);
+      await beginSpotifyAuthorization(clientId,spotifyRedirectUri);
+    }catch(error){setSpotifyConnectionStatus(error instanceof Error?error.message:"Spotify sign-in could not start.");setProviderBusy(false);}
+  };
+  const disconnectSpotifyAccount=()=>{
+    disconnectSpotify();setSpotifyConnected(false);setSpotifyConnectionStatus("Disconnected");
+    if(current?.source==="spotify"){audioRef.current?.pause();setPlaying(false);setPlaybackMessage("Spotify disconnected.");}
+  };
+  const connectAppleMusicAccount=async()=>{
+    setProviderBusy(true);setAppleMusicConnectionStatus("Opening Apple Music authorization…");
+    try{
+      const token=await lyneApi.appleMusicDeveloperToken();
+      await authorizeAppleMusic(token.developerToken);
+      setAppleMusicConnected(true);setAppleMusicConnectionStatus("Connected · Apple Music authorization active");
+    }catch(error){
+      setAppleMusicConnected(false);
+      setAppleMusicConnectionStatus(error instanceof Error?error.message:"Apple Music authorization failed.");
+    }finally{setProviderBusy(false);}
+  };
+  const disconnectAppleMusicAccount=async()=>{
+    await disconnectAppleMusic();setAppleMusicConnected(false);setAppleMusicConnectionStatus("Disconnected");
+    if(current?.source==="apple_music"){setPlaying(false);setPlaybackMessage("Apple Music disconnected.");}
+  };
+  const uploadCatalogueTrack=async()=>{
+    if(!catalogAdminToken.trim()||!catalogUploadTitle.trim()||!catalogUploadArtist.trim()||!catalogUploadFile||!catalogUploadReference.trim()){
+      setNotice("Add the admin token, track title, artist, audio file and rights reference first.");return;
+    }
+    setCatalogUploadBusy(true);
+    try{
+      const form=new FormData();
+      form.set("title",catalogUploadTitle.trim());form.set("artist",catalogUploadArtist.trim());
+      form.set("album",catalogUploadAlbum.trim());form.set("audio",catalogUploadFile);
+      if(catalogUploadArtwork)form.set("artwork",catalogUploadArtwork);
+      form.set("rightsConfirmed","true");form.set("rightsStatus",catalogUploadRights);form.set("rightsReference",catalogUploadReference.trim());
+      const response=await fetch(getApiUrl()+"/v1/admin/tracks",{method:"POST",headers:{"x-admin-token":catalogAdminToken.trim()},body:form});
+      const body=await response.json().catch(()=>({})) as {error?:string;title?:string};
+      if(!response.ok)throw new Error(body.error||"LYNE catalogue upload failed (HTTP "+response.status+").");
+      setNotice("Published "+(body.title||catalogUploadTitle)+" to the LYNE catalogue.");
+      setCatalogUploadTitle("");setCatalogUploadArtist("");setCatalogUploadAlbum("");setCatalogUploadReference("");
+      setCatalogUploadFile(null);setCatalogUploadArtwork(null);
+      setCatalogTracks([]);
+    }catch(error){setNotice(error instanceof Error?error.message:"LYNE catalogue upload failed.");}
+    finally{setCatalogUploadBusy(false);}
+  };
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
   const [ambientColor,setAmbientColor]=useState("36,38,44");
   const [equalizerError,setEqualizerError]=useState("");
@@ -459,6 +532,31 @@ export default function App() {
   const listeningReportedRef=useRef<string|null>(null);
 
   useEffect(()=>{ localStorage.setItem(STORE,JSON.stringify(state)); },[state]);
+  useEffect(()=>{
+    let active=true;
+    const clientId=spotifySavedClientId();
+    if(clientId){
+      void (async()=>{
+        try{
+          const completed=await handleSpotifyAuthorizationRedirect(clientId,spotifyRedirectUri);
+          if(completed&&active)setSpotifyConnectionStatus("Spotify authorized. Connecting LYNE player…");
+          if(spotifyHasSession()){
+            await connectSpotifyPlayer(clientId,onSpotifyPlaybackSnapshot);
+            if(active){setSpotifyConnected(true);setSpotifyConnectionStatus("Connected · LYNE playback device ready");}
+          }
+        }catch(error){
+          if(active){setSpotifyConnected(false);setSpotifyConnectionStatus(error instanceof Error?error.message:"Spotify could not connect.");}
+        }
+      })();
+    }
+    void lyneApi.appleMusicDeveloperToken().then(async result=>{
+      await initializeAppleMusic(result.developerToken);
+      if(active)setAppleMusicConnectionStatus("Developer token ready · connect your Apple Music account");
+    }).catch(error=>{
+      if(active)setAppleMusicConnectionStatus(error instanceof Error?error.message:"Apple Music developer token is not configured.");
+    });
+    return ()=>{active=false;};
+  },[]);
   useEffect(()=>{
     const media=window.matchMedia("(prefers-color-scheme: dark)");
     const apply=()=>{document.documentElement.dataset.theme=state.theme==="system"?(media.matches?"dark":"light"):state.theme;};
