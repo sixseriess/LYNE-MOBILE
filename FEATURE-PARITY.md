@@ -14,7 +14,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 ## Feature inventory and acceptance criteria
 
 ### Core app and discovery
-- [x] Mobile-first app shell and bottom navigation.
+- [x] Mobile-first app shell with the LYNE Windows-style left navigation rail, adapted for phone touch targets and safe areas.
 - [x] Home page sections and personalized Daily Mix, On Repeat, Discovery Mix, and Recent Mix backed by LYNE catalogue data and listening history.
 - [x] Search tracks, artists, albums, and playlists with working detail pages; artist pages include play-all, shuffle, save-to-library, and shareable deep links.
 - [x] Artist profiles, album/collection pages, artwork, and track actions.
@@ -28,7 +28,7 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 - [x] Local audio track title, artist, album and artwork editing is saved in IndexedDB alongside the audio; system-level file/folder access and cross-device local-file sync remain browser-limited.
 - [x] Save individual first-party LYNE catalogue tracks and LYNE catalogue mixes to device storage for offline playback, with cumulative storage-limit checks, partial-failure feedback, saved-mix cards and remove controls. Offline mixes are local to this device; third-party provider embeds are not downloaded or rehosted.
 - [x] Import preview, provider/source attribution, local duplicate detection, progress states, and retry of failed account sync from the still-open preview; bulk import reports partial sync failures.
-- [x] Spotify, SoundCloud, YouTube, and Apple Music imports use provider metadata APIs when configured, plus public oEmbed / catalogue lookup fallbacks for eligible single items. Official provider embeds play source media; full playlist and some album track lists still require provider credentials. Imports do not copy or rehost provider audio.
+- [x] Spotify, SoundCloud, YouTube, and Apple Music imports save source metadata and links. Provider embeds are not used as LYNE playback. Imported songs first match against a full-length LYNE catalogue stream; if no match exists, the app explains that the licensed audio file must be added to Local Files or published to the LYNE catalogue. Full provider playlist and some album track lists still require provider credentials.
 
 ### Player and audio
 - [x] Basic playback UI, mini-player, expanded player, seek, volume, queue, shuffle, repeat, and likes.
@@ -79,6 +79,6 @@ This is the acceptance checklist for LYNE Mobile. The Windows application is the
 
 ## Current implementation snapshot
 
-The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, downloadable offline mix groups with saved-mix cards, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, imported-collection track additions, saved artists, shareable artist links, an offline banner, PWA update checks, a Windows-matched 10-band equalizer, dominant cover-colour extraction, and recent-listening recommendations. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
+The current mobile client includes playlist search/detail pages, playlist editing and R2 artwork, account session recovery, profile-photo and preferences sync, individual offline catalogue downloads, downloadable offline mix groups with saved-mix cards, queue reorder/remove, adjustable timed lyrics, player swipe gestures, haptics, system theme and reduced-motion behavior, import duplicate/progress handling, imported-collection track additions, saved artists, shareable artist links, an offline banner, PWA update checks, a Windows-matched 10-band equalizer, dominant cover-colour extraction, recent-listening recommendations, and imported-song matching to full-length LYNE catalogue streams. Some features still rely on Cloudflare account configuration or provider OAuth, and platform-specific behavior needs device validation. The mobile accent and install icons use LYNE's lime-and-dark visual identity.
 
 This snapshot is not a completion claim. Any unchecked item remains work to do, and each feature must be tested on both iOS Safari (installed PWA) and Android Chrome (installed PWA) before release.
