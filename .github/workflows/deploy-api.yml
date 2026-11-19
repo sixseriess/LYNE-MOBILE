@@ -140,3 +140,22 @@ jobs:
       - name: Smoke test deployed API
         run: |
           curl --fail --silent --show-error https://lyne-api.nealeadam10.workers.dev/v1/health
+
+      - name: Smoke test account registration and sign-in
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          api="https://lyne-api.nealeadam10.workers.dev"
+          username="lynecheck_${GITHUB_RUN_ID}"
+          email="${username}@example.invalid"
+          password="Test-${GITHUB_RUN_ID}-LYNE-Auth!"
+          cleanup() { npx wrangler d1 execute lyne-catalog --remote --command "DELETE FROM users WHERE username_norm = '${username}'" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          payload=$(printf '{"username":"%s","email":"%s","password":"%s"}' "$username" "$email" "$password")
+          created=$(curl --fail --silent --show-error -H "Content-Type: application/json" -d "$payload" "$api/v1/auth/register")
+          printf '%s' "$created" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.accessToken||!x.user?.id)process.exit(1);});'
+          logged_in=$(printf '{"username":"%s","password":"%s"}' "$username" "$password" | curl --fail --silent --show-error -H "Content-Type: application/json" --data-binary @- "$api/v1/auth/login")
+          printf '%s' "$logged_in" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const x=JSON.parse(s);if(!x.accessToken||!x.user?.id)process.exit(1);});'
+          echo "LYNE registration and sign-in smoke test passed."
