@@ -9,7 +9,7 @@ import {
 import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type Playlist, type SearchKind, type SearchPlaylist, type ResolvedImport, type SavedImport } from "./api/client";
 import { Home7Fill as WindowsHomeIcon, Search3Fill as WindowsSearchIcon, BookmarksFill as WindowsLibraryIcon, Settings4Fill as WindowsSettingsIcon, AlbumFill, FireFill, TimeFill, TrophyFill } from "@mingcute/react";
 import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, playSpotifyTracks, getSpotifyPlaybackSnapshot, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
-import { authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
+import { appleMusicIsAuthorized, authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
 
 type HlsPlayback = {
   attachMedia(media:HTMLMediaElement):void;
@@ -376,7 +376,7 @@ export default function App() {
   const [catalogUploadRights,setCatalogUploadRights]=useState<"owned"|"licensed"|"public_domain">("owned");
   const [catalogRightsConfirmed,setCatalogRightsConfirmed]=useState(false);
   const [catalogUploadReference,setCatalogUploadReference]=useState("");
-  const [catalogUploadFile,setCatalogUploadFile]=useState<File|null>(null);
+  const [catalogUploadFiles,setCatalogUploadFiles]=useState<File[]>([]);
   const [catalogUploadArtwork,setCatalogUploadArtwork]=useState<File|null>(null);
   const [catalogUploadBusy,setCatalogUploadBusy]=useState(false);
   const spotifyRedirectUri=window.location.origin+import.meta.env.BASE_URL;
@@ -418,25 +418,62 @@ export default function App() {
     if(current?.source==="apple_music"){setPlaying(false);setPlaybackMessage("Apple Music disconnected.");}
   };
   const uploadCatalogueTrack=async()=>{
-    if(!catalogAdminToken.trim()||!catalogUploadTitle.trim()||!catalogUploadArtist.trim()||!catalogUploadFile||!catalogUploadReference.trim()||!catalogRightsConfirmed){
-      setNotice("Add the admin token, track title, artist, audio file and rights reference first.");return;
+    const files=[...catalogUploadFiles];
+    if(!catalogAdminToken.trim()||!files.length||!catalogUploadReference.trim()||!catalogRightsConfirmed){
+      setNotice("Add the LYNE admin token, audio files, rights reference and rights confirmation first.");return;
+    }
+    if(files.length===1&&!catalogUploadArtist.trim()&&!/\s+-\s+/.test(files[0].name.replace(/\.[^.]+$/,""))){
+      setNotice("Add the artist name, or name the file Artist - Title.mp3.");return;
     }
     setCatalogUploadBusy(true);
+    let published=0;
+    const failed:File[]=[];
+    const failures:string[]=[];
     try{
-      const form=new FormData();
-      form.set("title",catalogUploadTitle.trim());form.set("artist",catalogUploadArtist.trim());
-      form.set("album",catalogUploadAlbum.trim());form.set("audio",catalogUploadFile);
-      if(catalogUploadArtwork)form.set("artwork",catalogUploadArtwork);
-      form.set("rightsConfirmed","true");form.set("rightsStatus",catalogUploadRights);form.set("rightsReference",catalogUploadReference.trim());
-      const response=await fetch(getApiUrl()+"/v1/admin/tracks",{method:"POST",headers:{"x-admin-token":catalogAdminToken.trim()},body:form});
-      const body=await response.json().catch(()=>({})) as {error?:string;title?:string};
-      if(!response.ok)throw new Error(body.error||"LYNE catalogue upload failed (HTTP "+response.status+").");
-      setNotice("Published "+(body.title||catalogUploadTitle)+" to the LYNE catalogue.");
-      setCatalogUploadTitle("");setCatalogUploadArtist("");setCatalogUploadAlbum("");setCatalogUploadReference("");
-      setCatalogUploadFile(null);setCatalogUploadArtwork(null);setCatalogRightsConfirmed(false);
-      setCatalogTracks([]);
-    }catch(error){setNotice(error instanceof Error?error.message:"LYNE catalogue upload failed.");}
-    finally{setCatalogUploadBusy(false);}
+      for(const file of files){
+        const baseName=file.name.replace(/\.[^.]+$/,"").trim();
+        const split=baseName.match(/^(.+?)\s+-\s+(.+)$/);
+        const inferredArtist=split?.[1]?.trim()||catalogUploadArtist.trim();
+        const inferredTitle=(files.length===1&&catalogUploadTitle.trim())||split?.[2]?.trim()||baseName;
+        if(!inferredArtist||!inferredTitle){
+          failed.push(file);failures.push(file.name+": add an artist or rename it Artist - Title.");continue;
+        }
+        const form=new FormData();
+        form.set("title",inferredTitle.slice(0,180));
+        form.set("artist",inferredArtist.slice(0,140));
+        form.set("album",catalogUploadAlbum.trim());
+        form.set("audio",file);
+        if(catalogUploadArtwork)form.set("artwork",catalogUploadArtwork);
+        form.set("rightsConfirmed","true");
+        form.set("rightsStatus",catalogUploadRights);
+        form.set("rightsReference",catalogUploadReference.trim());
+        try{
+          const response=await fetch(getApiUrl()+"/v1/admin/tracks",{method:"POST",headers:{"x-admin-token":catalogAdminToken.trim()},body:form});
+          const body=await response.json().catch(()=>({})) as {error?:string;title?:string};
+          if(!response.ok)throw new Error(body.error||"HTTP "+response.status);
+          published++;
+        }catch(error){
+          failed.push(file);
+          failures.push(file.name+": "+(error instanceof Error?error.message:"upload failed"));
+        }
+      }
+      setCatalogUploadFiles(failed);
+      if(published){
+        setCatalogTracks([]);
+        setCatalogUploadTitle("");
+        setCatalogUploadAlbum("");
+      }
+      if(!failed.length){
+        setCatalogUploadArtist("");
+        setCatalogUploadReference("");
+        setCatalogUploadArtwork(null);
+        setCatalogRightsConfirmed(false);
+        setNotice("Published "+published+" recording"+(published===1?"":"s")+" to the LYNE catalogue.");
+        if(libraryDetail==="catalog")void loadCatalog();
+      }else{
+        setNotice("Published "+published+" of "+files.length+". Remaining files: "+failures.slice(0,3).join(" · ")+(failures.length>3?" · and "+(failures.length-3)+" more":""));
+      }
+    }finally{setCatalogUploadBusy(false);}
   };
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
   const [ambientColor,setAmbientColor]=useState("36,38,44");
@@ -567,7 +604,12 @@ export default function App() {
     }
     void lyneApi.appleMusicDeveloperToken().then(async result=>{
       await initializeAppleMusic(result.developerToken);
-      if(active){setAppleMusicConfigured(true);setAppleMusicConnectionStatus("Developer token ready · connect your Apple Music account");}
+      if(active){
+        setAppleMusicConfigured(true);
+        const authorized=appleMusicIsAuthorized();
+        setAppleMusicConnected(authorized);
+        setAppleMusicConnectionStatus(authorized?"Connected · Apple Music authorization restored":"Developer token ready · connect your Apple Music account");
+      }
     }).catch(error=>{
       if(active)setAppleMusicConnectionStatus(error instanceof Error?error.message:"Apple Music developer token is not configured.");
     });
@@ -936,7 +978,15 @@ export default function App() {
       return;
     }
     if(current?.source==="apple_music"){
-      void toggleAppleMusicPlayback().then(()=>setPlaybackMessage("Apple Music playback updated")).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music playback control failed."));
+      void toggleAppleMusicPlayback().then(()=>{
+        const snapshot=getAppleMusicPlaybackState();
+        if(snapshot){
+          setPlaying(snapshot.isPlaying);
+          setPosition(snapshot.positionMs);
+          setDuration(snapshot.durationMs);
+          setPlaybackMessage(snapshot.isPlaying?"Playing on Apple Music":"Paused on Apple Music");
+        }
+      }).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music playback control failed."));
       return;
     }
     if(!audio||!current?.audioUrl){setPlaying(false);const message="No playable audio is attached to this track.";setPlaybackMessage(message);setNotice(message);return;}
@@ -1027,13 +1077,33 @@ export default function App() {
       session.playbackState=playing?"playing":"paused";
     }catch{}
     const bind=(action:MediaSessionAction,handler:MediaSessionActionHandler|null)=>{try{session.setActionHandler(action,handler);}catch{}};
-    bind("play",()=>setPlaying(true));
-    bind("pause",()=>setPlaying(false));
+    bind("play",()=>{if(!playing)togglePlaybackFromGesture();});
+    bind("pause",()=>{if(playing)togglePlaybackFromGesture();});
     bind("previoustrack",()=>previous());
     bind("nexttrack",()=>next());
-    bind("seekto",details=>{if(typeof details.seekTime==="number"&&audioRef.current){audioRef.current.currentTime=Math.max(0,details.seekTime);setPosition(audioRef.current.currentTime*1000);}});
-    bind("seekbackward",details=>{if(audioRef.current){const offset=details.seekOffset??10;audioRef.current.currentTime=Math.max(0,audioRef.current.currentTime-offset);setPosition(audioRef.current.currentTime*1000);}});
-    bind("seekforward",details=>{if(audioRef.current){const offset=details.seekOffset??10;const limit=Number.isFinite(audioRef.current.duration)?audioRef.current.duration:Infinity;audioRef.current.currentTime=Math.min(limit,audioRef.current.currentTime+offset);setPosition(audioRef.current.currentTime*1000);}});
+    bind("seekto",details=>{
+      if(typeof details.seekTime!=="number")return;
+      const target=Math.max(0,details.seekTime*1000);
+      setPosition(target);
+      if(current?.source==="spotify")void seekSpotifyPlayback(target).catch(error=>setNotice(error instanceof Error?error.message:"Spotify could not seek."));
+      else if(current?.source==="apple_music")void seekAppleMusicPlayback(target).catch(error=>setNotice(error instanceof Error?error.message:"Apple Music could not seek."));
+      else if(audioRef.current)audioRef.current.currentTime=target/1000;
+    });
+    bind("seekbackward",details=>{
+      const offset=(details.seekOffset??10)*1000;
+      const target=Math.max(0,position-offset);setPosition(target);
+      if(current?.source==="spotify")void seekSpotifyPlayback(target).catch(()=>{});
+      else if(current?.source==="apple_music")void seekAppleMusicPlayback(target).catch(()=>{});
+      else if(audioRef.current)audioRef.current.currentTime=target/1000;
+    });
+    bind("seekforward",details=>{
+      const offset=(details.seekOffset??10)*1000;
+      const limit=duration>0?duration:Infinity;
+      const target=Math.min(limit,position+offset);setPosition(target);
+      if(current?.source==="spotify")void seekSpotifyPlayback(target).catch(()=>{});
+      else if(current?.source==="apple_music")void seekAppleMusicPlayback(target).catch(()=>{});
+      else if(audioRef.current)audioRef.current.currentTime=target/1000;
+    });
     return ()=>{["play","pause","previoustrack","nexttrack","seekto","seekbackward","seekforward"].forEach(action=>bind(action as MediaSessionAction,null));};
   },[current?.id,current?.title,current?.artist,current?.album,current?.artwork,playing,queue,shuffle,position,duration]);
   useEffect(()=>{
@@ -1229,6 +1299,14 @@ export default function App() {
   };
   const importedLocalAudioReady=(item:SavedImport)=>Boolean(findLocalTrackForImport(item.title,item.subtitle));
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;uploader?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string;uploader?:string}[]})=>{
+    if(item.kind&&item.kind!=="track"&&item.provider==="apple_music"){
+      const collection:Track={
+        id:"apple_music:"+item.kind+":"+item.providerId,title:item.title,artist:item.subtitle,
+        artwork:item.artwork,source:"apple_music",providerId:item.providerId,externalUrl:item.externalUrl
+      };
+      play(collection,[collection]);
+      return;
+    }
     if(item.kind&&item.kind!=="track"&&item.tracks?.length){
       if(item.provider==="spotify"){
         const trackQueue:Track[]=item.tracks.map(track=>({
@@ -1802,13 +1880,15 @@ export default function App() {
             <label className="field-label">Track title<input value={catalogUploadTitle} onChange={e=>setCatalogUploadTitle(e.target.value)} maxLength={180} placeholder="Song title"/></label>
             <label className="field-label">Artist<input value={catalogUploadArtist} onChange={e=>setCatalogUploadArtist(e.target.value)} maxLength={140} placeholder="Artist name"/></label>
             <label className="field-label">Album (optional)<input value={catalogUploadAlbum} onChange={e=>setCatalogUploadAlbum(e.target.value)} maxLength={180} placeholder="Album name"/></label>
-            <label className="field-label">Audio file (MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM · max 45 MB)<input type="file" accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/flac,audio/ogg,audio/opus,audio/webm" onChange={e=>setCatalogUploadFile(e.target.files?.[0]||null)}/></label>
+            <label className="field-label">Audio files (MP3, AAC, M4A, WAV, FLAC, OGG, OPUS or WebM · max 45 MB each)<input type="file" multiple accept="audio/mpeg,audio/mp4,audio/aac,audio/wav,audio/x-wav,audio/flac,audio/ogg,audio/opus,audio/webm" onChange={e=>setCatalogUploadFiles(files=>[...files,...Array.from(e.target.files||[]).filter(file=>!files.some(existing=>existing.name===file.name&&existing.size===file.size))])}/></label>
+            {catalogUploadFiles.length>0&&<div className="catalog-file-list">{catalogUploadFiles.map((file,index)=><div className="catalog-file-item" key={file.name+":"+file.size}><span><b>{file.name}</b><small>{(file.size/1024/1024).toFixed(1)} MB</small></span><button type="button" className="provider-open" onClick={()=>setCatalogUploadFiles(items=>items.filter((_,i)=>i!==index))}>Remove</button></div>)}</div>}
+            <p className="settings-note">For bulk uploads, name files Artist - Title.mp3. LYNE will use the filename to fill in the artist and title. A common artist and album can also be entered above.</p>
             <label className="field-label">Artwork (optional · JPG, PNG, WebP or AVIF)<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={e=>setCatalogUploadArtwork(e.target.files?.[0]||null)}/></label>
             <label className="field-label">Rights status<select value={catalogUploadRights} onChange={e=>setCatalogUploadRights(e.target.value as "owned"|"licensed"|"public_domain")}><option value="owned">I own this recording</option><option value="licensed">I have a distribution licence</option><option value="public_domain">Public domain</option></select></label>
             <label className="field-label">Rights reference<input value={catalogUploadReference} onChange={e=>setCatalogUploadReference(e.target.value)} maxLength={500} placeholder="Licence ID, contract reference or public-domain source"/></label>
             <label className="catalog-rights-confirm"><input type="checkbox" checked={catalogRightsConfirmed} onChange={e=>setCatalogRightsConfirmed(e.target.checked)}/> I confirm I have the right to distribute this recording and its artwork through LYNE.</label>
             <button className="primary-button" type="button" onClick={()=>void uploadCatalogueTrack()} disabled={catalogUploadBusy}>{catalogUploadBusy?<LoaderCircle size={15} className="spin"/>:null}{catalogUploadBusy?"Publishing…":"Publish track to LYNE"}</button>
-            <p className="settings-note">The admin token is used only for this upload and is not saved in LYNE settings.</p>
+            <p className="settings-note">The admin token is used only for this upload and is not saved in LYNE settings. To set it up, save the same token as the GitHub Actions secret LYNE_ADMIN_API_TOKEN and run Deploy LYNE API; then paste that token here. Do not share it.</p>
             <button className="secondary-action full-action" type="button" onClick={()=>void loadProviderStatus()}>Refresh connection status</button>
           </>}
           {settingsSection==="YouTube"&&<><div className="settings-section-title">YouTube</div><div className="capability-note"><b>YouTube account sync is not active in this PWA yet</b><p>Public YouTube links can be resolved when LYNE's backend is configured. Account playback and private library sync require a supported official OAuth flow and provider credentials; LYNE does not use desktop cookies or private endpoints. These controls stay unavailable until that integration is implemented.</p></div></>}
