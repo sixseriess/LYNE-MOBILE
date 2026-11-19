@@ -873,18 +873,27 @@ export default function App() {
     }finally{setImportSaving(false);}
   };
   const likeImportedTrack=(collection:SavedImport,track:NonNullable<SavedImport["tracks"]>[number])=>{const saved:SavedImport={provider:collection.provider,kind:"track",providerId:track.providerId,title:track.title,subtitle:track.artist,externalUrl:track.externalUrl,artwork:track.artwork,embedUrl:track.embedUrl,tracks:[track]};setState(s=>({...s,importedLikes:[saved,...s.importedLikes.filter(x=>!(x.provider===saved.provider&&x.providerId===saved.providerId))]}));if(user)void lyneApi.saveImport(saved).catch(()=>setNotice("Added locally. Account sync couldn't be completed."));setNotice(`Added ${track.title} to Liked Songs.`);};
-  const openImportedPlayback=(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;embedUrl?:string;artwork?:string})=>{
-    // Imported provider links are library references, not embedded mini-players.
-    // LYNE's in-app player is reserved for full audio streams from the LYNE catalogue.
+  const findPlayableCatalogTrackForImport=async(title:string,artist:string):Promise<Track|null>=>{
+    const normalize=(value:string)=>value.normalize("NFKD").replace(/[\\u0300-\\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
     try{
-      const external=new URL(item.externalUrl);
-      if(external.protocol!=="https:")throw new Error();
-      window.open(external.toString(),"_blank","noopener,noreferrer");
-    }catch{
-      setNotice("This imported item has no valid original provider link.");
+      const result=await lyneApi.search([title,artist].filter(Boolean).join(" "),"tracks");
+      const playable=result.tracks.filter(track=>Boolean(track.audioUrl));
+      const wantedTitle=normalize(title),wantedArtist=normalize(artist);
+      const exact=playable.find(track=>normalize(track.title)===wantedTitle&&normalize(track.artist)===wantedArtist);
+      if(exact)return exact;
+      const titleMatches=playable.filter(track=>normalize(track.title)===wantedTitle);
+      return titleMatches.length===1?titleMatches[0]:null;
+    }catch{return null;}
+  };
+  const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;embedUrl?:string;artwork?:string})=>{
+    setNotice("Checking the LYNE catalogue for a full-length version...");
+    const match=await findPlayableCatalogTrackForImport(item.title,item.subtitle);
+    if(match){
+      play(match,[match]);
+      setNotice("Playing "+match.title+" in LYNE.");
       return;
     }
-    setNotice("Opened the original "+providerName(item.provider)+" link. LYNE playback uses full audio sources from the LYNE catalogue.");
+    setNotice('“'+item.title+'” is saved in your Library, but no matching full-length LYNE audio source was found. Add the licensed audio file in Local Files or publish it to the LYNE catalogue to play it here.');
   };
   const likeAllImportedTracks=async(collection:SavedImport)=>{
     const tracks=collection.tracks||[];
