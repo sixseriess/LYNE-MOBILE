@@ -161,6 +161,35 @@ function hslToRgb(h:number,saturation:number,l:number):[number,number,number]{
 }
 type CoverFluidColors={color1:string;color2:string;logoColor:string};
 const DEFAULT_COVER_FLUID:CoverFluidColors={color1:"rgb(20,22,28)",color2:"rgb(120,140,175)",logoColor:"rgb(235,242,250)"};
+function extractAmbientArtworkColors(image:HTMLImageElement):[string,string]{
+  const canvas=document.createElement("canvas");canvas.width=72;canvas.height=72;
+  const context=canvas.getContext("2d",{willReadFrequently:true});
+  if(!context)return ["120,140,175","72,76,88"];
+  context.drawImage(image,0,0,72,72);
+  const pixels=context.getImageData(0,0,72,72).data;
+  const buckets=new Map<string,{count:number;r:number;g:number;b:number;weight:number}>();
+  for(let i=0;i<pixels.length;i+=4){
+    if(pixels[i+3]<160)continue;
+    const r=pixels[i],g=pixels[i+1],b=pixels[i+2];
+    const [h,s,l]=rgbToHsl(r,g,b);
+    if(l<.09||l>.94||s<.12)continue;
+    const key=[r>>4,g>>4,b>>4].join(":");
+    const weight=.55+s*.9;
+    const bucket=buckets.get(key)||{count:0,r:0,g:0,b:0,weight:0};
+    bucket.count++;bucket.r+=r*weight;bucket.g+=g*weight;bucket.b+=b*weight;bucket.weight+=weight;
+    buckets.set(key,bucket);
+  }
+  const ranked=[...buckets.values()].sort((a,b)=>b.count*(b.weight/b.count)-a.count*(a.weight/a.count));
+  const pick=(bucket:{count:number;r:number;g:number;b:number;weight:number}|undefined,fallback:string)=>{
+    if(!bucket||!bucket.weight)return fallback;
+    const raw:[number,number,number]=[bucket.r/bucket.weight,bucket.g/bucket.weight,bucket.b/bucket.weight];
+    const [h,s,l]=rgbToHsl(...raw);
+    return hslToRgb(h,Math.min(.92,s*1.12),Math.max(.34,Math.min(.64,l))).join(",");
+  };
+  const first=ranked[0];
+  const second=ranked.find(item=>!first||Math.sqrt(Math.pow(item.r/item.weight-first.r/first.weight,2)+Math.pow(item.g/item.weight-first.g/first.weight,2)+Math.pow(item.b/item.weight-first.b/first.weight,2))>70);
+  return [pick(first,"120,140,175"),pick(second||first,"72,76,88")];
+}
 function extractCoverFluidColors(image:HTMLImageElement):CoverFluidColors{
   try{
     const canvas=document.createElement("canvas");canvas.width=48;canvas.height=48;
@@ -653,15 +682,9 @@ export default function App() {
     image.onload=()=>{
       if(!active)return;
       try{
-        const colors=extractCoverFluidColors(image);
-        const primaryRaw=colors.color2.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"120,140,175";
-        const secondaryRaw=colors.color1.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"72,76,88";
-        const lift=(raw:string,lightness:number)=>{
-          const [h,s]=rgbToHsl(...raw.split(",").map(value=>Number(value.trim())) as [number,number,number]);
-          return hslToRgb(h,Math.max(s,.58),Math.max(lightness,rgbToHsl(...raw.split(",").map(value=>Number(value.trim())) as [number,number,number])[2])).join(",");
-        };
-        setAmbientColor(lift(primaryRaw,.68));
-        setAmbientSecondaryColor(lift(secondaryRaw,.58));
+        const [primary,secondary]=extractAmbientArtworkColors(image);
+        setAmbientColor(primary);
+        setAmbientSecondaryColor(secondary);
       }catch{setAmbientColor("200,245,106");setAmbientSecondaryColor("95,72,132");}
     };
     image.onerror=()=>{if(active){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");}};
