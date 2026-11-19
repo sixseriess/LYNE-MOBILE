@@ -986,62 +986,7 @@ export default function App() {
     return artistMatches.length===1?artistMatches[0]:null;
   };
   const importedLocalAudioReady=(item:SavedImport)=>Boolean(findLocalTrackForImport(item.title,item.subtitle));
-  // Preserve the tap's media-playback permission before a provider stream is resolved over the network.
-  // Mobile browsers can reject play() after the provider request has finished.
-  const unlockAudioForPendingRequest=useCallback(()=>{
-    const audio=audioRef.current;
-    if(!audio)return;
-    const activeContext=audioContextRef.current;
-    if(activeContext?.state==="suspended")void activeContext.resume().catch(()=>{});
-    if(!audio.paused)return;
-    const previousSrc=audio.getAttribute("src");
-    const previousTrackId=audio.dataset.trackId||"";
-    const sampleRate=8000;
-    const sampleCount=1600;
-    const buffer=new ArrayBuffer(44+sampleCount);
-    const view=new DataView(buffer);
-    const writeText=(offset:number,value:string)=>{for(let index=0;index<value.length;index++)view.setUint8(offset+index,value.charCodeAt(index));};
-    writeText(0,"RIFF");view.setUint32(4,36+sampleCount,true);writeText(8,"WAVE");
-    writeText(12,"fmt ");view.setUint32(16,16,true);view.setUint16(20,1,true);view.setUint16(22,1,true);
-    view.setUint32(24,sampleRate,true);view.setUint32(28,sampleRate,true);view.setUint16(32,1,true);view.setUint16(34,8,true);
-    writeText(36,"data");view.setUint32(40,sampleCount,true);
-    new Uint8Array(buffer,44).fill(128);
-    const silentUrl=URL.createObjectURL(new Blob([buffer],{type:"audio/wav"}));
-    const marker="__lyne_audio_unlock__";
-    const restore=()=>{
-      if(audio.dataset.trackId!==marker){URL.revokeObjectURL(silentUrl);return;}
-      audio.pause();
-      if(previousSrc!==null){audio.setAttribute("src",previousSrc);audio.dataset.trackId=previousTrackId;}
-      else{audio.removeAttribute("src");audio.dataset.trackId="";}
-      audio.load();
-      URL.revokeObjectURL(silentUrl);
-    };
-    audio.pause();audio.src=silentUrl;audio.dataset.trackId=marker;audio.load();
-    try{
-      const request=audio.play();
-      if(request)void request.then(()=>window.setTimeout(restore,120)).catch(restore);
-      else window.setTimeout(restore,120);
-    }catch{restore();}
-  },[]);
-  const findPlayableCatalogTrackForImport=async(title:string,artist:string):Promise<Track|null>=>{
-    const wantedTitle=normalizeImportedText(title),wantedArtist=normalizeImportedText(artist);
-    if(!wantedTitle||!wantedArtist)return null;
-    try{
-      const result=await lyneApi.search([title,artist].filter(Boolean).join(" "),"tracks");
-      const playable=result.tracks.filter(track=>Boolean(track.audioUrl));
-      return playable.find(track=>normalizeImportedText(track.title)===wantedTitle&&normalizeImportedText(track.artist)===wantedArtist)||null;
-    }catch{return null;}
-  };
-  const playYoutubeStandIn=async(title:string,artist:string,artworkUrl?:string)=>{
-    setNotice("Finding the exact recording on YouTube...");
-    const match=await lyneApi.youtubeMatch(title,artist);
-    const stream=await lyneApi.youtubePlayback(match.videoId);
-    const playable:Track={id:"yt:"+match.videoId,title,artist,artwork:artworkUrl,audioUrl:stream.url,audioMime:stream.mimeType,durationMs:stream.durationMs||match.durationMs,source:"catalog"};
-    play(playable,[playable]);
-    setNotice("Playing the matched full-length recording in LYNE.");
-  };
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string}[]})=>{
-    unlockAudioForPendingRequest();
     if(item.kind&&item.kind!=="track"&&item.tracks?.length){
       const first=item.tracks[0];
       await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,tracks:[first]});
@@ -1051,28 +996,25 @@ export default function App() {
       const trackInfo=item.tracks?.[0];
       const soundcloudTrackId=item.kind==="track"?item.providerId:trackInfo?.providerId||"";
       if(!soundcloudTrackId){setNotice("This SoundCloud collection has no playable tracks.");return;}
-      setNotice("Connecting to SoundCloud for the full-length stream...");
-      try{
-        const stream=await lyneApi.soundcloudPlayback(soundcloudTrackId);
-        const playable:Track={id:"sc:"+soundcloudTrackId,title:trackInfo?.title||item.title,artist:trackInfo?.artist||item.subtitle,artwork:item.artwork,audioUrl:stream.url,audioMime:stream.mimeType,durationMs:stream.durationMs||trackInfo?.durationMs,source:"catalog"};
-        play(playable,[playable]);
-        setNotice("Playing the SoundCloud track in LYNE.");
-        return;
-      }catch(error){
-        try{await playYoutubeStandIn(trackInfo?.title||item.title,trackInfo?.artist||item.subtitle,item.artwork);}
-        catch(fallbackError){setNotice(fallbackError instanceof Error?fallbackError.message:(error instanceof Error?error.message:"SoundCloud couldn't provide a full-length stream."));}
-        return;
-      }
+      const playable:Track={
+        id:"sc:"+soundcloudTrackId,title:trackInfo?.title||item.title,
+        artist:trackInfo?.artist||item.subtitle,artwork:item.artwork,
+        audioUrl:getApiUrl()+"/v1/providers/soundcloud/stream/"+encodeURIComponent(soundcloudTrackId),
+        durationMs:trackInfo?.durationMs,source:"catalog"
+      };
+      play(playable,[playable]);
+      setNotice("Loading the full-length SoundCloud stream in LYNE...");
+      return;
     }
     if(item.provider==="youtube"){
-      setNotice("Resolving the full-length YouTube audio stream...");
-      try{
-        const stream=await lyneApi.youtubePlayback(item.providerId);
-        const playable:Track={id:"yt:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,audioUrl:stream.url,audioMime:stream.mimeType,durationMs:stream.durationMs,source:"catalog"};
-        play(playable,[playable]);
-        setNotice("Playing YouTube audio in LYNE.");
-        return;
-      }catch(error){setNotice(error instanceof Error?error.message:"YouTube could not provide a direct full-length stream.");return;}
+      const playable:Track={
+        id:"yt:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,
+        audioUrl:getApiUrl()+"/v1/providers/youtube/stream/"+encodeURIComponent(item.providerId),
+        source:"catalog"
+      };
+      play(playable,[playable]);
+      setNotice("Loading YouTube audio in LYNE...");
+      return;
     }
     const localMatch=findLocalTrackForImport(item.title,item.subtitle);
     if(localMatch){
@@ -1080,18 +1022,14 @@ export default function App() {
       setNotice("Playing your local audio file in LYNE.");
       return;
     }
-    setNotice("Checking the LYNE catalogue for an exact full-length match...");
-    const match=await findPlayableCatalogTrackForImport(item.title,item.subtitle);
-    if(match){
-      play(match,[match]);
-      setNotice("Playing "+match.title+" in LYNE.");
-      return;
-    }
-    if(item.provider==="spotify"||item.provider==="apple_music"){
-      try{await playYoutubeStandIn(item.title,item.subtitle,item.artwork);return;}
-      catch(error){setNotice(error instanceof Error?error.message:"No full-length recording was found. Add your audio file to Local Files.");return;}
-    }
-    setNotice('“'+item.title+'” is saved in your Library, but no exact full-length match is available yet. Add the audio file in Local Files or publish a recording you have rights to distribute to the LYNE catalogue. Provider links are never used as embedded playback.');
+    const matchedStreamUrl=getApiUrl()+"/v1/providers/import/stream?title="+encodeURIComponent(item.title)+"&artist="+encodeURIComponent(item.subtitle);
+    const playable:Track={
+      id:"import:"+item.provider+":"+item.providerId,title:item.title,artist:item.subtitle,
+      artwork:item.artwork,audioUrl:matchedStreamUrl,source:"catalog"
+    };
+    play(playable,[playable]);
+    setNotice("Finding and loading the full-length recording in LYNE...");
+
   };
   const likeAllImportedTracks=async(collection:SavedImport)=>{
     const tracks=collection.tracks||[];
