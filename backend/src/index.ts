@@ -253,9 +253,17 @@ async function handle(request: Request, env: Env): Promise<Response> {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail("Enter a valid email address.");
     if (password.length < 10 || password.length > 128) return fail("Password must be 10–128 characters.");
     const userId = id();
+    const duplicate=await env.DB.prepare("SELECT username_norm,email FROM users WHERE username_norm=? OR email=?").bind(normalized(username),email).first<{username_norm:string;email:string}>();
+    if(duplicate)return fail(duplicate.username_norm===normalized(username)?"That username is already taken.":"That email is already registered.",409);
     try {
-      await env.DB.prepare("INSERT INTO users (id,username,username_norm,email,password_hash) VALUES (?,?,?,?,?)").bind(userId,username,normalized(username),email,await passwordHash(password)).run();
-    } catch { return fail("That username or email is already registered.",409); }
+      const hash=await passwordHash(password);
+      await env.DB.prepare("INSERT INTO users (id,username,username_norm,email,password_hash) VALUES (?,?,?,?,?)").bind(userId,username,normalized(username),email,hash).run();
+    } catch(error) {
+      console.error("LYNE account registration failed",error);
+      const detail=error instanceof Error?error.message:"";
+      if(/unique|constraint/i.test(detail))return fail("That username or email is already registered.",409);
+      return fail("LYNE couldn't create your account right now. Please try again.",503);
+    }
     return json({ accessToken: await issueToken(userId,env.AUTH_SECRET), user: { id: userId, username } },201);
   }
 
@@ -263,7 +271,9 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const body = await request.json() as { username?: string; password?: string };
     const username = body.username?.trim() || ""; const password = body.password || "";
     const row = await env.DB.prepare("SELECT id,username,password_hash FROM users WHERE username_norm=? OR email=?").bind(normalized(username),username.toLowerCase()).first<{id:string;username:string;password_hash:string}>();
-    if (!row || !(await verifyPassword(password,row.password_hash))) return fail("Incorrect username or password.",401);
+    if (!row) return fail("Incorrect username or password.",401);
+    try { if(!(await verifyPassword(password,row.password_hash)))return fail("Incorrect username or password.",401); }
+    catch(error){console.error("LYNE password verification failed",error);return fail("LYNE couldn't verify your password right now. Please try again.",503);}
     return json({ accessToken: await issueToken(row.id,env.AUTH_SECRET), user: { id: row.id, username: row.username } });
   }
 

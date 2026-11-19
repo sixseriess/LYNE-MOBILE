@@ -24,7 +24,8 @@ function normalizeApiUrl(raw:string):string{
   return parsed.origin;
 }
 const savedApiUrl=typeof localStorage!=="undefined"?localStorage.getItem("lyne.apiUrl"):"";
-let API_URL=normalizeApiUrl(savedApiUrl||import.meta.env.VITE_API_URL||"");
+const DEFAULT_API_URL="https://lyne-api.nealeadam10.workers.dev";
+let API_URL=normalizeApiUrl(savedApiUrl||import.meta.env.VITE_API_URL||DEFAULT_API_URL);
 export function getApiUrl():string{return API_URL;}
 export function isApiConfigured():boolean{return Boolean(API_URL);}
 export function configureApiUrl(raw:string):string{
@@ -62,12 +63,16 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
       headers: { Accept: "application/json", ...(init.body && !(typeof FormData!=="undefined" && init.body instanceof FormData) ? { "Content-Type": "application/json" } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init.headers },
     });
   } catch { throw new ApiError("Can't reach the LYNE API. Check your connection."); }
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({})) as { error?: string; message?: string };
-    throw new ApiError(body.message || body.error || `LYNE API error (${response.status})`, response.status);
-  }
   if (response.status === 204) return undefined as T;
-  return response.json().then((data: unknown) => hydrateMedia(data as T));
+  const raw=await response.text();
+  let data:unknown=null;
+  if(raw){try{data=JSON.parse(raw);}catch{data=null;}}
+  if (!response.ok) {
+    const body=(data&&typeof data==="object"?data:{}) as {error?:string;message?:string};
+    throw new ApiError(body.message||body.error||(`LYNE API returned HTTP ${response.status}`),response.status);
+  }
+  if(data===null)throw new ApiError("LYNE returned an empty or invalid response. Please try again.");
+  return hydrateMedia(data as T);
 }
 export const lyneApi = {
   health: () => api<{ ok: boolean; service: string }>("/v1/health"),

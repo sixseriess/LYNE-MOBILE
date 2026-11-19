@@ -2476,3 +2476,42 @@ html,body,#root{background:var(--bg)}
   .page-home .mix-card,.page-home .home-track-card{flex-basis:148px;width:148px;min-width:148px}
   .page-home .mix-grid,.page-home .home-card-rail{gap:17px}
 }
+
+
+/* LYNE Windows Library refinements + dedicated Liked Songs view */
+.page-library .library-search{display:flex;align-items:center;gap:9px;min-width:0;flex:1 1 190px;height:38px;padding:0 11px;color:rgba(255,255,255,.58);overflow:hidden}
+.page-library .library-search:focus-within{border-color:rgba(200,245,106,.45);background:rgba(255,255,255,.075)}
+.page-library .library-search>svg{width:16px;height:16px;flex:none}
+.page-library .library-search input{display:block;flex:1 1 auto;width:0;min-width:0;height:100%;padding:0;border:0;outline:0;background:transparent;color:#fff;font-size:13px}
+.page-library .library-search input::placeholder{color:rgba(255,255,255,.42)}
+.page-library .library-search button{width:24px;height:24px;flex:none;display:grid;place-items:center;border:0;background:transparent;color:rgba(255,255,255,.58)}
+.liked-detail-page{padding:10px 12px 92px;min-height:100%}
+.library-back{height:34px;display:flex;align-items:center;gap:8px;padding:0 2px;border:0;background:transparent;color:rgba(255,255,255,.72);font-size:12px}
+.liked-detail-hero{display:flex;align-items:flex-end;gap:16px;padding:22px 0 18px}
+.liked-detail-art{width:clamp(112px,36vw,170px);aspect-ratio:1;flex:none;overflow:hidden;border-radius:7px;background:linear-gradient(145deg,#65538e,#211d34);box-shadow:0 12px 34px rgba(0,0,0,.3)}
+.liked-detail-art img{display:block;width:100%;height:100%;object-fit:cover}
+.liked-detail-copy{min-width:0;padding-bottom:3px}
+.liked-detail-copy .eyebrow{margin:0 0 8px;font-size:9px}
+.liked-detail-copy h1{margin:0;color:#fff;font-size:clamp(24px,7vw,36px);line-height:1.05;letter-spacing:-1px;font-weight:650}
+.liked-detail-copy p:last-child{margin:8px 0 0;color:rgba(255,255,255,.55);font-size:11px}
+.liked-detail-actions{display:flex;align-items:center;gap:9px;padding:4px 0 14px}
+.liked-detail-actions button{height:36px;display:flex;align-items:center;justify-content:center;gap:8px;padding:0 15px;border-radius:8px;font-size:12px;font-weight:600}
+.liked-play-all{border:0;background:#f1f1f1;color:#111}
+.liked-shuffle{border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.055);color:#f2f2f2}
+.liked-detail-actions button:disabled{opacity:.4;cursor:not-allowed}
+.liked-search{width:100%;margin:0 0 9px}
+.liked-import-row{width:100%;min-height:58px;display:flex;align-items:center;gap:11px;padding:7px 0;border:0;border-bottom:1px solid rgba(255,255,255,.055);background:transparent;text-align:left}
+.liked-import-row>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.liked-import-row b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}
+.liked-import-row small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.48);font-size:11px}
+.liked-import-row>svg{flex:none;color:rgba(255,255,255,.75)}
+:root[data-theme=light] .page-library .library-search{color:rgba(0,0,0,.58);background:rgba(0,0,0,.045);border-color:rgba(0,0,0,.09)}
+:root[data-theme=light] .page-library .library-search input{color:#18181b}
+:root[data-theme=light] .page-library .library-search input::placeholder{color:rgba(0,0,0,.42)}
+:root[data-theme=light] .library-back{color:rgba(0,0,0,.72)}
+:root[data-theme=light] .liked-detail-copy h1{color:#18181b}
+:root[data-theme=light] .liked-detail-copy p:last-child{color:rgba(0,0,0,.5)}
+:root[data-theme=light] .liked-shuffle{color:#18181b;border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.04)}
+:root[data-theme=light] .liked-import-row{border-bottom-color:rgba(0,0,0,.08)}
+:root[data-theme=light] .liked-import-row small{color:rgba(0,0,0,.48)}
+@media(max-width:390px){.liked-detail-hero{gap:12px}.liked-detail-art{width:clamp(100px,33vw,132px)}.liked-detail-copy h1{font-size:25px}}
