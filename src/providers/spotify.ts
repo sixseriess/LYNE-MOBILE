@@ -233,19 +233,30 @@ export async function connectSpotifyPlayer(
 }
 
 export async function playSpotifyTrack(uri: string, clientId: string): Promise<void> {
+  await playSpotifyTracks([uri], clientId);
+}
+
+export async function playSpotifyTracks(uris: string[], clientId: string): Promise<void> {
   if (!player || !deviceId) throw new Error("Spotify is not connected to LYNE yet. Open Settings → Connections and connect Spotify.");
+  const validUris = uris.filter(uri => /^spotify:track:[A-Za-z0-9]+$/.test(uri)).slice(0, 100);
+  if (!validUris.length) throw new Error("No valid Spotify tracks were provided.");
   // Must run immediately from the user's tap on iOS and other autoplay-restricted browsers.
   void player.activateElement().catch(() => {});
   const token = await getSpotifyAccessToken(clientId);
   const response = await fetch("https://api.spotify.com/v1/me/player/play?device_id=" + encodeURIComponent(deviceId), {
     method: "PUT",
     headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-    body: JSON.stringify({ uris: [uri] }),
+    body: JSON.stringify({ uris: validUris }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({})) as { error?: { message?: string } };
     throw new Error(body.error?.message || "Spotify could not start this track on LYNE.");
   }
+}
+
+export async function getSpotifyPlaybackSnapshot(): Promise<SpotifyPlaybackSnapshot | null> {
+  if (!player) return null;
+  return snapshotFromState(await player.getCurrentState());
 }
 
 export async function toggleSpotifyPlayback(): Promise<void> {
