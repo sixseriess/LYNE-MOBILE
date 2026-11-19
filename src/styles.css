@@ -3404,3 +3404,43 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
     animation: none !important;
   }
 }
+
+
+/* Mobile song ambience: render the real cover art as the full-screen colour source. */
+.app-shell::before {
+  opacity: 0 !important;
+  transition: opacity 900ms ease !important;
+}
+.app-shell.has-song-ambience::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  inset: -22% -28% -12% !important;
+  pointer-events: none !important;
+  background-image: linear-gradient(180deg, rgba(8,9,12,.12), rgba(8,9,12,.42) 72%, rgba(8,9,12,.68)), var(--current-artwork) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  filter: blur(76px) saturate(1.9) brightness(1.12) !important;
+  opacity: .92 !important;
+  transform: scale(1.18);
+  animation: lyne-cover-colour-drift 24s ease-in-out infinite alternate;
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0,0,0,.94) 70%, rgba(0,0,0,.55) 100%) !important;
+}
+.app-shell.has-song-ambience::after {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  background: radial-gradient(ellipse at 50% 45%, transparent 10%, rgba(8,9,12,.18) 100%) !important;
+  opacity: 1 !important;
+}
+.app-shell.has-song-ambience > * { position: relative; z-index: 1; }
+@keyframes lyne-cover-colour-drift {
+  from { transform: scale(1.12) translate3d(-1.5%, -1%, 0); }
+  to { transform: scale(1.24) translate3d(1.5%, 1%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-shell.has-song-ambience::before { animation: none !important; }
+}
