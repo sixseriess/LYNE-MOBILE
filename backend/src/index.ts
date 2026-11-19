@@ -294,13 +294,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
   }
 
 
+  if(path==="/v1/providers/apple/developer-token"&&request.method==="GET"){
+    if(!env.APPLE_MUSIC_DEVELOPER_TOKEN)return fail("Apple Music developer token is not configured on the LYNE Worker.",503);
+    return json({developerToken:env.APPLE_MUSIC_DEVELOPER_TOKEN},200,{"cache-control":"no-store"});
+  }
+
   if (path === "/v1/providers/status" && request.method === "GET") {
     return json({
       providers: {
-        spotify: { configured: !!(env.SPOTIFY_CLIENT_ID && env.SPOTIFY_CLIENT_SECRET), capability: "metadata" },
+        spotify: { configured: !!env.SPOTIFY_CLIENT_ID, capability: "official Web Playback SDK; Premium account and user authorization required" },
         soundcloud: { configured: true, capability: "public API metadata and eligible full-length streams" },
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
-        apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "metadata" },
+        apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "MusicKit full playback; user authorization and subscription required" },
       },
       playback: { soundcloud: "official public API; eligible full-length tracks only", youtube: "metadata only; use a licensed LYNE catalogue file or a local file for playback" },
     });
