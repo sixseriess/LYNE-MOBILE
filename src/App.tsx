@@ -654,10 +654,14 @@ export default function App() {
       if(!active)return;
       try{
         const colors=extractCoverFluidColors(image);
-        const primary=colors.color2.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"120,140,175";
-        const secondary=colors.color1.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"72,76,88";
-        setAmbientColor(primary);
-        setAmbientSecondaryColor(secondary);
+        const primaryRaw=colors.color2.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"120,140,175";
+        const secondaryRaw=colors.color1.match(/\d+\s*,\s*\d+\s*,\s*\d+/)?.[0]||"72,76,88";
+        const lift=(raw:string,lightness:number)=>{
+          const [h,s]=rgbToHsl(...raw.split(",").map(value=>Number(value.trim())) as [number,number,number]);
+          return hslToRgb(h,Math.max(s,.58),Math.max(lightness,rgbToHsl(...raw.split(",").map(value=>Number(value.trim())) as [number,number,number])[2])).join(",");
+        };
+        setAmbientColor(lift(primaryRaw,.68));
+        setAmbientSecondaryColor(lift(secondaryRaw,.58));
       }catch{setAmbientColor("200,245,106");setAmbientSecondaryColor("95,72,132");}
     };
     image.onerror=()=>{if(active){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");}};
