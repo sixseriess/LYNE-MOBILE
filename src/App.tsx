@@ -646,7 +646,7 @@ export default function App() {
   },[state.preferences.reduceMotion,state.preferences.ambientVisualMode]);
   useEffect(()=>{
     const artworkUrl=current?.artwork;
-    if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");return;}
+    if(!playing||!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");return;}
     let active=true;
     const image=new Image();
     image.crossOrigin="anonymous";
@@ -667,7 +667,7 @@ export default function App() {
     image.onerror=()=>{if(active){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");}};
     image.src=artworkUrl;
     return ()=>{active=false;image.onload=null;image.onerror=null;};
-  },[current?.artwork,state.preferences.ambientVisualMode]);
+  },[current?.artwork,playing,state.preferences.ambientVisualMode]);
   useEffect(()=>{
     const root=document.documentElement;
     const cover=current?.artwork||homeTracks[0]?.artwork||popularAlbums[0]?.artwork||"";
@@ -1657,7 +1657,7 @@ export default function App() {
     <p className="auth-version">LYNE MOBILE · BUILT AROUND YOUR MUSIC</p>
   </main>;
 
-  return <main className={`app-shell${!customBackground&&state.preferences.ambientVisualMode!=="off"?" has-song-ambience":""}`} style={customBackground?{backgroundImage:`linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),url("${customBackground}")`,backgroundSize:"cover",backgroundPosition:"center"}:state.preferences.ambientVisualMode!=="off"?{backgroundColor:"var(--bg, #09090b)",backgroundImage:"radial-gradient(ellipse at 18% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .82) 0%, transparent 58%), radial-gradient(ellipse at 84% 48%, rgba(var(--ambient-color-b, 95, 72, 132), .76) 0%, transparent 60%), radial-gradient(ellipse at 46% 96%, rgba(var(--ambient-color-a, 120, 140, 175), .62) 0%, transparent 62%)",backgroundSize:"190% 190%, 180% 180%, 170% 170%"}:undefined}>
+  return <main className={`app-shell${!customBackground&&playing&&current&&state.preferences.ambientVisualMode!=="off"?" has-song-ambience":""}`} style={customBackground?{backgroundImage:`linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),url("${customBackground}")`,backgroundSize:"cover",backgroundPosition:"center"}:playing&&current&&state.preferences.ambientVisualMode!=="off"?{backgroundColor:"var(--bg, #09090b)",backgroundImage:"radial-gradient(ellipse at 18% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .82) 0%, transparent 58%), radial-gradient(ellipse at 84% 48%, rgba(var(--ambient-color-b, 95, 72, 132), .76) 0%, transparent 60%), radial-gradient(ellipse at 46% 96%, rgba(var(--ambient-color-a, 120, 140, 175), .62) 0%, transparent 62%)",backgroundSize:"190% 190%, 180% 180%, 170% 170%"}:undefined}>
     <audio ref={audioRef} preload="auto" onLoadStart={()=>setPlaybackMessage("Loading audio…")} onWaiting={()=>setPlaybackMessage("Buffering audio…")} onPlaying={()=>setPlaybackMessage("Playing")} onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={e=>{const code=e.currentTarget.error?.code;setPlaying(false);const message=code===2?"The audio source could not be fetched. Check the LYNE stream connection.":code===3?"The audio file could not be decoded. Try a different format.":code===4?"This audio format isn't supported by this browser.":"The audio stream failed. The imported link may not include playable audio.";setPlaybackMessage(message);setNotice(message);}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>{const value=e.currentTarget.duration;setDuration(Number.isFinite(value)?value*1000:0);}} />
     <header className="topbar">
       <button className="brand" type="button" aria-label="LYNE Home" onClick={()=>setTab("Home")}>
