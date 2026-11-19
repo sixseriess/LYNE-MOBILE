@@ -347,7 +347,7 @@ export default function App() {
   const [providerStatusError,setProviderStatusError]=useState("");
   const loadProviderStatus=async()=>{try{const result=await lyneApi.providerStatus();setProviderStatus(result.providers);setProviderStatusError("");}catch(error){setProviderStatusError(error instanceof Error?error.message:"Could not check provider connections.");}};
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
-  const [ambientColor,setAmbientColor]=useState("200,245,106");
+  const [ambientColor,setAmbientColor]=useState("36,38,44");
   const [equalizerError,setEqualizerError]=useState("");
   const [equalizerTab,setEqualizerTab]=useState<EqualizerCategory>(()=>state.preferences.equalizerCategory);
   const [equalizerPresetName,setEqualizerPresetName]=useState("");
@@ -467,7 +467,7 @@ export default function App() {
   },[state.preferences.reduceMotion]);
   useEffect(()=>{
     const artworkUrl=current?.artwork;
-    if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("200,245,106");return;}
+    if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");return;}
     let active=true;
     const image=new Image();
     image.crossOrigin="anonymous";
@@ -476,7 +476,7 @@ export default function App() {
       try{setAmbientColor(extractCoverAccent(image));}
       catch{setAmbientColor("200,245,106");}
     };
-    image.onerror=()=>{if(active)setAmbientColor("200,245,106");};
+    image.onerror=()=>{if(active)setAmbientColor("36,38,44");};
     image.src=artworkUrl;
     return ()=>{active=false;image.onload=null;image.onerror=null;};
   },[current?.artwork,state.preferences.ambientVisualMode]);
@@ -611,8 +611,29 @@ export default function App() {
     }finally{setHomeLoading(false);}
   },[]);
   useEffect(()=>{if(apiStatus==="online")void loadHome();},[apiStatus,loadHome]);
-  useEffect(()=>{ if(!current?.audioUrl){ if(audioRef.current)audioRef.current.pause(); return; } const audio=audioRef.current; if(!audio)return; audio.crossOrigin="anonymous"; audio.src=current.audioUrl; audio.volume=volume; if(playing)void audio.play().catch(()=>{setPlaying(false);setNotice("This track couldn't be played.");}); },[current?.id,current?.audioUrl]);
-  useEffect(()=>{ if(audioRef.current){audioRef.current.volume=volume;if(playing)void audioRef.current.play().catch(()=>setPlaying(false));else audioRef.current.pause();} },[playing,volume]);
+  useEffect(()=>{
+    const audio=audioRef.current;
+    if(!audio)return;
+    if(!current?.audioUrl){audio.pause();audio.removeAttribute("src");audio.load();return;}
+    audio.pause();
+    audio.src=current.audioUrl;
+    audio.volume=volume;
+    audio.load();
+    setPosition(0);
+    setDuration(current.durationMs||0);
+  },[current?.id,current?.audioUrl]);
+  useEffect(()=>{
+    const audio=audioRef.current;
+    if(!audio)return;
+    audio.volume=volume;
+    if(playing&&current?.audioUrl){
+      void audio.play().catch(error=>{
+        setPlaying(false);
+        const detail=audio.error?.code===2?"The audio stream could not be fetched.":audio.error?.code===3?"The audio format or stream could not be decoded.":audio.error?.code===4?"This browser doesn't support the supplied audio format.":"Playback was blocked by the browser or the source.";
+        setNotice(detail+" "+(error instanceof Error?error.message:"Try another track or a local audio file."));
+      });
+    }else audio.pause();
+  },[playing,volume,current?.id,current?.audioUrl]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.volume",String(volume));},[volume]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.playbackRate",String(playbackRate));},[playbackRate]);
   useEffect(()=>{localStorage.setItem("lyne.mobile.shuffle",String(shuffle));},[shuffle]);
@@ -638,6 +659,7 @@ export default function App() {
     haptic();
     const selected=localTracks.find(item=>item.id===track.id&&item.offline)||track;
     const selectedList=list.map(item=>localTracks.find(saved=>saved.id===item.id&&saved.offline)||item);
+    if(!selected.audioUrl){setPlaying(false);setNotice("This track doesn't have a playable audio file yet. Add its licensed audio to Local Files or the LYNE catalogue.");return;}
     if(current&&current.id!==selected.id)reportListening(current,position);
     listeningReportedRef.current=null;
     const quality=getAudioSourceQuality(selected);
@@ -647,6 +669,7 @@ export default function App() {
     }
     setCurrent(selected);
     setQueue(selectedList.length?selectedList:[selected]);
+    setPosition(0);setDuration(selected.durationMs||0);
     setPlaying(true);setExpanded(false);
     setState(old=>({...old,history:[selected,...old.history.filter(t=>t.id!==selected.id)].slice(0,50)}));
   },[state.preferences.audioQuality,current,position,reportListening,localTracks,haptic]);
@@ -725,7 +748,7 @@ export default function App() {
     if(!session||typeof session.setPositionState!=="function"||duration<=0)return;
     try{session.setPositionState({duration:duration/1000,position:Math.min(position,duration)/1000,playbackRate:audioRef.current?.playbackRate||1});}catch{}
   },[position,duration,playing]);
-  const allTracks=useMemo(()=>{const unique=new Map<string,Track>();[...homeTracks,...results,...state.history,...localTracks].forEach(track=>unique.set(track.id,track));return [...unique.values()];}, [localTracks,homeTracks,results,state.history]);
+  const allTracks=useMemo(()=>{const unique=new Map<string,Track>();[...homeTracks,...results,...catalogTracks,...state.history,...localTracks].forEach(track=>unique.set(track.id,track));return [...unique.values()];}, [localTracks,homeTracks,results,catalogTracks,state.history]);
   const selectedPlaylist=state.playlists.find(p=>p.id===selectedPlaylistId)||null;
   const selectedPlaylistTracks=selectedPlaylist?selectedPlaylist.trackIds.map(id=>allTracks.find(track=>track.id===id)).filter(Boolean) as Track[]:[];
   const likedTracks=useMemo(()=>state.likes.map(id=>allTracks.find(t=>t.id===id)).filter(Boolean) as Track[],[state.likes,allTracks]);
@@ -1163,10 +1186,21 @@ export default function App() {
   const greeting=hour>=5&&hour<12?"Good morning":hour>=12&&hour<17?"Good afternoon":hour>=17&&hour<22?"Good evening":"Good night";
   const dateLabel=new Intl.DateTimeFormat("en",{weekday:"long",month:"long",day:"numeric"}).format(new Date());
   const [libraryFilter,setLibraryFilter]=useState<"all"|"playlists"|"albums"|"artists">("all");
-  const [libraryDetail,setLibraryDetail]=useState<"liked"|null>(null);
+  const [libraryDetail,setLibraryDetail]=useState<"liked"|"local"|"catalog"|null>(null);
   const [likedSearch,setLikedSearch]=useState("");
+  const [localSearch,setLocalSearch]=useState("");
+  const [catalogSearch,setCatalogSearch]=useState("");
+  const [catalogTracks,setCatalogTracks]=useState<Track[]>([]);
+  const [catalogLoading,setCatalogLoading]=useState(false);
+  const [catalogError,setCatalogError]=useState("");
   const [libraryQuery,setLibraryQuery]=useState("");
   const [libraryViewMode,setLibraryViewMode]=useState<"grid"|"list">("grid");
+  const loadCatalog=async()=>{
+    setCatalogLoading(true);setCatalogError("");
+    try{const result=await lyneApi.tracks(100,0);setCatalogTracks(result.tracks||[]);}
+    catch(error){setCatalogError(error instanceof Error?error.message:"LYNE catalogue couldn't load.");}
+    finally{setCatalogLoading(false);}
+  };
   const renderRows=(items:Track[])=>items.length?<div className="track-list">{items.map(t=><Row key={t.id} track={t} active={current?.id===t.id} liked={state.likes.includes(t.id)} onPlay={()=>state.preferences.trackTapBehavior==="queue"?addNext(t):play(t,items)} onLike={()=>toggleLike(t)} onMore={()=>{setActiveTrack(t);setLocalMetaEdit(undefined);setModal("track");}}/>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
   const renderHomeCards=(items:Track[])=>items.length?<div className="home-card-rail">{items.map((track,index)=><button className="home-track-card" key={track.id} onClick={()=>play(track,items)}><div className="home-track-art"><Cover track={track}/><span className="home-track-play"><Play size={18} fill="currentColor"/></span></div><b>{track.title}</b><small>{track.artist}</small></button>)}</div>:<Empty title="Nothing here yet" text="Your music will show up here once LYNE's catalogue is connected, or add audio files from your device."/>;
   const renderAlbumCards=(items:typeof popularAlbums)=>items.length?<div className="home-card-rail">{items.map(album=><button className="home-track-card home-album-card" key={album.id} onClick={()=>void openAlbum(album.id)}><div className="home-track-art"><div className="cover" style={album.artwork?{backgroundImage:"url(\""+album.artwork+"\")"}:undefined}>{!album.artwork&&<Disc3 size={27}/>}</div><span className="home-track-play"><Play size={18} fill="currentColor"/></span></div><b>{album.title}</b><small>{album.artist}{album.trackCount?" · "+album.trackCount+" tracks":""}</small></button>)}</div>:<Empty title="No albums yet" text="Albums added to the LYNE catalogue will appear here."/>;
@@ -1199,7 +1233,7 @@ export default function App() {
   </main>;
 
   return <main className="app-shell" style={customBackground?{backgroundImage:`linear-gradient(rgba(0,0,0,.28),rgba(0,0,0,.28)),url("${customBackground}")`,backgroundSize:"cover",backgroundPosition:"center"}:undefined}>
-    <audio ref={audioRef} crossOrigin="anonymous" onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={()=>{setPlaying(false);setNotice("Playback failed or the audio stream was interrupted. Check your connection, then tap Play to retry or choose another track.");}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>setDuration(e.currentTarget.duration*1000)} />
+    <audio ref={audioRef} preload="auto" onEnded={()=>{if(state.repeat==="one"&&audioRef.current){audioRef.current.currentTime=0;void audioRef.current.play();}else next();}} onError={e=>{const code=e.currentTarget.error?.code;setPlaying(false);setNotice(code===2?"The audio source could not be fetched. Check the stream URL or connection.":code===3?"The audio file could not be decoded. Try a different format.":code===4?"This audio format isn't supported by this browser.":"The audio stream failed. Try another track or add a local audio file.");}} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)} onLoadedMetadata={e=>{const value=e.currentTarget.duration;setDuration(Number.isFinite(value)?value*1000:0);}} />
     <header className="topbar">
       <button className="brand" type="button" aria-label="LYNE Home" onClick={()=>setTab("Home")}>
         <img src="/LYNE-MOBILE/lyne-wordmark.png" alt="LYNE" width="54" height="27"/>
@@ -1266,6 +1300,19 @@ export default function App() {
             <div className="track-list">{state.importedLikes.filter(item=>!likedSearch.trim()||(item.title+" "+item.subtitle).toLocaleLowerCase().includes(likedSearch.trim().toLocaleLowerCase())).map(item=><button type="button" className="imported-row liked-import-row" key={item.provider+item.providerId} onClick={()=>openImportedPlayback(item)}><div className="cover" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<Music2/>}</div><span><b>{item.title}</b><small>{item.subtitle} · {providerName(item.provider)}</small></span><Play size={16}/></button>)}</div>
           </>}
           {!likedTracks.length&&!state.importedLikes.length&&<Empty title="No liked songs yet" text="Tap the heart beside any track or import a song link to start your collection."/>}
+        </div>:libraryDetail==="local"?<div className="liked-detail-page local-detail-page">
+          <button type="button" className="library-back" onClick={()=>setLibraryDetail(null)}><ArrowLeft size={17}/> Your Library</button>
+          <div className="liked-detail-hero"><div className="liked-detail-art local-detail-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div><div className="liked-detail-copy"><p className="eyebrow">ON THIS DEVICE</p><h1>Local Files</h1><p>{localTracks.length} tracks stored locally</p></div></div>
+          <div className="liked-detail-actions"><button type="button" className="liked-play-all" disabled={!localTracks.length} onClick={()=>play(localTracks[0],localTracks)}><Play size={16} fill="currentColor"/> Play</button><button type="button" className="liked-shuffle" disabled={!localTracks.length} onClick={()=>{const mixed=[...localTracks].sort(()=>Math.random()-.5);if(mixed[0])play(mixed[0],mixed);setShuffle(true);}}><Shuffle size={16}/> Shuffle</button><button type="button" className="liked-shuffle" onClick={()=>fileRef.current?.click()}><Upload size={15}/> Add files</button></div>
+          <label className="library-search liked-search"><Search size={16}/><input aria-label="Search local files" value={localSearch} onChange={e=>setLocalSearch(e.target.value)} placeholder="Find in Local Files"/>{localSearch&&<button type="button" aria-label="Clear search" onClick={()=>setLocalSearch("")}><X size={15}/></button>}</label>
+          {renderRows(localTracks.filter(track=>!localSearch.trim()||(track.title+" "+track.artist).toLocaleLowerCase().includes(localSearch.trim().toLocaleLowerCase())))}
+          <input ref={fileRef} hidden type="file" accept="audio/*" multiple onChange={e=>{void importFiles(e.target.files);e.currentTarget.value="";}}/>
+        </div>:libraryDetail==="catalog"?<div className="liked-detail-page catalog-detail-page">
+          <button type="button" className="library-back" onClick={()=>setLibraryDetail(null)}><ArrowLeft size={17}/> Your Library</button>
+          <div className="liked-detail-hero"><div className="liked-detail-art catalog-detail-art"><Music2 size={48}/></div><div className="liked-detail-copy"><p className="eyebrow">LYNE ORIGINALS</p><h1>Music Catalogue</h1><p>{catalogTracks.length} available tracks</p></div></div>
+          <div className="liked-detail-actions"><button type="button" className="liked-shuffle" onClick={()=>void loadCatalog()}><LoaderCircle size={15}/> Refresh catalogue</button></div>
+          <label className="library-search liked-search"><Search size={16}/><input aria-label="Search LYNE catalogue" value={catalogSearch} onChange={e=>setCatalogSearch(e.target.value)} placeholder="Search the LYNE catalogue"/>{catalogSearch&&<button type="button" aria-label="Clear catalogue search" onClick={()=>setCatalogSearch("")}><X size={15}/></button>}</label>
+          {catalogLoading?<div className="loading"><LoaderCircle className="spin"/> Loading LYNE music...</div>:catalogError?<div className="api-note"><span>Catalogue unavailable</span><small>{catalogError}</small><button type="button" className="secondary-action" onClick={()=>void loadCatalog()}>Try again</button></div>:catalogTracks.length?renderRows(catalogTracks.filter(track=>!catalogSearch.trim()||(track.title+" "+track.artist+" "+(track.album||"")).toLocaleLowerCase().includes(catalogSearch.trim().toLocaleLowerCase()))):<Empty title="The LYNE catalogue is being built" text="Official LYNE releases and recordings cleared for distribution will appear here. Add licensed audio to the catalogue to make it playable for everyone."/>}
         </div>:<>
         <div className="library-page-title"><h1>Your Library</h1></div>
         <div className="library-tab-row" role="tablist" aria-label="Library categories">
@@ -1288,18 +1335,26 @@ export default function App() {
                 <div className="library-item-art liked-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
                 <b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small>
               </button>}
-              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-item-card" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-item-card" onClick={()=>{setLocalSearch("");setLibraryDetail("local");}}>
                 <div className="library-item-art local-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
                 <b>Local Music</b><small>{localTracks.length} tracks</small>
+              </button>}
+              {(!libraryQuery.trim()||"lyne catalogue music".includes(libraryQuery.trim().toLocaleLowerCase())||catalogTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-item-card" onClick={()=>{setCatalogSearch("");setLibraryDetail("catalog");void loadCatalog();}}>
+                <div className="library-item-art catalog-art"><Music2/></div>
+                <b>LYNE Catalogue</b><small>{catalogTracks.length?catalogTracks.length+" tracks":"Browse music"}</small>
               </button>}
             </>:<>
               {(!libraryQuery.trim()||"liked songs".includes(libraryQuery.trim().toLocaleLowerCase())||likedTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()))||state.importedLikes.some(item=>(item.title+" "+item.subtitle).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>setLibraryDetail("liked")}>
                 <div className="library-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
                 <span><b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small></span><ChevronRight/>
               </button>}
-              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>{setLocalSearch("");setLibraryDetail("local");}}>
                 <div className="library-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
                 <span><b>Local Music</b><small>{localTracks.length} tracks</small></span><ChevronRight/>
+              </button>}
+              {(!libraryQuery.trim()||"lyne catalogue music".includes(libraryQuery.trim().toLocaleLowerCase())||catalogTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>{setCatalogSearch("");setLibraryDetail("catalog");void loadCatalog();}}>
+                <div className="library-art catalog-art"><Music2/></div>
+                <span><b>LYNE Catalogue</b><small>{catalogTracks.length?catalogTracks.length+" tracks":"Browse music"}</small></span><ChevronRight/>
               </button>}
             </>}
           </>}

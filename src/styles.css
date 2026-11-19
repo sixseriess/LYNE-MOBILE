@@ -2536,3 +2536,60 @@ html,body,#root{background:var(--bg)}
 :root[data-theme=light] .page-library .library-toolbar>.library-search input::placeholder{color:rgba(0,0,0,.4)}
 :root[data-theme=light] .page-library .library-toolbar>.library-search button{color:rgba(0,0,0,.55)}
 @media(max-width:360px){.page-library .library-toolbar{gap:6px}.page-library .library-toolbar>.library-search{height:40px;min-height:40px}}
+
+
+/* LYNE now-playing: restrained Windows-style dark glass, no lime wash */
+.player-overlay{
+  background:linear-gradient(180deg,rgba(19,20,24,.98) 0%,rgba(10,10,13,.99) 48%,#08080a 100%);
+}
+.player-overlay:before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+  background:radial-gradient(ellipse at 50% 12%,rgba(255,255,255,.055),transparent 48%);
+}
+.player-art-backdrop{
+  opacity:.14!important;filter:blur(58px) saturate(.48)!important;
+  mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent 82%)!important;
+}
+.player-overlay .player-top{color:rgba(245,245,247,.58)}
+.player-overlay .player-track h2{color:#f5f5f6;font-weight:600}
+.player-overlay .player-track p{color:rgba(245,245,247,.58)}
+.player-overlay .main-play{background:#f0f0f1;color:#111!important;box-shadow:0 5px 22px rgba(0,0,0,.28)}
+.player-overlay .main-play:hover{background:#fff}
+.player-overlay .plain-icon,.player-overlay .control-on{color:rgba(245,245,247,.78)}
+.player-overlay .control-on{color:#fff}
+.player-overlay .seek,.player-overlay .volume-row input{accent-color:#e8e8ea}
+.player-overlay .audio-source-label{color:rgba(245,245,247,.42)}
+.player-overlay .player-cover{box-shadow:0 18px 58px rgba(0,0,0,.5);border-radius:8px}
+
+/* Search inputs stay neutral while focused or selected; no browser-blue text or lime focus box */
+.page-search .searchbox:focus-within,
+.page-library .library-search:focus-within{
+  border-color:rgba(255,255,255,.2)!important;
+  box-shadow:none!important;outline:none!important;
+}
+.page-search .searchbox input,
+.page-library .library-search input{
+  color:#f4f4f5!important;-webkit-text-fill-color:#f4f4f5!important;
+  caret-color:#d8d8dc;outline:none!important;box-shadow:none!important;
+}
+.page-search .searchbox input::selection,
+.page-library .library-search input::selection{background:rgba(220,220,225,.25);color:#fff}
+.page-search .searchbox input:focus,
+.page-library .library-search input:focus{outline:none!important;box-shadow:none!important}
+.page-search .searchbox input:-webkit-autofill,
+.page-library .library-search input:-webkit-autofill{
+  -webkit-text-fill-color:#f4f4f5!important;
+  -webkit-box-shadow:0 0 0 1000px #17171b inset!important;
+}
+.page-search button:focus-visible,.page-library button:focus-visible{outline:1px solid rgba(255,255,255,.25);outline-offset:2px}
+
+/* Dedicated Local Files and first-party LYNE catalogue screens */
+.local-detail-art{background:linear-gradient(145deg,#30343c,#14161b)}
+.catalog-detail-art{display:grid;place-items:center;color:#e5e5e7;background:linear-gradient(145deg,#393d46,#17191e)}
+.catalog-art{display:grid;place-items:center;color:#e2e2e5;background:linear-gradient(145deg,#383c44,#17191e)}
+.local-detail-page .liked-detail-actions{flex-wrap:wrap}
+.local-detail-page .liked-detail-actions .liked-shuffle,
+.catalog-detail-page .liked-detail-actions .liked-shuffle{height:36px}
+.catalog-detail-page .empty{margin-top:18px}
+:root[data-theme=light] .player-overlay{background:linear-gradient(180deg,#25262a,#111114)}
+:root[data-theme=light] .player-overlay .player-track h2{color:#f5f5f6}
