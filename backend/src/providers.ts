@@ -409,3 +409,48 @@ export async function resolveYouTubePlayback(videoId:string):Promise<{url:string
   }
   throw lastError instanceof Error?lastError:new Error("YouTube audio could not be resolved.");
 }
+
+function collectYoutubeVideos(value:any,out:any[]=[],depth=0):any[]{
+  if(!value||typeof value!=="object"||depth>24)return out;
+  if(!Array.isArray(value)&&value.videoRenderer&&typeof value.videoRenderer.videoId==="string")out.push(value.videoRenderer);
+  const children=Array.isArray(value)?value:Object.values(value);
+  for(const child of children)collectYoutubeVideos(child,out,depth+1);
+  return out;
+}
+function normalizeMatchText(value:string):string{
+  return value.normalize("NFKD").toLocaleLowerCase("en")
+    .replace(/\b(official|audio|video|music|lyrics|lyric|visualizer|remastered|hd|4k|topic)\b/g," ")
+    .replace(/[^\p{L}\p{N}]/gu,"");
+}
+function youtubeDuration(value:string):number|undefined{
+  const parts=value.split(":").map(Number);
+  if(!parts.length||parts.some(part=>!Number.isFinite(part)))return undefined;
+  return parts.reduce((total,part)=>total*60+part,0)*1000;
+}
+export async function resolveYouTubeMatch(title:string,artist:string):Promise<{videoId:string;title:string;artist:string;durationMs?:number}>{
+  const wantedTitle=normalizeMatchText(title);
+  const wantedArtist=normalizeMatchText(artist);
+  if(wantedTitle.length<2||wantedArtist.length<2)throw new Error("A song title and artist are required to find a matching YouTube recording.");
+  const query=encodeURIComponent(title+" "+artist+" official audio");
+  const response=await fetch("https://www.youtube.com/results?search_query="+query,{headers:{accept:"text/html"}});
+  if(!response.ok)throw new Error("YouTube search is unavailable right now.");
+  const html=await response.text();
+  const data=extractEmbeddedJson(html,"ytInitialData")||extractEmbeddedJson(html,'window["ytInitialData"]');
+  if(!data)throw new Error("YouTube did not return search results.");
+  const candidates=collectYoutubeVideos(data);
+  for(const video of candidates){
+    const videoId=String(video.videoId||"");
+    const candidateTitle=String(video.title?.runs?.map((run:any)=>run.text).join("")||video.title?.simpleText||"");
+    const candidateArtist=String(video.ownerText?.runs?.map((run:any)=>run.text).join("")||video.shortBylineText?.runs?.map((run:any)=>run.text).join("")||"");
+    const normalizedTitle=normalizeMatchText(candidateTitle);
+    const normalizedArtist=normalizeMatchText(candidateArtist);
+    if(!/^[a-zA-Z0-9_-]{11}$/.test(videoId))continue;
+    const titleMatches=normalizedTitle===wantedTitle;
+    const artistMatches=normalizedArtist===wantedArtist||normalizedArtist.includes(wantedArtist)||wantedArtist.includes(normalizedArtist);
+    if(titleMatches&&artistMatches){
+      const durationText=String(video.lengthText?.simpleText||"");
+      return {videoId,title:candidateTitle,artist:candidateArtist,durationMs:youtubeDuration(durationText)};
+    }
+  }
+  throw new Error("LYNE couldn't find a confident YouTube match for that exact song and artist.");
+}

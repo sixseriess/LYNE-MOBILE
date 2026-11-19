@@ -912,6 +912,14 @@ export default function App() {
       return playable.find(track=>normalizeImportedText(track.title)===wantedTitle&&normalizeImportedText(track.artist)===wantedArtist)||null;
     }catch{return null;}
   };
+  const playYoutubeStandIn=async(title:string,artist:string,artworkUrl?:string)=>{
+    setNotice("Finding the exact recording on YouTube...");
+    const match=await lyneApi.youtubeMatch(title,artist);
+    const stream=await lyneApi.youtubePlayback(match.videoId);
+    const playable:Track={id:"yt:"+match.videoId,title,artist,artwork:artworkUrl,audioUrl:stream.url,audioMime:stream.mimeType,durationMs:stream.durationMs||match.durationMs,source:"catalog"};
+    play(playable,[playable]);
+    setNotice("Playing the matched full-length recording in LYNE.");
+  };
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;durationMs?:number}[]})=>{
     if(item.provider==="soundcloud"){
       const trackInfo=item.tracks?.[0];
@@ -925,7 +933,8 @@ export default function App() {
         setNotice("Playing the SoundCloud track in LYNE.");
         return;
       }catch(error){
-        setNotice(error instanceof Error?error.message:"SoundCloud couldn't provide a full-length stream.");
+        try{await playYoutubeStandIn(trackInfo?.title||item.title,trackInfo?.artist||item.subtitle,item.artwork);}
+        catch(fallbackError){setNotice(fallbackError instanceof Error?fallbackError.message:(error instanceof Error?error.message:"SoundCloud couldn't provide a full-length stream."));}
         return;
       }
     }
@@ -951,6 +960,10 @@ export default function App() {
       play(match,[match]);
       setNotice("Playing "+match.title+" in LYNE.");
       return;
+    }
+    if(item.provider==="spotify"||item.provider==="apple_music"){
+      try{await playYoutubeStandIn(item.title,item.subtitle,item.artwork);return;}
+      catch(error){setNotice(error instanceof Error?error.message:"No full-length recording was found. Add your audio file to Local Files.");return;}
     }
     setNotice('“'+item.title+'” is saved in your Library, but no exact full-length match is available yet. Add the audio file in Local Files or publish a recording you have rights to distribute to the LYNE catalogue. Provider links are never used as embedded playback.');
   };

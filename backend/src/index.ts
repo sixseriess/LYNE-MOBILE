@@ -1,4 +1,4 @@
-import { resolveMusicLink, resolveSoundCloudPlayback, resolveYouTubePlayback, type ResolvedImport } from "./providers";
+import { resolveMusicLink, resolveSoundCloudPlayback, resolveYouTubePlayback, resolveYouTubeMatch, type ResolvedImport } from "./providers";
 
 interface Env {
   SPOTIFY_CLIENT_ID?: string; SPOTIFY_CLIENT_SECRET?: string;
@@ -221,6 +221,14 @@ async function handle(request: Request, env: Env): Promise<Response> {
     const admin = env.ADMIN_API_TOKEN ? "configured" : "missing";
     const ok = database === "connected" && schema === "ready" && storage === "configured" && auth === "configured" && admin === "configured";
     return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
+  }
+
+  if(path==="/v1/providers/youtube/match"&&request.method==="GET"){
+    try{
+      const title=url.searchParams.get("title")||"";
+      const artist=url.searchParams.get("artist")||"";
+      return json(await resolveYouTubeMatch(title,artist));
+    }catch(error){return fail(error instanceof Error?error.message:"No matching YouTube recording was found.",404);}
   }
 
   const youtubePlaybackMatch=path.match(/^\/v1\/providers\/youtube\/playback\/([a-zA-Z0-9_-]{11})$/);
