@@ -998,6 +998,15 @@ export default function App() {
     });
     return artistMatches.length===1?artistMatches[0]:null;
   };
+  const findPlayableCatalogTrackForImport=async(title:string,artist:string):Promise<Track|null>=>{
+    const wantedTitle=normalizeImportedText(title),wantedArtist=normalizeImportedText(artist);
+    if(!wantedTitle||!wantedArtist)return null;
+    try{
+      const result=await lyneApi.search([title,artist].filter(Boolean).join(" "),"tracks");
+      const playable=(result.tracks||[]).filter(track=>Boolean(track.audioUrl));
+      return playable.find(track=>normalizeImportedText(track.title)===wantedTitle&&normalizeImportedText(track.artist)===wantedArtist)||null;
+    }catch{return null;}
+  };
   const importedLocalAudioReady=(item:SavedImport)=>Boolean(findLocalTrackForImport(item.title,item.subtitle));
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string}[]})=>{
     if(item.kind&&item.kind!=="track"&&item.tracks?.length){
