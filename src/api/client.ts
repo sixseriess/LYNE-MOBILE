@@ -1,6 +1,6 @@
 export type Track = {
   id: string; title: string; artist: string; album?: string; artwork?: string;
-  audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local";
+  audioUrl?: string; audioMime?: string; audioSize?: number; durationMs?: number; explicit?: boolean; source?: "catalog" | "local" | "spotify" | "apple_music"; providerId?: string; externalUrl?: string;
   lyrics?: string; offline?: boolean;
 };
 export type Playlist = { id: string; name: string; description?: string; cover?: string; trackIds: string[]; updatedAt: number; synced?: boolean };
