@@ -231,6 +231,9 @@ async function audioStreamResponse(
   const stream = await resolve();
   const target = new URL(stream.url);
   if (target.protocol !== "https:") return fail("The audio provider returned an insecure stream URL.", 502);
+  if(stream.mimeType.toLowerCase().includes("mpegurl")){
+    return new Response(null,{status:302,headers:{"location":target.toString(),"cache-control":"no-store"}});
+  }
   const upstreamHeaders = new Headers();
   const range = request.headers.get("range");
   if (range) upstreamHeaders.set("range", range);
@@ -303,7 +306,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({
       providers: {
         spotify: { configured: !!env.SPOTIFY_CLIENT_ID, capability: "official Web Playback SDK; Premium account and user authorization required" },
-        soundcloud: { configured: true, capability: "public API metadata and eligible full-length streams" },
+        soundcloud: { configured: !!(env.SOUNDCLOUD_CLIENT_ID && env.SOUNDCLOUD_CLIENT_SECRET), capability: "official OAuth public API; full-length playable tracks only" },
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
         apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "MusicKit full playback; user authorization and subscription required" },
       },
