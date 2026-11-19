@@ -78,6 +78,30 @@ async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport
   }
   return { provider:"spotify",kind:kind as ImportKind,providerId:id,title:clean(data.name)||"Untitled",subtitle:kind==="track"?(tracks[0]?.artist||"Spotify"):(kind==="album"?(data.artists||[]).map((a:any)=>a.name).join(", "):clean(data.owner?.display_name)||"Spotify playlist"),externalUrl,artwork:firstImage(kind==="track"?data.album?.images:data.images),embedUrl:`https://open.spotify.com/embed/${kind}/${id}`,tracks };
 }
+
+let cachedSoundCloudClientId:string|undefined;
+async function getSoundCloudClientId(configured?:string):Promise<string>{
+  if(configured?.trim())return configured.trim();
+  if(cachedSoundCloudClientId)return cachedSoundCloudClientId;
+  const home=await fetch("https://soundcloud.com",{headers:{accept:"text/html,application/xhtml+xml"}});
+  if(!home.ok)throw new Error("SoundCloud is unavailable right now.");
+  const html=await home.text();
+  const scripts=[...html.matchAll(/src="((?:https:)?\\/\\/a-v2\\.sndcdn\\.com\\/assets\\/[^"]+\\.js)"/g)].map(match=>match[1].startsWith("//")?"https:"+match[1]:match[1]).reverse();
+  for(const script of scripts){
+    const response=await fetch(script);
+    if(!response.ok)continue;
+    const source=await response.text();
+    const found=source.match(/client_id\\s*[:=]\\s*"([a-zA-Z0-9]{32})"/)?.[1];
+    if(found){cachedSoundCloudClientId=found;return found;}
+  }
+  throw new Error("Could not initialize the official SoundCloud API client.");
+}
+async function soundCloudApiJson(path:string,clientId:string):Promise<any>{
+  const url=new URL(path,"https://api-v2.soundcloud.com");
+  url.searchParams.set("client_id",clientId);
+  return providerJson(url.toString());
+}
+
 async function soundcloudToken(env: ProviderEnv) {
   if (!env.SOUNDCLOUD_CLIENT_ID || !env.SOUNDCLOUD_CLIENT_SECRET) throw new Error("SoundCloud API credentials are not configured.");
   const basic=btoa(env.SOUNDCLOUD_CLIENT_ID+":"+env.SOUNDCLOUD_CLIENT_SECRET);
@@ -218,11 +242,9 @@ export async function resolveMusicLink(raw: string, env: ProviderEnv): Promise<R
 export type SoundCloudPlaybackResult = { url:string; mimeType:string; durationMs?:number; expiresAt?:string };
 
 export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEnv):Promise<SoundCloudPlaybackResult>{
-  if(!/^\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
-  if(!env.SOUNDCLOUD_CLIENT_ID||!env.SOUNDCLOUD_CLIENT_SECRET)throw new Error("SoundCloud playback needs the official API client ID and secret configured on the LYNE backend.");
-  const token=await soundcloudToken(env);
-  const base="https://api-v2.soundcloud.com";
-  const track=await providerJson(base+"/tracks/"+providerId+"?client_id="+encodeURIComponent(env.SOUNDCLOUD_CLIENT_ID),{headers:{Authorization:"OAuth "+token,Accept:"application/json; charset=utf-8"}});
+  if(!/^\\d{1,20}$/.test(providerId))throw new Error("Invalid SoundCloud track ID.");
+  const clientId=await getSoundCloudClientId(env.SOUNDCLOUD_CLIENT_ID);
+  const track=await soundCloudApiJson("/tracks/"+providerId,clientId);
   if(track?.policy==="BLOCK"||track?.streamable===false)throw new Error("This SoundCloud track is not available for streaming.");
   const duration=Number(track?.duration)||0;
   const fullDuration=Number(track?.full_duration)||duration;
@@ -242,10 +264,10 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
   for(const item of playable){
     try{
       const streamUrl=new URL(item.url);
-      if(streamUrl.protocol!=="https:"||!/(^|\.)soundcloud\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
+      if(streamUrl.protocol!=="https:"||!/(^|\\.)soundcloud\\.com$/i.test(streamUrl.hostname))throw new Error("Unexpected SoundCloud stream endpoint.");
       if(track.track_authorization)streamUrl.searchParams.set("track_authorization",String(track.track_authorization));
-      streamUrl.searchParams.set("client_id",env.SOUNDCLOUD_CLIENT_ID);
-      const response=await fetch(streamUrl.toString(),{headers:{Authorization:"OAuth "+token,Accept:"application/json"}});
+      streamUrl.searchParams.set("client_id",clientId);
+      const response=await fetch(streamUrl.toString(),{headers:{Accept:"application/json"}});
       if(!response.ok)throw new Error("SoundCloud stream authorization failed ("+response.status+").");
       const payload=await response.json() as {url?:unknown};
       if(typeof payload.url!=="string")throw new Error("SoundCloud did not return a playable stream URL.");
@@ -253,7 +275,7 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
       if(mediaUrl.protocol!=="https:")throw new Error("SoundCloud returned an insecure media URL.");
       const mime=String(item?.format?.mime_type||"audio/mpeg").toLowerCase();
       const expires=mediaUrl.searchParams.get("Expires")||mediaUrl.searchParams.get("expires");
-      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
+      return {url:mediaUrl.toString(),mimeType:mime,durationMs:duration||undefined,expiresAt:expires&&/^\\d+$/.test(expires)?new Date(Number(expires)*1000).toISOString():undefined};
     }catch(error){lastError=error;}
   }
   throw lastError instanceof Error?lastError:new Error("Could not resolve a SoundCloud stream.");
