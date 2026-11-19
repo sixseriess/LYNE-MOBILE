@@ -47,6 +47,40 @@ async function spotifyToken(env: ProviderEnv) {
   if (!token.access_token) throw new Error("Spotify didn't provide an API token.");
   return token.access_token as string;
 }
+function findSpotifyEmbedEntity(value:any,depth=0):any{
+  if(!value||typeof value!=="object"||depth>18)return null;
+  if(!Array.isArray(value)&&Array.isArray(value.trackList)&&(typeof value.title==="string"||typeof value.name==="string"))return value;
+  const entries=Array.isArray(value)?value:Object.values(value);
+  for(const child of entries){const found=findSpotifyEmbedEntity(child,depth+1);if(found)return found;}
+  return null;
+}
+async function spotifyEmbedImport(url:URL):Promise<ResolvedImport>{
+  const {kind,id}=spotifyParts(url);
+  if(kind==="artist")throw new Error("Paste a Spotify song, album or playlist link.");
+  const html=await (await fetch("https://open.spotify.com/embed/"+kind+"/"+encodeURIComponent(id),{headers:{accept:"text/html"}})).text();
+  const scripts=[...html.matchAll(/<script[^>]*id="(?:__NEXT_DATA__|initial-state|session)"[^>]*>([\s\S]*?)<\/script>/gi)];
+  let entity:any=null;
+  for(const script of scripts){try{entity=findSpotifyEmbedEntity(JSON.parse(script[1]));if(entity)break;}catch{}}
+  if(!entity)throw new Error("Spotify returned the item details but not its track list. Try again in a moment.");
+  const splitArtists=(raw:any)=>String(raw||"").split(/,[\s\u00a0]+/).map((x:string)=>x.trim()).filter(Boolean);
+  const title=clean(entity.title||entity.name)||"Spotify item";
+  const subtitle=clean(entity.subtitle)||"Spotify";
+  const tracks:ImportedTrack[]=(Array.isArray(entity.trackList)?entity.trackList:[]).map((item:any)=>{
+    const uri=String(item?.uri||"");
+    const artists=splitArtists(item?.subtitle);
+    const cover=Array.isArray(item?.coverArt?.sources)?item.coverArt.sources[0]?.url:undefined;
+    const trackTitle=clean(item?.title);
+    const providerId=uri.split(":").pop()||String(item?.uid||"");
+    if(!trackTitle||!providerId)return null;
+    return {providerId,title:trackTitle,artist:artists.join(", ")||"Spotify Artist",externalUrl:"https://open.spotify.com/track/"+providerId,artwork:firstImage(cover),durationMs:Number(item?.duration)||undefined,embedUrl:"https://open.spotify.com/embed/track/"+providerId};
+  }).filter(Boolean).slice(0,100) as ImportedTrack[];
+  if(kind==="track"&&!tracks.length){
+    const artists=splitArtists(entity.subtitle);
+    tracks.push({providerId:id,title,artist:artists.join(", ")||subtitle,externalUrl:url.toString(),embedUrl:"https://open.spotify.com/embed/track/"+id});
+  }
+  const cover=Array.isArray(entity.coverArt?.sources)?entity.coverArt.sources[0]?.url:undefined;
+  return {provider:"spotify",kind:kind as ImportKind,providerId:id,title,subtitle,externalUrl:url.toString(),artwork:firstImage(cover),embedUrl:"https://open.spotify.com/embed/"+kind+"/"+id,tracks};
+}
 async function spotifyOembedImport(url:URL):Promise<ResolvedImport>{
   const {kind,id}=spotifyParts(url);
   if(kind==="artist")throw new Error("Paste a Spotify song, album or playlist link. Artist-only imports aren't library items yet.");
@@ -60,7 +94,7 @@ async function spotifyOembedImport(url:URL):Promise<ResolvedImport>{
 async function spotifyImport(url: URL, env: ProviderEnv): Promise<ResolvedImport> {
   const { kind, id } = spotifyParts(url);
   if (kind === "artist") throw new Error("Paste a Spotify song, album or playlist link. Artist-only imports aren't library items yet.");
-  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyOembedImport(url);
+  if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_CLIENT_SECRET) return spotifyEmbedImport(url);
   const token = await spotifyToken(env);
   const data = await providerJson(`https://api.spotify.com/v1/${kind}s/${id}?market=CA`, { headers:{ Authorization:"Bearer "+token } });
   const externalUrl = data.external_urls?.spotify || url.toString();
@@ -155,10 +189,38 @@ function youtubeIdFromUrl(url: URL) {
   const match=url.pathname.match(/\/(?:shorts|embed|live)\/([^/?]+)/);
   return match?.[1]||"";
 }
+function findYoutubePlaylistRenderer(value:any,depth=0):any{
+  if(!value||typeof value!=="object"||depth>22)return null;
+  if(!Array.isArray(value)&&Array.isArray(value.contents)&&value.contents.some((item:any)=>item?.playlistVideoRenderer))return value;
+  const entries=Array.isArray(value)?value:Object.values(value);
+  for(const child of entries){const found=findYoutubePlaylistRenderer(child,depth+1);if(found)return found;}
+  return null;
+}
+async function youtubePlaylistHtmlImport(url:URL,playlistId:string):Promise<ResolvedImport>{
+  const response=await fetch("https://www.youtube.com/playlist?list="+encodeURIComponent(playlistId),{headers:{accept:"text/html"}});
+  if(!response.ok)throw new Error("YouTube playlist page could not be loaded.");
+  const html=await response.text();
+  const match=html.match(/(?:var\\s+ytInitialData\\s*=|window\\["ytInitialData"\\]\\s*=)({[\\s\\S]*?});<\\/script>/);
+  if(!match)throw new Error("YouTube did not provide a public playlist track list.");
+  let data:any;try{data=JSON.parse(match[1]);}catch{throw new Error("YouTube playlist data was invalid.");}
+  const renderer=findYoutubePlaylistRenderer(data);
+  const tracks:ImportedTrack[]=(renderer?.contents||[]).map((entry:any)=>{
+    const video=entry?.playlistVideoRenderer;
+    const videoId=String(video?.videoId||"");
+    const title=clean(video?.title?.runs?.map((x:any)=>x.text).join("")||video?.title?.simpleText);
+    const artist=clean(video?.shortBylineText?.runs?.map((x:any)=>x.text).join("")||video?.videoOwnerRenderer?.title?.runs?.map((x:any)=>x.text).join(""));
+    const thumbs=video?.thumbnail?.thumbnails;
+    if(!/^[a-zA-Z0-9_-]{11}$/.test(videoId)||!title)return null;
+    return {providerId:videoId,title,artist:artist||"YouTube",externalUrl:"https://www.youtube.com/watch?v="+videoId,artwork:firstImage(thumbs?.slice(-1)[0]?.url),embedUrl:"https://www.youtube-nocookie.com/embed/"+videoId};
+  }).filter(Boolean).slice(0,100) as ImportedTrack[];
+  if(!tracks.length)throw new Error("No public tracks were found in that YouTube playlist.");
+  const title=clean(html.match(/<title>([^<]+)<\\/title>/i)?.[1]?.replace(/\\s*-\\s*YouTube$/,""))||"YouTube playlist";
+  return {provider:"youtube",kind:"playlist",providerId:playlistId,title,subtitle:"YouTube",externalUrl:url.toString(),tracks};
+}
 async function youtubeOembedImport(url:URL):Promise<ResolvedImport>{
   const playlistId=url.searchParams.get("list");
   const videoId=youtubeIdFromUrl(url);
-  if(playlistId)throw new Error("This YouTube playlist needs a YouTube Data API key to import its track list. Single video links can still be imported without one.");
+  if(playlistId)return youtubePlaylistHtmlImport(url,playlistId);
   if(!videoId)throw new Error("Paste a YouTube video link. YouTube playlist track lists require the official Data API key.");
   const data=await providerJson("https://www.youtube.com/oembed?format=json&url="+encodeURIComponent(url.toString()));
   const title=clean(data.title)||"YouTube video";
@@ -299,4 +361,32 @@ export async function resolveSoundCloudPlayback(providerId:string,env:ProviderEn
     }catch(error){lastError=error;}
   }
   throw lastError instanceof Error?lastError:new Error("Could not resolve a SoundCloud stream.");
+}
+
+export async function resolveYouTubePlayback(videoId:string):Promise<{url:string;mimeType:string;durationMs?:number}>{
+  if(!/^[a-zA-Z0-9_-]{11}$/.test(videoId))throw new Error("Invalid YouTube video ID.");
+  const profiles=[
+    {clientName:"VISIONOS",clientVersion:"1.02",clientIdHeader:"101",origin:"https://www.youtube.com",context:{osName:"visionOS",osVersion:"26.5.23O471",deviceMake:"Apple",deviceModel:"RealityDevice17,1"}},
+    {clientName:"ANDROID_VR",clientVersion:"1.65.10",clientIdHeader:"28",origin:"https://www.youtube.com",context:{osName:"Android",osVersion:"12L",deviceMake:"Oculus",deviceModel:"Quest 3",androidSdkVersion:32}}
+  ];
+  let lastError:unknown;
+  for(const profile of profiles){
+    try{
+      const response=await providerJson(profile.origin+"/youtubei/v1/player?prettyPrint=false",{
+        method:"POST",
+        headers:{"content-type":"application/json","accept":"application/json","x-youtube-client-name":profile.clientIdHeader,"x-youtube-client-version":profile.clientVersion,"x-origin":profile.origin,"user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/130.0.0.0 Safari/537.36"},
+        body:JSON.stringify({videoId,contentCheckOk:true,racyCheckOk:true,context:{client:{clientName:profile.clientName,clientVersion:profile.clientVersion,hl:"en",gl:"US",...profile.context},user:{lockedSafetyMode:false}}})
+      });
+      const status=response?.playabilityStatus?.status;
+      if(status!=="OK")throw new Error(response?.playabilityStatus?.reason||"YouTube does not allow playback for this video.");
+      const formats=Array.isArray(response?.streamingData?.adaptiveFormats)?response.streamingData.adaptiveFormats:[];
+      const audio=formats.filter((item:any)=>typeof item?.url==="string"&&String(item?.mimeType||"").startsWith("audio/")).sort((x:any,y:any)=>(Number(y.bitrate)||0)-(Number(x.bitrate)||0));
+      if(!audio.length)throw new Error("YouTube did not return a direct audio stream for this video.");
+      const best=audio[0];
+      const mediaUrl=new URL(best.url);
+      if(mediaUrl.protocol!=="https:"||!/(^|\\.)googlevideo\\.com$/i.test(mediaUrl.hostname))throw new Error("YouTube returned an unexpected audio URL.");
+      return {url:mediaUrl.toString(),mimeType:String(best.mimeType).split(";")[0],durationMs:Number(response?.videoDetails?.lengthSeconds)*1000||undefined};
+    }catch(error){lastError=error;}
+  }
+  throw lastError instanceof Error?lastError:new Error("YouTube audio could not be resolved.");
 }

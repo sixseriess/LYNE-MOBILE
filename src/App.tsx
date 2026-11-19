@@ -929,6 +929,16 @@ export default function App() {
         return;
       }
     }
+    if(item.provider==="youtube"){
+      setNotice("Resolving the full-length YouTube audio stream...");
+      try{
+        const stream=await lyneApi.youtubePlayback(item.providerId);
+        const playable:Track={id:"yt:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,audioUrl:stream.url,audioMime:stream.mimeType,durationMs:stream.durationMs,source:"catalog"};
+        play(playable,[playable]);
+        setNotice("Playing YouTube audio in LYNE.");
+        return;
+      }catch(error){setNotice(error instanceof Error?error.message:"YouTube could not provide a direct full-length stream.");return;}
+    }
     const localMatch=findLocalTrackForImport(item.title,item.subtitle);
     if(localMatch){
       play(localMatch,[localMatch]);
@@ -1041,7 +1051,7 @@ export default function App() {
 
   const submitAccount=async()=>{
     if(!accountName.trim()||!accountPassword){setAccountMessage("Enter your username/email and password.");return;}
-    if(accountMode==="register"&&(!accountEmail.trim()||accountPassword.length<10)){setAccountMessage("Enter a valid email and a password with at least 10 characters.");return;}
+    if(accountMode==="register"&&(!/^[a-zA-Z0-9_]{3,24}$/.test(accountName.trim())||!accountEmail.trim()||accountPassword.length<10)){setAccountMessage("Choose a username (3–24 letters, numbers or underscores), enter a valid email, and use a password with at least 10 characters.");return;}
     setAccountBusy(true);setAccountMessage("Connecting to LYNE...");
     try{
       const result=accountMode==="login"
@@ -1059,7 +1069,7 @@ export default function App() {
         setAccountSyncReady(true);
       }catch{setAccountSyncReady(true);setNotice("Signed in. Some account library data could not be loaded yet; local settings will be kept.");}
       setAccountMessage("You're signed in.");setModal(null);setNotice("Signed in to LYNE.");
-    }catch(e){localStorage.removeItem("lyne.accessToken");setAccountMessage(e instanceof Error?e.message:"Couldn't connect to LYNE.");}
+    }catch(e){localStorage.removeItem("lyne.accessToken");const message=e instanceof Error?e.message:"Couldn't connect to LYNE.";setAccountMessage(message.includes("Can't reach")?"LYNE's account server couldn't be reached. Check your connection and try again.":message);}
     finally{setAccountBusy(false);}
   };
   const logout=()=>{localStorage.removeItem("lyne.accessToken");setAccountSyncReady(false);setUser(null);setGuestMode(false);setNotice("Signed out.");};
@@ -1151,7 +1161,7 @@ export default function App() {
       <p className="auth-subtitle">{accountMode==="login"?"Sign in to sync your library, playlists and listening history.":"Create an account and keep your LYNE collection in sync."}</p>
       <div className="auth-mode"><button className={accountMode==="login"?"active":""} onClick={()=>{setAccountMode("login");setAccountMessage("");}}>Sign in</button><button className={accountMode==="register"?"active":""} onClick={()=>{setAccountMode("register");setAccountMessage("");}}>Create account</button></div>
       <form onSubmit={event=>{event.preventDefault();void submitAccount();}}>
-        <label className="auth-field"><span>Username or email</span><input value={accountName} onChange={event=>setAccountName(event.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} autoCorrect="off" placeholder="Your username or email" required/></label>
+        <label className="auth-field"><span>{accountMode==="register"?"Choose a username":"Username or email"}</span><input value={accountName} onChange={event=>setAccountName(event.target.value)} autoComplete="username" autoCapitalize="none" spellCheck={false} autoCorrect="off" placeholder={accountMode==="register"?"Choose a username":"Your username or email"} required/></label>
         {accountMode==="register"&&<label className="auth-field"><span>Email address</span><input value={accountEmail} onChange={event=>setAccountEmail(event.target.value)} type="email" autoComplete="email" autoCapitalize="none" spellCheck={false} autoCorrect="off" placeholder="you@example.com" required/></label>}
         <label className="auth-field"><span>Password</span><input value={accountPassword} onChange={event=>setAccountPassword(event.target.value)} type="password" autoComplete={accountMode==="login"?"current-password":"new-password"} autoCapitalize="none" spellCheck={false} autoCorrect="off" placeholder={accountMode==="login"?"Your password":"At least 10 characters"} required minLength={accountMode==="register"?10:1}/></label>
         <button className="auth-submit" type="submit" disabled={accountBusy}>{accountBusy?<LoaderCircle className="spin" size={16}/>:null}{accountBusy?"Connecting...":accountMode==="login"?"Sign in to LYNE":"Create account"}</button>
@@ -1244,7 +1254,7 @@ export default function App() {
           {(["all","playlists","albums","artists"] as const).map(item=><button type="button" key={item} role="tab" aria-selected={libraryFilter===item} className={libraryFilter===item?"active":""} onClick={()=>setLibraryFilter(item)}>{item==="all"?"All":item[0].toUpperCase()+item.slice(1)}</button>)}
         </div>
         <div className="library-toolbar">
-          <label className="library-search"><Search size={16}/><input aria-label="Search your library" value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} placeholder="Search your library"/></label>
+          <label className="library-search"><Search size={16}/><input aria-label="Search your library" value={libraryQuery} onChange={e=>setLibraryQuery(e.target.value)} placeholder="Search songs, playlists, albums and artists"/>{libraryQuery&&<button type="button" aria-label="Clear library search" onClick={()=>setLibraryQuery("")}><X size={15}/></button>}</label>
           <div className="library-view-controls">
             <button type="button" title="Grid view" aria-label="Grid view" aria-pressed={libraryViewMode==="grid"} className={libraryViewMode==="grid"?"selected":""} onClick={()=>setLibraryViewMode("grid")}><LayoutGrid size={15}/></button>
             <button type="button" title="List view" aria-label="List view" aria-pressed={libraryViewMode==="list"} className={libraryViewMode==="list"?"selected":""} onClick={()=>setLibraryViewMode("list")}><List size={15}/></button>
@@ -1256,40 +1266,40 @@ export default function App() {
         <div className={`library-content-grid ${libraryViewMode}`}>
           {libraryFilter==="all"&&<>
             {libraryViewMode==="grid"?<>
-              <button type="button" className="library-item-card" onClick={()=>setLibraryDetail("liked")}>
+              {(!libraryQuery.trim()||"liked songs".includes(libraryQuery.trim().toLocaleLowerCase())||likedTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()))||state.importedLikes.some(item=>(item.title+" "+item.subtitle).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-item-card" onClick={()=>setLibraryDetail("liked")}>
                 <div className="library-item-art liked-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
                 <b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small>
-              </button>
-              <button type="button" className="library-item-card" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              </button>}
+              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-item-card" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
                 <div className="library-item-art local-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
                 <b>Local Music</b><small>{localTracks.length} tracks</small>
-              </button>
+              </button>}
             </>:<>
-              <button type="button" className="library-row" onClick={()=>document.getElementById("liked-tracks-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              {(!libraryQuery.trim()||"liked songs".includes(libraryQuery.trim().toLocaleLowerCase())||likedTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()))||state.importedLikes.some(item=>(item.title+" "+item.subtitle).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>setLibraryDetail("liked")}>
                 <div className="library-art"><img src="/LYNE-MOBILE/likes-cover.svg" alt="" draggable={false}/></div>
                 <span><b>Liked Songs</b><small>{likedTracks.length+state.importedLikes.length} songs</small></span><ChevronRight/>
-              </button>
-              <button type="button" className="library-row" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
+              </button>}
+              {(!libraryQuery.trim()||"local music local files".includes(libraryQuery.trim().toLocaleLowerCase())||localTracks.some(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())))&&<button type="button" className="library-row" onClick={()=>document.getElementById("local-files-section")?.scrollIntoView({behavior:"smooth",block:"start"})}>
                 <div className="library-art"><img src="/LYNE-MOBILE/local-files-cover.svg" alt="" draggable={false}/></div>
                 <span><b>Local Music</b><small>{localTracks.length} tracks</small></span><ChevronRight/>
-              </button>
+              </button>}
             </>}
           </>}
-          {(libraryFilter==="all"||libraryFilter==="playlists")&&state.playlists.filter(item=>!libraryQuery.trim()||item.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(p=>libraryViewMode==="grid"
+          {(libraryFilter==="all"||libraryFilter==="playlists")&&state.playlists.filter(item=>!libraryQuery.trim()||item.name.toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())).map(p=>libraryViewMode==="grid"
             ?<button className="library-item-card" key={p.id} onClick={()=>openPlaylist(p)}>
               <div className="library-item-art playlist-art" style={p.cover?{backgroundImage:`url("${p.cover}")`}:undefined}>{!p.cover&&<ListMusic/>}</div><b>{p.name}</b><small>{p.trackIds.length} tracks</small>
             </button>
             :<button className="library-row" key={p.id} onClick={()=>openPlaylist(p)}>
               <div className="library-art playlist-art" style={p.cover?{backgroundImage:`url("${p.cover}")`}:undefined}>{!p.cover&&<ListMusic/>}</div><span><b>{p.name}</b><small>Playlist · {p.trackIds.length} tracks</small></span><ChevronRight/>
             </button>)}
-          {(libraryFilter==="all"||libraryFilter==="artists")&&state.savedArtists.filter(item=>!libraryQuery.trim()||item.name.toLowerCase().includes(libraryQuery.trim().toLowerCase())).map(artist=>libraryViewMode==="grid"
+          {(libraryFilter==="all"||libraryFilter==="artists")&&state.savedArtists.filter(item=>!libraryQuery.trim()||item.name.toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase())).map(artist=>libraryViewMode==="grid"
             ?<button className="library-item-card" key={artist.id} onClick={()=>void openArtist(artist.id)}>
               <div className="library-item-art artist-library-art" style={artist.artwork?{backgroundImage:`url("${artist.artwork}")`}:undefined}>{!artist.artwork&&<UserRound/>}</div><b>{artist.name}</b><small>Artist</small>
             </button>
             :<button className="library-row" key={artist.id} onClick={()=>void openArtist(artist.id)}>
               <div className="library-art artist-library-art" style={artist.artwork?{backgroundImage:`url("${artist.artwork}")`}:undefined}>{!artist.artwork&&<UserRound/>}</div><span><b>{artist.name}</b><small>Artist · Saved on this device</small></span><ChevronRight/>
             </button>)}
-          {(libraryFilter==="all"||libraryFilter==="playlists"||libraryFilter==="albums")&&state.importedCollections.filter(item=>(libraryFilter==="all"||item.kind===(libraryFilter==="albums"?"album":"playlist"))&&(!libraryQuery.trim()||item.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||String(item.subtitle||"").toLowerCase().includes(libraryQuery.trim().toLowerCase()))).map(item=>libraryViewMode==="grid"
+          {(libraryFilter==="all"||libraryFilter==="playlists"||libraryFilter==="albums")&&state.importedCollections.filter(item=>(libraryFilter==="all"||item.kind===(libraryFilter==="albums"?"album":"playlist"))&&(!libraryQuery.trim()||(item.title+" "+String(item.subtitle||"")).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()))).map(item=>libraryViewMode==="grid"
             ?<button className="library-item-card" key={item.provider+item.providerId+item.kind} onClick={()=>{setActiveCollection(item);setModal("collection");}}>
               <div className="library-item-art" style={item.artwork?{backgroundImage:`url("${item.artwork}")`}:undefined}>{!item.artwork&&<ListMusic/>}</div><b>{item.title}</b><small>{item.kind==="album"?"Album":"Playlist"} · {providerName(item.provider)}</small>
             </button>
@@ -1306,7 +1316,7 @@ export default function App() {
         </div>
         {libraryFilter==="all"&&<>
           <div id="liked-tracks-section" className="section-heading library-section-heading"><h2>Liked Tracks</h2><span className="section-note">{likedTracks.length} SONGS</span></div>
-          {libraryQuery.trim()?renderRows(likedTracks.filter(track=>track.title.toLowerCase().includes(libraryQuery.trim().toLowerCase())||track.artist.toLowerCase().includes(libraryQuery.trim().toLowerCase()))):renderRows(likedTracks)}
+          {libraryQuery.trim()?renderRows(likedTracks.filter(track=>(track.title+" "+track.artist).toLocaleLowerCase().includes(libraryQuery.trim().toLocaleLowerCase()))):renderRows(likedTracks)}
           <div id="local-files-section" className="section-heading library-section-heading">
             <h2>Local Files</h2>
             <div className="library-local-actions">
