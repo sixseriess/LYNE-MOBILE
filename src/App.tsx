@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { lyneApi, getApiUrl, configureApiUrl, isApiConfigured, type Track, type Playlist, type SearchKind, type SearchPlaylist, type ResolvedImport, type SavedImport } from "./api/client";
 import { Home7Fill as WindowsHomeIcon, Search3Fill as WindowsSearchIcon, BookmarksFill as WindowsLibraryIcon, Settings4Fill as WindowsSettingsIcon, AlbumFill, FireFill, TimeFill, TrophyFill } from "@mingcute/react";
+import { beginSpotifyAuthorization, connectSpotifyPlayer, disconnectSpotify, handleSpotifyAuthorizationRedirect, playSpotifyTrack, previousSpotifyTrack, nextSpotifyTrack, seekSpotifyPlayback, setSpotifyVolume, spotifyHasSession, spotifySavedClientId, toggleSpotifyPlayback, type SpotifyPlaybackSnapshot } from "./providers/spotify";
+import { authorizeAppleMusic, disconnectAppleMusic, getAppleMusicPlaybackState, initializeAppleMusic, nextAppleMusicTrack, playAppleMusicSong, previousAppleMusicTrack, seekAppleMusicPlayback, setAppleMusicVolume, toggleAppleMusicPlayback } from "./providers/appleMusic";
 
 type Tab = "Home" | "Search" | "Library" | "Stats" | "Profile";
 type Period = "day" | "week" | "month" | "year";
