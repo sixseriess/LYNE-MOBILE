@@ -366,6 +366,7 @@ export default function App() {
   const [spotifyConnected,setSpotifyConnected]=useState(false);
   const [spotifyConnectionStatus,setSpotifyConnectionStatus]=useState("Not connected");
   const [appleMusicConnected,setAppleMusicConnected]=useState(false);
+  const [appleMusicConfigured,setAppleMusicConfigured]=useState(false);
   const [appleMusicConnectionStatus,setAppleMusicConnectionStatus]=useState("Checking Apple Music configuration…");
   const [providerBusy,setProviderBusy]=useState(false);
   const [catalogAdminToken,setCatalogAdminToken]=useState("");
@@ -402,10 +403,10 @@ export default function App() {
     if(current?.source==="spotify"){audioRef.current?.pause();setPlaying(false);setPlaybackMessage("Spotify disconnected.");}
   };
   const connectAppleMusicAccount=async()=>{
+    if(!appleMusicConfigured){setAppleMusicConnectionStatus("Apple Music developer token isn't ready. Check the Worker secret and refresh this page.");return;}
     setProviderBusy(true);setAppleMusicConnectionStatus("Opening Apple Music authorization…");
     try{
-      const token=await lyneApi.appleMusicDeveloperToken();
-      await authorizeAppleMusic(token.developerToken);
+      await authorizeAppleMusic();
       setAppleMusicConnected(true);setAppleMusicConnectionStatus("Connected · Apple Music authorization active");
     }catch(error){
       setAppleMusicConnected(false);
@@ -566,7 +567,7 @@ export default function App() {
     }
     void lyneApi.appleMusicDeveloperToken().then(async result=>{
       await initializeAppleMusic(result.developerToken);
-      if(active)setAppleMusicConnectionStatus("Developer token ready · connect your Apple Music account");
+      if(active){setAppleMusicConfigured(true);setAppleMusicConnectionStatus("Developer token ready · connect your Apple Music account");}
     }).catch(error=>{
       if(active)setAppleMusicConnectionStatus(error instanceof Error?error.message:"Apple Music developer token is not configured.");
     });
@@ -822,12 +823,15 @@ export default function App() {
           setPlaying(false);setPlaybackMessage(message);setNotice(message);
         });
       }else{
-        void (async()=>{
-          const token=await lyneApi.appleMusicDeveloperToken();
-          await authorizeAppleMusic(token.developerToken);
-          if(!selected.externalUrl)throw new Error("This Apple Music import has no playable catalogue URL.");
-          await playAppleMusicSong(selected.externalUrl);
-        })().then(()=>{
+        if(!appleMusicConnected){
+          const message="Connect Apple Music in Settings → Connections before playing this song.";
+          setPlaybackMessage(message);setNotice(message);return;
+        }
+        if(!selected.externalUrl){
+          const message="This Apple Music import has no playable catalogue URL.";
+          setPlaybackMessage(message);setNotice(message);return;
+        }
+        void playAppleMusicSong(selected.externalUrl).then(()=>{
           setPlaying(true);setPlaybackMessage("Playing on Apple Music");
         }).catch(error=>{
           const message=error instanceof Error?error.message:"Apple Music playback could not start.";
