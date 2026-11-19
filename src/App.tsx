@@ -1163,6 +1163,23 @@ export default function App() {
   const importedLocalAudioReady=(item:SavedImport)=>Boolean(findLocalTrackForImport(item.title,item.subtitle));
   const openImportedPlayback=async(item:{provider:SavedImport["provider"];title:string;subtitle:string;externalUrl:string;providerId:string;kind?:"track"|"playlist"|"album";embedUrl?:string;artwork?:string;tracks?:{providerId:string;title:string;artist:string;externalUrl?:string;durationMs?:number;artwork?:string;embedUrl?:string}[]})=>{
     if(item.kind&&item.kind!=="track"&&item.tracks?.length){
+      if(item.provider==="spotify"){
+        const trackQueue:Track[]=item.tracks.map(track=>({
+          id:"spotify:"+track.providerId,title:track.title,artist:track.artist,artwork:track.artwork||item.artwork,
+          durationMs:track.durationMs,source:"spotify",providerId:track.providerId,externalUrl:track.externalUrl
+        }));
+        if(trackQueue[0])play(trackQueue[0],trackQueue);
+        return;
+      }
+      if(item.provider==="apple_music"){
+        const first=item.tracks[0];
+        const track:Track={
+          id:"apple_music:"+first.providerId,title:first.title,artist:first.artist,artwork:first.artwork||item.artwork,
+          durationMs:first.durationMs,source:"apple_music",providerId:first.providerId,externalUrl:item.externalUrl
+        };
+        play(track,[track]);
+        return;
+      }
       const first=item.tracks[0];
       await openImportedPlayback({...item,kind:"track",providerId:first.providerId,title:first.title,subtitle:first.artist,externalUrl:first.externalUrl||item.externalUrl,artwork:first.artwork||item.artwork,tracks:[first]});
       return;
@@ -1202,16 +1219,28 @@ export default function App() {
       return;
     }
 
+    if(item.provider==="spotify"){
+      const track:Track={
+        id:"spotify:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,
+        durationMs:item.tracks?.[0]?.durationMs,source:"spotify",providerId:item.providerId,externalUrl:item.externalUrl
+      };
+      play(track,[track]);
+      return;
+    }
+    if(item.provider==="apple_music"){
+      const track:Track={
+        id:"apple_music:"+item.providerId,title:item.title,artist:item.subtitle,artwork:item.artwork,
+        durationMs:item.tracks?.[0]?.durationMs,source:"apple_music",providerId:item.providerId,externalUrl:item.externalUrl
+      };
+      play(track,[track]);
+      return;
+    }
     const metadataTrack:Track={
       id:"import:"+item.provider+":"+item.providerId,title:item.title,artist:item.subtitle,
       artwork:item.artwork,durationMs:item.tracks?.[0]?.durationMs,source:"catalog"
     };
     play(metadataTrack,[metadataTrack]);
-    const message=item.provider==="spotify"
-      ?"Spotify supplied song information, not a playable audio stream. Full playback needs Spotify's official Web Playback SDK, a Spotify Premium account and user authorization, or a licensed audio file in the LYNE catalogue."
-      :item.provider==="apple_music"
-      ?"Apple Music supplied song information, not a playable audio stream. Full playback needs MusicKit user authorization and an active Apple Music subscription, or a licensed audio file in the LYNE catalogue."
-      :"YouTube supplied video information, not a direct audio file. LYNE won't extract or rip YouTube audio. Add a licensed audio file to Local Files or the LYNE catalogue to play it here.";
+    const message="YouTube supplied video information, not a direct audio file. LYNE won't extract or rip YouTube audio. Add a licensed audio file to Local Files or the LYNE catalogue to play it here.";
     setPlaybackMessage(message);
     setNotice(message);
   };
