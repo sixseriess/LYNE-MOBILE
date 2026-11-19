@@ -3392,3 +3392,15 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
       radial-gradient(ellipse at 46% 96%, rgba(var(--ambient-color-a, 120, 140, 175), .30) 0%, transparent 62%) !important;
   }
 }
+
+
+/* The song ambience is now applied inline to .app-shell so it cannot be
+   lost when the shell has other inline styles. Keep its movement enabled. */
+@media screen and (max-width: 600px) {
+  .app-shell.has-song-ambience {
+    animation: lyne-song-colour-flow 20s ease-in-out infinite alternate !important;
+  }
+  :root[data-reduced-motion="true"] .app-shell.has-song-ambience {
+    animation: none !important;
+  }
+}
