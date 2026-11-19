@@ -223,6 +223,18 @@ async function handle(request: Request, env: Env): Promise<Response> {
     return json({ ok, service: "LYNE API", database, schema, storage, auth, admin }, ok ? 200 : 503);
   }
 
+  if (path === "/v1/providers/status" && request.method === "GET") {
+    return json({
+      providers: {
+        spotify: { configured: !!(env.SPOTIFY_CLIENT_ID && env.SPOTIFY_CLIENT_SECRET), capability: "metadata" },
+        soundcloud: { configured: !!(env.SOUNDCLOUD_CLIENT_ID && env.SOUNDCLOUD_CLIENT_SECRET), capability: "metadata" },
+        youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
+        apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "metadata" },
+      },
+      playback: "LYNE catalogue only",
+    });
+  }
+
   if (path.startsWith("/v1/media/") && ["GET","HEAD"].includes(request.method)) {
     const key = path.slice("/v1/media/".length).split("/").map(decodeURIComponent).join("/");
     return media(request, env, key);
