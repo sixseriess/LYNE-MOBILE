@@ -12,6 +12,7 @@ type AppleMusicPlayer = {
 };
 
 type AppleMusicInstance = {
+  isAuthorized?: boolean;
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
   setQueue(descriptor: { url: string }): Promise<unknown>;
@@ -79,6 +80,10 @@ export async function initializeAppleMusic(token: string): Promise<void> {
     features: ["player-accurate-timing", "api-data-store", "api-session-storage"],
   });
   instance = window.MusicKit.getInstance();
+}
+
+export function appleMusicIsAuthorized(): boolean {
+  return Boolean(instance?.isAuthorized);
 }
 
 export async function authorizeAppleMusic(token?: string): Promise<void> {
