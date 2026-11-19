@@ -305,7 +305,7 @@ async function handle(request: Request, env: Env): Promise<Response> {
   if (path === "/v1/providers/status" && request.method === "GET") {
     return json({
       providers: {
-        spotify: { configured: !!env.SPOTIFY_CLIENT_ID, capability: "official Web Playback SDK; Premium account and user authorization required" },
+        spotify: { configured: !!env.SPOTIFY_CLIENT_ID, clientId: env.SPOTIFY_CLIENT_ID || "", capability: "official Web Playback SDK; Premium account and user authorization required" },
         soundcloud: { configured: !!(env.SOUNDCLOUD_CLIENT_ID && env.SOUNDCLOUD_CLIENT_SECRET), capability: "official OAuth public API; full-length playable tracks only" },
         youtube: { configured: !!env.YOUTUBE_API_KEY, capability: "metadata" },
         apple_music: { configured: !!env.APPLE_MUSIC_DEVELOPER_TOKEN, capability: "MusicKit full playback; user authorization and subscription required" },
