@@ -3310,3 +3310,49 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
   background: rgba(255,255,255,.72) !important;
   border-color: rgba(30,32,40,.14) !important;
 }
+
+
+/* Full-screen animated artwork ambience for LYNE Mobile.
+   The two colour fields are extracted from the active track's cover art. */
+@media screen and (max-width: 600px) {
+  .app-shell {
+    background-color: var(--bg) !important;
+    background-image:
+      radial-gradient(ellipse at 16% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .38) 0%, transparent 52%),
+      radial-gradient(ellipse at 86% 48%, rgba(var(--ambient-color-b, 72, 76, 88), .34) 0%, transparent 54%),
+      radial-gradient(ellipse at 48% 100%, rgba(var(--ambient-color-a, 120, 140, 175), .2) 0%, transparent 58%) !important;
+    background-size: 180% 180%, 170% 170%, 160% 160% !important;
+    background-position: 0% 0%, 100% 42%, 50% 100% !important;
+    animation: lyne-song-colour-flow 22s ease-in-out infinite alternate;
+  }
+
+  @keyframes lyne-song-colour-flow {
+    0% {
+      background-position: 0% 0%, 100% 42%, 50% 100%;
+    }
+    50% {
+      background-position: 48% 36%, 42% 0%, 12% 58%;
+    }
+    100% {
+      background-position: 100% 72%, 0% 100%, 88% 12%;
+    }
+  }
+
+  :root[data-theme="light"] .app-shell {
+    background-color: #f0f0f3 !important;
+    background-image:
+      radial-gradient(ellipse at 16% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .2) 0%, transparent 52%),
+      radial-gradient(ellipse at 86% 48%, rgba(var(--ambient-color-b, 72, 76, 88), .17) 0%, transparent 54%),
+      radial-gradient(ellipse at 48% 100%, rgba(var(--ambient-color-a, 120, 140, 175), .12) 0%, transparent 58%) !important;
+  }
+
+  :root[data-reduced-motion="true"] .app-shell,
+  :root[data-ambient-mode="off"] .app-shell {
+    animation: none !important;
+    background-position: 50% 50%, 50% 50%, 50% 50% !important;
+  }
+
+  :root[data-ambient-mode="off"] .app-shell {
+    background-image: none !important;
+  }
+}
