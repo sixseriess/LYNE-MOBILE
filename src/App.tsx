@@ -340,6 +340,7 @@ export default function App() {
   const [period,setPeriod]=useState<Period>("week");
   const [wrappedOpen,setWrappedOpen]=useState(false);
   const [localTracks,setLocalTracks]=useState<Track[]>([]);
+  const [catalogTracks,setCatalogTracks]=useState<Track[]>([]);
   const [shuffle,setShuffle]=useState(()=>localStorage.getItem("lyne.mobile.shuffle")==="true");
   const [notice,setNotice]=useState("");
   const [settingsSection,setSettingsSection]=useState<"Profile"|"Playback"|"Listening"|"Shortcuts"|"Appearance"|"Overlay"|"Connections"|"YouTube"|"Discord"|"Storage"|"About">("Appearance");
@@ -1190,7 +1191,6 @@ export default function App() {
   const [likedSearch,setLikedSearch]=useState("");
   const [localSearch,setLocalSearch]=useState("");
   const [catalogSearch,setCatalogSearch]=useState("");
-  const [catalogTracks,setCatalogTracks]=useState<Track[]>([]);
   const [catalogLoading,setCatalogLoading]=useState(false);
   const [catalogError,setCatalogError]=useState("");
   const [libraryQuery,setLibraryQuery]=useState("");
