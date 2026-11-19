@@ -477,6 +477,7 @@ export default function App() {
   };
   const [storageUsed,setStorageUsed]=useState<number|null>(null);
   const [ambientColor,setAmbientColor]=useState("36,38,44");
+  const [ambientSecondaryColor,setAmbientSecondaryColor]=useState("95,72,132");
   const [equalizerError,setEqualizerError]=useState("");
   const [equalizerTab,setEqualizerTab]=useState<EqualizerCategory>(()=>state.preferences.equalizerCategory);
   const [equalizerPresetName,setEqualizerPresetName]=useState("");
@@ -644,16 +645,21 @@ export default function App() {
   },[state.preferences.reduceMotion]);
   useEffect(()=>{
     const artworkUrl=current?.artwork;
-    if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");return;}
+    if(!artworkUrl||state.preferences.ambientVisualMode==="off"){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");return;}
     let active=true;
     const image=new Image();
     image.crossOrigin="anonymous";
     image.onload=()=>{
       if(!active)return;
-      try{setAmbientColor(extractCoverAccent(image));}
-      catch{setAmbientColor("200,245,106");}
+      try{
+        const colors=extractCoverFluidColors(image);
+        const primary=colors.color2.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/)?.[0]||"120,140,175";
+        const secondary=colors.color1.match(/\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+/)?.[0]||"72,76,88";
+        setAmbientColor(primary);
+        setAmbientSecondaryColor(secondary);
+      }catch{setAmbientColor("200,245,106");setAmbientSecondaryColor("95,72,132");}
     };
-    image.onerror=()=>{if(active)setAmbientColor("36,38,44");};
+    image.onerror=()=>{if(active){setAmbientColor("36,38,44");setAmbientSecondaryColor("72,76,88");}};
     image.src=artworkUrl;
     return ()=>{active=false;image.onload=null;image.onerror=null;};
   },[current?.artwork,state.preferences.ambientVisualMode]);
@@ -671,7 +677,9 @@ export default function App() {
     root.style.setProperty("--lime",`rgb(${red} ${green} ${blue})`);
     root.style.setProperty("--lime-soft",`rgba(${red}, ${green}, ${blue}, .14)`);
     root.style.setProperty("--artwork-glow",`rgba(${red}, ${green}, ${blue}, .22)`);
-  },[ambientColor]);
+    root.style.setProperty("--ambient-color-a",`${red}, ${green}, ${blue}`);
+    root.style.setProperty("--ambient-color-b",ambientSecondaryColor);
+  },[ambientColor,ambientSecondaryColor]);
   useEffect(()=>{
     const update=()=>setNetworkOnline(navigator.onLine);
     window.addEventListener("online",update);
