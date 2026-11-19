@@ -3360,3 +3360,35 @@ input:focus-visible,select:focus-visible{outline:1px solid rgba(255,255,255,.32)
     animation: none !important;
   }
 }
+
+
+/* Make the extracted song colours the actual full-screen mobile backdrop.
+   The older artwork pseudo-element was painting over the shell ambience. */
+@media screen and (max-width: 600px) {
+  .app-shell:not([style*="background-image"]) {
+    background-color: var(--bg, #09090b) !important;
+    background-image:
+      radial-gradient(ellipse at 18% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .76) 0%, transparent 58%),
+      radial-gradient(ellipse at 84% 48%, rgba(var(--ambient-color-b, 95, 72, 132), .68) 0%, transparent 60%),
+      radial-gradient(ellipse at 46% 96%, rgba(var(--ambient-color-a, 120, 140, 175), .52) 0%, transparent 62%) !important;
+    background-size: 190% 190%, 180% 180%, 170% 170% !important;
+    animation: lyne-song-colour-flow 20s ease-in-out infinite alternate !important;
+  }
+
+  .app-shell:not([style*="background-image"])::before {
+    content: none !important;
+    display: none !important;
+  }
+
+  .app-shell > .page {
+    background: transparent !important;
+  }
+
+  :root[data-theme="light"] .app-shell:not([style*="background-image"]) {
+    background-color: #f0f0f3 !important;
+    background-image:
+      radial-gradient(ellipse at 18% 18%, rgba(var(--ambient-color-a, 120, 140, 175), .48) 0%, transparent 58%),
+      radial-gradient(ellipse at 84% 48%, rgba(var(--ambient-color-b, 95, 72, 132), .40) 0%, transparent 60%),
+      radial-gradient(ellipse at 46% 96%, rgba(var(--ambient-color-a, 120, 140, 175), .30) 0%, transparent 62%) !important;
+  }
+}
