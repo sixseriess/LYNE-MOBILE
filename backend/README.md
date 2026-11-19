@@ -72,19 +72,46 @@ Account:
 Admin:
 - `POST /v1/admin/tracks`
 
-Imported provider content stays linked to its source. Metadata and permitted artwork URLs are stored with the source URL; LYNE does not download provider audio or re-stream it. Spotify content must retain links and attribution, and Spotify content may not be downloaded or stream-ripped. YouTube imports use Data API metadata and official YouTube embeds; Apple Music items use catalogue links/MusicKit-compatible playback; SoundCloud items retain their official permalink/widget stream reference. Follow each provider's developer terms before enabling playback or caching.
+Imported provider content stays linked to its source. LYNE stores provider metadata and permitted artwork, while provider-owned playback stays in the official provider player. LYNE does not download, copy, or re-host Spotify, Apple Music, YouTube, or SoundCloud recordings in its catalogue. SoundCloud custom-player playback uses the official SoundCloud API's signed HLS stream URLs and must show both uploader credit and the official SoundCloud logo linked to the original work.
 
-The first-party LYNE catalogue and provider-link imports are separate. LYNE's own hosted catalogue remains empty until LYNE adds recordings it owns, recordings it has licensed, or public-domain recordings.
+The LYNE catalogue is separate from provider imports. Only recordings LYNE owns, has licensed for distribution, or can document as public domain may be uploaded to the catalogue. The rights confirmation and reference are required audit fields and do not replace an actual licence.
 
-## Optional provider integrations
+## Connect official provider playback
 
-Add provider credentials as Worker secrets only when those integrations are approved and ready:
-- `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`
-- `SOUNDCLOUD_CLIENT_ID`, `SOUNDCLOUD_CLIENT_SECRET`
-- `YOUTUBE_API_KEY`
-- `APPLE_MUSIC_DEVELOPER_TOKEN`
+### Spotify
 
-Spotify and SoundCloud public resources use app tokens; YouTube uses a Data API key; Apple Music uses a signed developer token. Private or user-library resources need their own user authorization flow, which is not included in this public-link resolver.
+1. Create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. In LYNE Mobile, open **Settings → Connections → Spotify** and paste the app's **Client ID**.
+3. Add the exact Redirect URI displayed in LYNE to the Spotify app settings:
+   `https://sixseriess.github.io/LYNE-MOBILE/`
+4. Press **Connect Spotify**, sign in, and authorize the requested playback scopes.
+5. Spotify playback needs a **Spotify Premium** user account. Spotify apps are also subject to Spotify's developer policy: streaming integrations are not permitted for commercial projects without Spotify's prior written approval. Do not use this integration commercially unless LYNE has that approval.
+
+Spotify's browser SDK runs on the user's device. The Client ID is public by design for the PKCE flow; do not put a Spotify client secret in the PWA.
+
+### Apple Music
+
+1. In the [Apple Developer account](https://developer.apple.com/account/resources/identifiers/list), create a MusicKit identifier and private key.
+2. Generate a valid Apple Music developer token JWT for that identifier.
+3. Add the token as the GitHub Actions repository secret `APPLE_MUSIC_DEVELOPER_TOKEN`.
+4. Run [Deploy LYNE API](https://github.com/sixseriess/LYNE-MOBILE/actions/workflows/deploy-api.yml) to install the secret on the Worker.
+5. In LYNE Mobile, open **Settings → Connections → Apple Music**, press **Connect Apple Music**, and authorize access. Full-length playback requires the user to have an active Apple Music subscription.
+
+The Worker returns the developer token to MusicKit on the Web with `Cache-Control: no-store`; it never returns the Apple private signing key.
+
+### SoundCloud
+
+1. Register an API application in [SoundCloud for Developers](https://developers.soundcloud.com/). Current SoundCloud API credentials are available to eligible Artist Pro accounts.
+2. Add `SOUNDCLOUD_CLIENT_ID` and `SOUNDCLOUD_CLIENT_SECRET` as GitHub Actions repository secrets.
+3. Run [Deploy LYNE API](https://github.com/sixseriess/LYNE-MOBILE/actions/workflows/deploy-api.yml).
+4. Refresh provider status in LYNE **Settings → Connections**.
+
+LYNE uses SoundCloud's official Client Credentials flow for public resources and rejects blocked or preview-only tracks. SoundCloud's current public API can return HLS audio streams; LYNE uses native HLS where available and HLS.js in browsers without native HLS. The player links back to the SoundCloud track and shows the uploader with the official SoundCloud logo. Private tracks require a separate user authorization flow and are not covered by this public-resource integration.
+
+### YouTube
+
+YouTube imports provide metadata only. The YouTube Data API does not provide a full-length audio stream URL. LYNE does not rip or extract audio from YouTube videos. A YouTube import can play in LYNE only when a matching licensed recording already exists in Local Files or the LYNE catalogue.
+
 
 For local development, run `npm install`, `npx wrangler dev` in `backend/`. Do not run a production deploy until the Cloudflare and Supabase secrets above are configured.
 
