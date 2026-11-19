@@ -82,6 +82,10 @@ export function spotifySavedClientId(): string {
   return localStorage.getItem(CLIENT_KEY) || "";
 }
 
+export function setSpotifyClientId(clientId: string): void {
+  if (clientId.trim()) localStorage.setItem(CLIENT_KEY, clientId.trim());
+}
+
 export async function beginSpotifyAuthorization(clientId: string, redirectUri: string): Promise<void> {
   const normalizedId = clientId.trim();
   if (!normalizedId) throw new Error("Enter your Spotify app Client ID first.");
